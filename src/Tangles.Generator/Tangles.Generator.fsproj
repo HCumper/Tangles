@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net11.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Tangles.Core/Tangles.Core.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Generation.fs" />
+    <Compile Include="Export.fs" />
+    <Compile Include="CommandLine.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+</Project>

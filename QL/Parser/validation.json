@@ -1,0 +1,88 @@
+{
+  "validatedAt": "2026-11-17T01:00:30.655633+00:00",
+  "librarySha256": "ee924e5d55d544f2c2d1170f8b4960d49f746a8f4b2819e01fdf70081800002e",
+  "target": "SSB2.8.0 records -> S*BASIC; SMSQ/E on SMSQmulator 68000 CPU; Turbo5.09 with brief optimization and64KBcompilerbuffer",
+  "runs": [
+    {
+      "passed": true,
+      "compiled": false,
+      "example": false,
+      "ramMiB": 8,
+      "caseCount": 60,
+      "packCount": 2,
+      "packNodes": {
+        "quickstart_json": 66,
+        "starter_json": 1784
+      },
+      "librarySha256": "ee924e5d55d544f2c2d1170f8b4960d49f746a8f4b2819e01fdf70081800002e",
+      "errors": [],
+      "folder": "C:\\Source\\codex-workspace\\tangles-json-test-6",
+      "testedAt": "2026-11-17T00:57:28.901509+00:00",
+      "packSha256": {
+        "quickstart_json": "5011abbeb6fe94bb280c64fd374b9cf98df54c1741c7c697b0074136fe683cc8",
+        "starter_json": "5363ab7b933aff7cde018c0ce267e7351533bd425c8adf0addea156ae06e58b5"
+      },
+      "additionalVerification": "All container/scalar source spans and error byte/line/column consistency independently checked."
+    },
+    {
+      "passed": true,
+      "compiled": true,
+      "example": false,
+      "ramMiB": 8,
+      "caseCount": 60,
+      "packCount": 2,
+      "packNodes": {
+        "quickstart_json": 66,
+        "starter_json": 1784
+      },
+      "librarySha256": "ee924e5d55d544f2c2d1170f8b4960d49f746a8f4b2819e01fdf70081800002e",
+      "errors": [],
+      "folder": "C:\\Source\\codex-workspace\\tangles-json-test-compiled-5",
+      "testedAt": "2026-11-17T00:57:42.497328+00:00",
+      "packSha256": {
+        "quickstart_json": "5011abbeb6fe94bb280c64fd374b9cf98df54c1741c7c697b0074136fe683cc8",
+        "starter_json": "5363ab7b933aff7cde018c0ce267e7351533bd425c8adf0addea156ae06e58b5"
+      },
+      "additionalVerification": "All container/scalar source spans and error byte/line/column consistency independently checked."
+    },
+    {
+      "passed": true,
+      "compiled": true,
+      "example": true,
+      "ramMiB": 8,
+      "caseCount": 0,
+      "packCount": 1,
+      "packNodes": {
+        "quickstart_json": 66,
+        "starter_json": 1784
+      },
+      "librarySha256": "ee924e5d55d544f2c2d1170f8b4960d49f746a8f4b2819e01fdf70081800002e",
+      "errors": [],
+      "folder": "C:\\Source\\codex-workspace\\tangles-json-example-compiled-3",
+      "testedAt": "2026-11-17T00:57:30.247909+00:00"
+    },
+    {
+      "passed": true,
+      "compiled": true,
+      "ramMiB": 2,
+      "caseCount": 60,
+      "packNodes": {
+        "quickstart_json": 66,
+        "starter_json": 1784
+      },
+      "librarySha256": "ee924e5d55d544f2c2d1170f8b4960d49f746a8f4b2819e01fdf70081800002e",
+      "errors": [],
+      "folder": "C:\\Source\\codex-workspace\\tangles-json-runtime-2m"
+    }
+  ],
+  "compilerNotes": "0 errors;14 local-only string-name warnings. Fast optimization and2KBcompilerbuffer not supported by this local build for this target.",
+  "limits": "Classic QDOS ROM and128KBmachine not tested;2MiB runtime tested after8MiB build.",
+  "commentRevision": {
+    "checkedAt": "2026-11-17T01:32:02.723599+00:00",
+    "originalTestedLibrarySha256": "ee924e5d55d544f2c2d1170f8b4960d49f746a8f4b2819e01fdf70081800002e",
+    "currentLibrarySha256": "db883037da0be76c27864b71d93c12aeb4d98c09f8bac28491ce69cf3155a220",
+    "executableSourceSha256": "7ff6b6552e24a10f21844838d32abf48ad346ef059f0ca9ccfc23bc234859e3b",
+    "executableSourceUnchanged": true,
+    "check": "Nonblank source lines excluding full-line ## comments are byte-identical to the previously emulator-tested source. LF and ASCII preserved. Runtime suites not repeated for this comment-only change."
+  }
+}

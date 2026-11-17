@@ -1,6 +1,6 @@
 # Tangles
 
-A .NET 11 / F# console generator for connect-the-pairs puzzles. It constructs
+A .NET 11 / F# puzzle generator and Bolero WebAssembly player. The generator constructs
 non-overlapping paths, hides their interiors, and retains an independently
 validated solution. Unused cells are allowed.
 
@@ -90,8 +90,82 @@ the same batch settings produce identical JSON on the same runtime.
 ## Layout
 
 - `Tangles.slnx`: solution.
-- `src/Tangles.Core`: shared puzzle types and rules validator, without UI or IO.
+- `src/Tangles.Core`: shared puzzle types, complete/partial rules validation, pack reading and player state.
 - `src/Tangles.Generator`: generation, command line, console display and JSON export.
+- `src/Tangles.Player`: standalone Bolero WebAssembly player and static assets.
 - `tests/Tangles.Tests`: rule regressions, independent multi-seed witness checks,
   reproducibility, input validation, cancellation and export checks.
 - `global.json`: .NET SDK selection.
+
+## Bolero web player
+
+The player targets .NET 11 and uses Bolero 0.25.65 with the .NET 11 Blazor
+WebAssembly runtime. It runs entirely in the browser, without an application
+backend, server-side rendering, or a database. The generator stays a separate
+console application in the same solution.
+
+Start the development preview from the repository root:
+
+```powershell
+dotnet run --project src/Tangles.Player -- --urls http://localhost:5094
+```
+
+Open the displayed URL. Eight generator-produced 8x8 puzzles are bundled.
+A small practice puzzle is available at `/?pack=packs/quick-start.json`.
+
+### Playing
+
+- Drag with a mouse or finger from either lettered endpoint to its match.
+- Retrace to shorten a path, or drag from an existing path to trim and extend it.
+- Starting at an endpoint replaces that pair's current path.
+- Other routes and endpoints cannot be crossed or overwritten. Self-touching
+  and diagonal steps are rejected by the shared F# validator.
+- Undo restores one drawing stroke. Reset clears the board and is undoable.
+- Keyboard: Tab to the board; arrows move the cursor; Space/Enter starts or
+  stops drawing. Escape stops drawing; Ctrl+Z/Cmd+Z undoes.
+- Any valid connection of every pair completes a puzzle. Empty squares are
+  allowed. The player never compares the answer with a stored solution.
+
+Valid partial progress is saved in this browser's local storage per puzzle.
+Undo history is not persisted. Storage can be unavailable or cleared by the
+browser; progress does not synchronise between devices. Custom packs must be
+loaded again after a reload unless supplied as a static pack URL.
+
+### Loading generator packs
+
+Use **Load puzzle pack** to select the generator's v1 JSON output (up to 5 MB).
+The file is read locally; it is not uploaded. Unsupported versions/rules and
+invalid endpoint layouts are rejected without replacing the current puzzle.
+Only clues are loaded into game state; stored solutions and verification claims
+are ignored. Duplicate identical puzzles are permitted; conflicting boards with
+the same ID are rejected. Imported clues are validated, but arbitrary imported
+packs are not independently checked for solvability.
+
+Alternatively copy a pack to `src/Tangles.Player/wwwroot/packs/` and open
+`?pack=packs/your-pack.json`. Pack URLs must be on the same site.
+
+### Publish as static files
+
+```powershell
+dotnet publish src/Tangles.Player -c Release -o artifacts/player
+```
+
+Deploy the **contents of `artifacts/player/wwwroot`** to any static HTTPS host.
+There is no server project to deploy. Keep the `_framework` folder and puzzle
+packs alongside `index.html`; the host must serve `.wasm` as `application/wasm`
+and allow the generated framework file extensions. The relative `<base href="./">`
+supports deployment in a subdirectory, such as a GitHub Pages project site;
+use its trailing-slash URL. A `.nojekyll` file is included for GitHub Pages so `_framework` is served.
+
+To verify the actual published files locally, if Python is installed:
+
+```powershell
+python -m http.server 5094 --bind 127.0.0.1 --directory artifacts/player/wwwroot
+```
+
+The WebAssembly runtime is included in the initial download. This initial
+version does not install an offline service worker or provide logical hints,
+difficulty ratings, generation in the browser, or solution reveals. A
+`wasm-tools` workload is not required for this interpreted WebAssembly build;
+AOT/native optimisation is disabled. The .NET publish command may suggest
+installing that optional workload.

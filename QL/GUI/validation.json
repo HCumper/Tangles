@@ -1,0 +1,42 @@
+{
+  "testedAt": "2026-11-17T04:25:35.962430+00:00",
+  "passed": true,
+  "toolchain": "SSB 2.8.0 / Turbo 5.09 / SMSQmulator SMSQ/E",
+  "target": "SMSQ/E on SMSQmulator 68000 CPU, 8 MiB RAM, mode 32, 800x600",
+  "compilerReport": [
+    "TURBO: Parsing done, 0 errors and 0 warnings.",
+    "TURBO Code generation completed at 13980 lines per minute."
+  ],
+  "sourceSha256": "69fc06257f5e50540eb2b3c6b51907fcff500de1dfa276fbd165534b622461e9",
+  "executableSha256": "62eb30d76298c0e043b14e1c7fcd94b7efb125acb22cc8e80e33797473cd551a",
+  "checkedFiles": {
+    "tangles.ssb": "69fc06257f5e50540eb2b3c6b51907fcff500de1dfa276fbd165534b622461e9",
+    "build.ssb": "d1079e9a9cf5723900c337323b0e872caf975b1df7a24bcee4cac60384b1d085",
+    "build.py": "a7f196bf63d00a5ff49523a2bc30a82da86d6c974603cd78b5d483343468edcd",
+    "GuiCheck.java": "907b8484bd845252ce47b227df8051ed04d26b4f5afbf7b13ccb2831a73eeccc"
+  },
+  "runtimeDependencies": {
+    "tptr_ext": "90353755a800393d459bae42e4a4450f805e4773d81fd2a1a17a7e8b797f47cd",
+    "ttk": "f83ab612cdd63f872fcd40631b5be00f78a76dcfb2e4b4cc58f68a5ef66976ef"
+  },
+  "smoke": {
+    "passed": true,
+    "resolution": "800x600",
+    "mode": 32,
+    "colours": 16,
+    "compiled": true,
+    "checks": [
+      "palette",
+      "drag",
+      "interpolation",
+      "release",
+      "redraw",
+      "move",
+      "clear",
+      "quit"
+    ]
+  },
+  "assertionsPassed": 32,
+  "input": "Real emulated mouse/button linkage and keyboard queue; rendered pixel assertions; no direct calls to BASIC paint routines.",
+  "limits": "Paint-grid proof, no puzzle rules or packs. Other applications covering/uncovering the window and other display backends have not been tested."
+}

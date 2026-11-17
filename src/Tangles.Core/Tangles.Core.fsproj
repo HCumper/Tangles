@@ -5,5 +5,7 @@
   <ItemGroup>
     <Compile Include="Puzzle.fs" />
     <Compile Include="Validation.fs" />
+    <Compile Include="PuzzlePacks.fs" />
+    <Compile Include="Play.fs" />
   </ItemGroup>
 </Project>

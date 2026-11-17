@@ -7,6 +7,7 @@
   <Folder Name="/src/">
     <Project Path="src/Tangles.Core/Tangles.Core.fsproj" />
     <Project Path="src/Tangles.Generator/Tangles.Generator.fsproj" />
+    <Project Path="src/Tangles.Player/Tangles.Player.fsproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Tangles.Tests/Tangles.Tests.fsproj" />

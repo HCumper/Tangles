@@ -1,0 +1,249 @@
+## Tangles GUI experiment. This is a paint grid, not the puzzle player.
+## SMSQ/E GD2, TurboPTR TPTR_EXT, 800x600 or larger; no TPTR_BAS required.
+## Colours are RGB numbers kept in real variables, never signed % integers.
+DIM guiColours(16),guiCells%(7,7),gt$(80)
+guiWindow = 0 : guiDefinition = 0 : guiChannel = 0
+guiSelected% = 1 : guiPainted% = 0 : guiStrokes% = 0
+guiLastX% = -1 : guiLastY% = -1 : guiQuit% = 0
+guiPalette
+OPEN #0,con
+guiMaximum=W_MAX
+guiScreenX%=INT(guiMaximum/65536)
+guiScreenY%=guiMaximum-65536*guiScreenX%
+IF guiScreenX%<800 OR guiScreenY%<600 THEN
+  PRINT #0,"Tangles needs an 800x600 SMSQ/E desktop."
+  STOP
+END IF
+IF DISP_TYPE<16 THEN
+  PRINT #0,"Tangles needs a GD2 high-colour display."
+  STOP
+END IF
+guiMakeDefinition
+IF COMPILED THEN
+  guiWindow = M_SETUP(#100,guiDefinition,0)
+  guiChannel = M_PRPOS(guiWindow,16*65536+16)
+ELSE
+  BOUTL
+  guiWindow = M_SETUP(#0,guiDefinition,0)
+  guiChannel = M_PULLD(guiWindow,16*65536+16)
+END IF
+OPEN #4,con
+guiBind
+guiDraw
+guiPosition = BRPTR(48,0,guiWindow)
+REPeat guiMain
+  guiPosition = BRPTR(11,guiPosition,guiWindow)
+  guiStatus = PEEK_L(guiWindow)
+  POKE_L guiStatus+$20,guiPosition
+  guiX% = PEEK_W(guiStatus+$E)
+  guiY% = PEEK_W(guiStatus+$10)
+  guiKey% = PEEK(guiStatus+$12)
+  SELect ON guiKey%
+    =27: guiQuit% = 1
+    =67,99: guiClear
+    =82,114: guiDraw
+    =77,109,$F5: guiMove
+    =1: guiClick
+  END SELect
+  IF guiQuit% THEN EXIT guiMain
+END REPeat guiMain
+guiClose
+STOP
+
+DEFine PROCedure guiPalette
+  guiColours(1)=$E34B4B : guiColours(2)=$F38B32
+  guiColours(3)=$E5BD28 : guiColours(4)=$9DBD30
+  guiColours(5)=$38AE61 : guiColours(6)=$28B6A0
+  guiColours(7)=$35B7D9 : guiColours(8)=$397CE0
+  guiColours(9)=$6554D2 : guiColours(10)=$9854CB
+  guiColours(11)=$D65EAE : guiColours(12)=$EF87A1
+  guiColours(13)=$AD7850 : guiColours(14)=$8F999E
+  guiColours(15)=$CEE2B4 : guiColours(16)=$E4D4F5
+END DEFine
+
+DEFine PROCedure guiMakeDefinition
+  LOCal gd%
+  ## Native new-style WMAN definition, described in TurboPTR Appendix 1.
+  ## Fixed header 48 bytes; one layout; terminator; status length/area/size.
+  ## Relative word pointers are offsets from the pointer's own address.
+  guiDefinition=ALCHP(512)
+  FOR gd%=0 TO 508 STEP 4
+    POKE_L guiDefinition+gd%,0
+  END FOR gd%
+  POKE_W guiDefinition,768 : POKE_W guiDefinition+2,568
+  POKE_W guiDefinition+10,-32766 : POKE_W guiDefinition+12,7
+  POKE_W guiDefinition+$30,768 : POKE_W guiDefinition+$32,568
+  POKE_W guiDefinition+$34,256-$34
+  POKE_W guiDefinition+$3A,-1
+  POKE_W guiDefinition+$3C,0
+  ## 124-byte working header plus one 22-byte information window entry.
+  POKE_L guiDefinition+126,146
+  ## One full-client information window, no objects. Terminate its list.
+  POKE_W guiDefinition+256,768 : POKE_W guiDefinition+258,568
+  POKE_W guiDefinition+268,7 : POKE_W guiDefinition+274,-1
+END DEFine
+
+DEFine PROCedure guiBind
+  SET_CHANNEL #4,SWIN(0,0,guiWindow)
+  COLOUR_24
+  OVER #4,0 : UNDER #4,0 : CSIZE #4,0,0
+END DEFine
+
+DEFine PROCedure guiText(gx%,gy%,gt$)
+  CURSOR #4,gx%,gy%
+  PRINT #4,gt$;
+END DEFine
+
+DEFine PROCedure guiDraw
+  LOCal dx%,dy%,di%
+  PAPER #4,$F0EEE7 : INK #4,$24302D : CLS #4
+  BLOCK #4,768,36,0,0,$263C35
+  INK #4,$FFFFFF : STRIP #4,$263C35
+  guiText 16,10,"TANGLES  /  SSB + TurboPTR"
+  guiText 578,10,"Move [M]"
+  guiText 672,10,"Quit [Esc]"
+  BLOCK #4,481,481,16,52,$50605F
+  FOR dy%=0 TO 7
+    FOR dx%=0 TO 7
+      guiCell dx%,dy%
+    END FOR dx%
+  END FOR dy%
+  guiSwatches
+  INK #4,$24302D : STRIP #4,$F0EEE7
+  guiText 528,52,"SIXTEEN COLOURS"
+  guiText 528,72,"Choose a letter, then drag"
+  guiText 528,408,"Selected:"
+  guiText 528,464,"Drag left button on grid."
+  guiText 528,484,"C = clear   R = redraw"
+  guiText 528,504,"M = move    Esc = quit"
+  guiText 528,542,"GUI proof / 8 x 8 paint grid"
+  BLOCK #4,208,30,528,426,$D8DFD4
+  STRIP #4,$D8DFD4 : guiText 584,434,"Clear [C]"
+  guiDetails
+END DEFine
+
+DEFine PROCedure guiCell(cx%,cy%)
+  LOCal cc%,rgb
+  cc%=guiCells%(cx%,cy%) : rgb=$192D36
+  IF cc% THEN rgb=guiColours(cc%)
+  BLOCK #4,59,59,17+60*cx%,53+60*cy%,rgb
+  IF cc% THEN
+    INK #4,$101820 : STRIP #4,rgb
+    guiText 42+60*cx%,76+60*cy%,CHR$(64+cc%)
+  END IF
+END DEFine
+
+DEFine PROCedure guiSwatches
+  LOCal si%,sx%,sy%
+  FOR si%=1 TO 16
+    sx%=528+108*((si%-1) MOD 2) : sy%=104+36*INT((si%-1)/2)
+    BLOCK #4,100,30,sx%,sy%,guiColours(si%)
+    INK #4,$101820 : STRIP #4,guiColours(si%)
+    guiText sx%+44,sy%+7,CHR$(64+si%)
+    IF si%=guiSelected% THEN
+      BLOCK #4,100,2,sx%,sy%,$101820
+      BLOCK #4,100,2,sx%,sy%+28,$101820
+      BLOCK #4,2,30,sx%,sy%,$101820
+      BLOCK #4,2,30,sx%+98,sy%,$101820
+    END IF
+  END FOR si%
+END DEFine
+
+DEFine PROCedure guiDetails
+  BLOCK #4,120,18,596,408,$F0EEE7
+  INK #4,$24302D : STRIP #4,$F0EEE7
+  guiText 600,408,CHR$(64+guiSelected%)
+  BLOCK #4,480,20,16,542,$F0EEE7
+  CURSOR #4,16,542
+  PRINT #4,"Cells: ";guiPainted%;"    Strokes: ";guiStrokes%;
+END DEFine
+
+DEFine PROCedure guiClick
+  LOCal ci%,col%,row%
+  IF guiY%>=0 AND guiY%<36 THEN
+    IF guiX%>=664 THEN
+      guiQuit%=1
+    ELSE
+      guiMove
+    END IF
+    RETurn
+  END IF
+  IF guiX%>=528 AND guiX%<736 THEN
+    IF guiY%>=104 AND guiY%<392 THEN
+      col%=INT((guiX%-528)/108) : row%=INT((guiY%-104)/36)
+      IF (guiX%-528) MOD 108<100 AND (guiY%-104) MOD 36<30 THEN
+        guiSelected%=1+col%+2*row% : guiSwatches : guiDetails
+      END IF
+    END IF
+    IF guiY%>=426 AND guiY%<456 THEN guiClear
+    RETurn
+  END IF
+  IF guiX%>=16 AND guiX%<496 AND guiY%>=52 AND guiY%<532 THEN guiDrag
+END DEFine
+
+DEFine PROCedure guiDrag
+  LOCal dp,dn,dl
+  guiLastX%=-1 : guiLastY%=-1 : guiStrokes%=guiStrokes%+1
+  dp=BRPTR(48,0,guiWindow) : guiPaint
+  REPeat dl
+    dn=BRPTR(12,dp,guiWindow)
+    IF dn=dp THEN EXIT dl
+    guiPaint
+    dp=dn
+  END REPeat dl
+  guiPosition=dp
+  guiDetails
+END DEFine
+
+DEFine PROCedure guiPaint
+  LOCal px%,py%,tx%,ty%,sx%,sy%
+  px%=PEEK_W(PEEK_L(guiWindow)+$E) : py%=PEEK_W(PEEK_L(guiWindow)+$10)
+  IF px%<16 OR px%>=496 OR py%<52 OR py%>=532 THEN
+    guiLastX%=-1 : guiLastY%=-1 : RETurn
+  END IF
+  tx%=INT((px%-16)/60) : ty%=INT((py%-52)/60)
+  IF guiLastX%<0 THEN guiLastX%=tx% : guiLastY%=ty%
+  ## Conservative orthogonal interpolation: horizontal, then vertical.
+  ## Every intervening cell is visited even if the pointer moves quickly.
+  sx%=1 : sy%=1
+  IF tx%<guiLastX% THEN sx%=-1
+  IF ty%<guiLastY% THEN sy%=-1
+  REPeat gx
+    guiPut guiLastX%,guiLastY%
+    IF guiLastX%=tx% THEN EXIT gx
+    guiLastX%=guiLastX%+sx%
+  END REPeat gx
+  REPeat gy
+    guiPut guiLastX%,guiLastY%
+    IF guiLastY%=ty% THEN EXIT gy
+    guiLastY%=guiLastY%+sy%
+  END REPeat gy
+END DEFine
+
+DEFine PROCedure guiPut(px%,py%)
+  IF guiCells%(px%,py%)=guiSelected% THEN RETurn
+  IF guiCells%(px%,py%)=0 THEN guiPainted%=guiPainted%+1
+  guiCells%(px%,py%)=guiSelected%
+  guiCell px%,py%
+END DEFine
+
+DEFine PROCedure guiClear
+  DIM guiCells%(7,7)
+  guiPainted%=0 : guiStrokes%=0
+  guiDraw
+END DEFine
+
+DEFine PROCedure guiMove
+  POKE_L PEEK_L(guiWindow)+$20,guiPosition
+  BCHWIN guiWindow
+  guiBind
+  guiDraw
+  guiPosition=BRPTR(48,0,guiWindow)
+END DEFine
+
+DEFine PROCedure guiClose
+  CLOSE #4
+  IF guiWindow THEN BUNST guiWindow : BRCHP guiWindow
+  IF guiChannel THEN CLOS guiChannel
+  IF guiDefinition THEN BRCHP guiDefinition
+END DEFine

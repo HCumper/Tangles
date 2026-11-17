@@ -1,0 +1,58 @@
+## Put json_ssb and starter_json on the same QL device as this example.
+## Change the filename below for a different mounted drive.
+#INCLUDE json_ssb
+DIM packId$(128),packLabel$(128)
+json_load "nfa1_starter_json",4096,1048576,32
+IF jsonDoc.error% THEN
+  PRINT jsonDoc.message$;" at byte ";jsonDoc.errorPosition
+  PRINT "Line ";jsonDoc.errorLine;", column ";jsonDoc.errorColumn
+  STOP
+END IF
+packRoot% = jsonDoc.root%
+packVersion% = json_member%(packRoot%,"formatVersion")
+IF packVersion% = 0 THEN PRINT "Missing formatVersion" : STOP
+IF json_number(packVersion%) <> 1 THEN PRINT "Unsupported pack version" : STOP
+packPuzzles% = json_member%(packRoot%,"puzzles")
+IF packPuzzles% = 0 THEN PRINT "Missing puzzles array" : STOP
+IF jsonNodes(packPuzzles%).kind% <> 2 THEN PRINT "puzzles must be an array" : STOP
+PRINT "Puzzles: ";jsonNodes(packPuzzles%).count%
+packPuzzle% = jsonNodes(packPuzzles%).first%
+REPeat packEntries
+  IF packPuzzle% = 0 OR jsonDoc.error% THEN EXIT packEntries
+  packItem% = json_member%(packPuzzle%,"id")
+  IF packItem% = 0 THEN PRINT "Missing puzzle id" : STOP
+  packId$ = json_string$(packItem%)
+  packItem% = json_member%(packPuzzle%,"width")
+  IF packItem% = 0 THEN PRINT "Missing width" : STOP
+  packWidth = json_number(packItem%)
+  packItem% = json_member%(packPuzzle%,"height")
+  IF packItem% = 0 THEN PRINT "Missing height" : STOP
+  packHeight = json_number(packItem%)
+  packPairs% = json_member%(packPuzzle%,"pairs")
+  IF packPairs% = 0 THEN PRINT "Missing endpoint pairs" : STOP
+  IF jsonNodes(packPairs%).kind% <> 2 THEN PRINT "pairs must be an array" : STOP
+  PRINT packId$
+  PRINT packWidth;" by ";packHeight;", pairs: ";jsonNodes(packPairs%).count%
+  packPair% = jsonNodes(packPairs%).first%
+  REPeat packEndpoints
+    IF packPair% = 0 OR jsonDoc.error% THEN EXIT packEndpoints
+    packItem% = json_member%(packPair%,"label")
+    IF packItem% = 0 THEN PRINT "Missing pair label" : STOP
+    packLabel$ = json_string$(packItem%)
+    packStart% = json_member%(packPair%,"start")
+    packFinish% = json_member%(packPair%,"finish")
+    IF packStart% = 0 OR packFinish% = 0 THEN PRINT "Missing pair endpoint" : STOP
+    packX% = json_member%(packStart%,"x") : packY% = json_member%(packStart%,"y")
+    IF packX% = 0 OR packY% = 0 THEN PRINT "Missing start coordinate" : STOP
+    packStartX = json_number(packX%) : packStartY = json_number(packY%)
+    packX% = json_member%(packFinish%,"x") : packY% = json_member%(packFinish%,"y")
+    IF packX% = 0 OR packY% = 0 THEN PRINT "Missing finish coordinate" : STOP
+    packFinishX = json_number(packX%) : packFinishY = json_number(packY%)
+    PRINT packLabel$;": ";packStartX;",";packStartY;" -> ";packFinishX;",";packFinishY
+    packPair% = jsonNodes(packPair%).next%
+  END REPeat packEndpoints
+  packPuzzle% = jsonNodes(packPuzzle%).next%
+END REPeat packEntries
+IF jsonDoc.error% THEN PRINT jsonDoc.message$
+## Stored solutions and verification claims are parsed, not treated as proof.
+STOP

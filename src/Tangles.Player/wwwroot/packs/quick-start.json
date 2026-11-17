@@ -1,0 +1,89 @@
+{
+  "formatVersion": 1,
+  "rules": {
+    "orthogonalOnly": true,
+    "noSharedCells": true,
+    "noSelfTouching": true,
+    "requireFullCoverage": false
+  },
+  "generation": {
+    "algorithm": "random-path-growth-v1",
+    "seed": 42,
+    "width": 3,
+    "height": 3,
+    "pairCount": 2,
+    "minPathLength": 2,
+    "maxPathLength": 3,
+    "maxAttempts": 500
+  },
+  "puzzles": [
+    {
+      "id": "tangles-9afaed60cc344e8a0066477e8ec3edbab6655c162d573d146199af2c9a2324c8",
+      "width": 3,
+      "height": 3,
+      "seed": 42,
+      "attempts": 1,
+      "pairs": [
+        {
+          "label": "A",
+          "start": {
+            "x": 0,
+            "y": 2
+          },
+          "finish": {
+            "x": 1,
+            "y": 1
+          }
+        },
+        {
+          "label": "B",
+          "start": {
+            "x": 2,
+            "y": 0
+          },
+          "finish": {
+            "x": 2,
+            "y": 1
+          }
+        }
+      ],
+      "solution": [
+        {
+          "label": "A",
+          "cells": [
+            {
+              "x": 0,
+              "y": 2
+            },
+            {
+              "x": 1,
+              "y": 2
+            },
+            {
+              "x": 1,
+              "y": 1
+            }
+          ]
+        },
+        {
+          "label": "B",
+          "cells": [
+            {
+              "x": 2,
+              "y": 0
+            },
+            {
+              "x": 2,
+              "y": 1
+            }
+          ]
+        }
+      ],
+      "verification": {
+        "solutionValid": true,
+        "uniqueness": "notChecked",
+        "difficulty": "notAssessed"
+      }
+    }
+  ]
+}

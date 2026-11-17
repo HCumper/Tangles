@@ -1,0 +1,10 @@
+## Compile this wrapper after processing it with SSB 2.8.0.
+TURBO_objfil "ram1_pack_example_exe"
+TURBO_repfil "ram1_pack_example_err"
+TURBO_windo 0
+TURBO_objdat 256
+TURBO_buffersz 64
+TURBO_list 0
+TURBO_model ">"
+TURBO_optim 0
+#INCLUDE pack_example_ssb

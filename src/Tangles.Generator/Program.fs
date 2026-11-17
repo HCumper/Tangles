@@ -32,13 +32,14 @@ let private run (cancellation: CancellationToken) options =
 
             match options.OutputPath with
             | Some path ->
-                let pack = Export.createPack options.Generation (generated.ToArray())
+                let pack = Export.createPackWithCancellation cancellation options.Generation (generated.ToArray())
+                cancellation.ThrowIfCancellationRequested()
                 Export.writeFile path options.Force pack
                 printfn "Saved %d puzzle(s) to %s" generated.Count (Path.GetFullPath path)
             | None -> ()
 
-            for puzzle in generated do Export.printPuzzle options.ShowSolution puzzle
-            printfn "\nKnown solutions validated; uniqueness unchecked; difficulty unassessed."
+            for puzzle in generated do Export.printPuzzleWithCancellation cancellation options.ShowSolution puzzle
+            printfn "\nKnown solutions validated; uniqueness unchecked; difficulty is a provisional heuristic estimate."
             0
 
 [<EntryPoint>]

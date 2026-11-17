@@ -5,6 +5,7 @@ open System.IO
 open System.Security.Cryptography
 open System.Text
 open System.Text.Json
+open System.Threading
 open Tangles.Core
 
 module Export =
@@ -29,6 +30,7 @@ module Export =
           Attempts: int
           Pairs: EndpointPair array
           Solution: PathDocument array
+          Difficulty: Difficulty.Assessment
           Verification: Verification }
 
     type GenerationSettings =
@@ -62,8 +64,10 @@ module Export =
         let hash = SHA256.HashData(Encoding.UTF8.GetBytes canonical)
         "tangles-" + Convert.ToHexString(hash).ToLowerInvariant()
 
-    let createPack (options: GenerationOptions) (generated: GeneratedPuzzle array) =
+    let createPackWithCancellation (cancellation: CancellationToken) (options: GenerationOptions) (generated: GeneratedPuzzle array) =
+        cancellation.ThrowIfCancellationRequested()
         for item in generated do
+            cancellation.ThrowIfCancellationRequested()
             if item.Puzzle.RequireFullCoverage <> (options.Mode = FullCoverage) then
                 invalidArg (nameof generated) "Puzzle coverage must match the generation mode of the pack."
             match Validation.solution item.Puzzle item.Solution with
@@ -96,7 +100,10 @@ module Export =
                   Attempts = item.Attempts
                   Pairs = Array.ofList item.Puzzle.Pairs
                   Solution = item.Solution |> List.map (fun p -> { Label = p.Label; Cells = Array.ofList p.Cells }) |> Array.ofList
-                  Verification = { SolutionValid = true; Uniqueness = "notChecked"; Difficulty = "notAssessed" } }) }
+                  Difficulty = Difficulty.assessWithCancellation cancellation item.Puzzle
+                  Verification = { SolutionValid = true; Uniqueness = "notChecked"; Difficulty = "heuristicEstimate" } }) }
+
+    let createPack options generated = createPackWithCancellation CancellationToken.None options generated
 
     let toJson pack = JsonSerializer.Serialize<PuzzlePack>(pack, jsonOptions)
 
@@ -129,13 +136,17 @@ module Export =
             |> String.concat " "
             |> printfn "%s"
 
-    let printPuzzle showSolution (generated: GeneratedPuzzle) =
+    let printPuzzleWithCancellation cancellation showSolution (generated: GeneratedPuzzle) =
         let board = generated.Puzzle
+        let difficulty = Difficulty.assessWithCancellation cancellation board
         printfn "\n%dx%d, %d pairs, seed %d, %d attempt(s)" board.Width board.Height board.Pairs.Length generated.Seed generated.Attempts
         printfn "Mode: %s" (if board.RequireFullCoverage then "full-coverage (every square must be filled)" else "connect-only (unused squares allowed)")
+        printfn "Difficulty: %s (%d/100; provisional heuristic)" difficulty.Grade difficulty.Score
         let endpoints = board.Pairs |> Seq.collect (fun p -> [ p.Start, p.Label; p.Finish, p.Label ])
         printGrid "Puzzle (. = empty):" board.Width board.Height endpoints
 
         if showSolution then
             let entries = generated.Solution |> Seq.collect (fun p -> p.Cells |> Seq.map (fun cell -> cell, p.Label))
             printGrid "Known solution (. = unused):" board.Width board.Height entries
+
+    let printPuzzle showSolution generated = printPuzzleWithCancellation CancellationToken.None showSolution generated

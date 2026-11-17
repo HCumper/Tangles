@@ -7,6 +7,7 @@
     <ProjectReference Include="../Tangles.Core/Tangles.Core.fsproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Difficulty.fs" />
     <Compile Include="Generation.fs" />
     <Compile Include="Export.fs" />
     <Compile Include="CommandLine.fs" />

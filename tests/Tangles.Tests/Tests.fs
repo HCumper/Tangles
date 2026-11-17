@@ -191,7 +191,7 @@ let ``export records endpoints ordered solution paths and honest verification st
     Assert.Equal(6, puzzle.GetProperty("solution").GetArrayLength())
     Assert.True(puzzle.GetProperty("verification").GetProperty("solutionValid").GetBoolean())
     Assert.Equal("notChecked", puzzle.GetProperty("verification").GetProperty("uniqueness").GetString())
-    Assert.Equal("notAssessed", puzzle.GetProperty("verification").GetProperty("difficulty").GetString())
+    Assert.Equal("heuristicEstimate", puzzle.GetProperty("verification").GetProperty("difficulty").GetString())
 
 [<Fact>]
 let ``invalid witnesses cannot be exported as validated`` () =

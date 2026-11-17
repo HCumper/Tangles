@@ -83,10 +83,14 @@ different pair/length settings may help. One path cannot fill a two-dimensional
 rectangle under the no-self-touching rule, and is rejected in this mode.
 
 The shared validator separately checks the returned witness before it is
-displayed or saved. This initial version does **not** assess difficulty,
-establish uniqueness, deduplicate puzzles, or guarantee enjoyable play.
-Constructed path length is not a difficulty rating. Solver-assisted selection
-and playtesting remain future work.
+displayed or saved. Every console run and JSON export also receives an initial
+**provisional heuristic difficulty grade** (`easy`, `medium` or `hard`) and a
+0..100 score. The two coverage modes use separate profiles. Grades depend on
+the clues, not on the shape of the stored solution, and are not calibrated
+against human play. The generator does not establish uniqueness, deduplicate
+puzzles, or guarantee enjoyable play. Solver-assisted selection and playtesting
+remain future work. See [the difficulty model](docs/difficulty-grading.md) for
+measurements, formulas, weights and limitations.
 
 An explicit seed reproduces generation with the same options, algorithm and
 .NET runtime implementation. A batch uses the supplied seed for the first
@@ -104,8 +108,10 @@ and a `puzzles` array. Every puzzle includes:
 - `width`, `height`, `seed`, and candidate `attempts`.
 - `pairs`: labels with `start` and `finish` coordinates.
 - `solution`: labels with ordered `cells` arrays, including endpoints.
+- `difficulty`: provisional grade, score, versioned mode-specific profile,
+  thresholds, aggregate and per-pair measurements, and weighted score components.
 - `verification`: `solutionValid: true`, `uniqueness: "notChecked"`,
-  `difficulty: "notAssessed"`.
+  `difficulty: "heuristicEstimate"` (an estimate, not a verified human rating).
 
 Coordinates are zero-based `{ "x": 0, "y": 0 }`, with the origin at the top
 left. Puzzle clues are the dimensions and endpoint pairs; solution cells are
@@ -116,12 +122,17 @@ the same batch settings produce identical JSON on the same runtime.
 `generation.mode` is `connect-only` or `full-coverage`, and `generation.algorithm`
 records the corresponding algorithm. Both modes use format version 1: the
 coverage flag was already part of that format. Each pack uses one rule set.
+The difficulty object is also an additive format-v1 field; old packs without
+it remain valid. Existing players ignore this extra metadata. Difficulty does
+not change puzzle IDs or the generated clues/solutions. Previously generated
+packs are not modified automatically; new runs include assessments.
 
 ## Layout
 
 - `Tangles.slnx`: solution.
 - `src/Tangles.Core`: shared puzzle types, complete/partial rules validation, pack reading and player state.
-- `src/Tangles.Generator`: generation, command line, console display and JSON export.
+- `src/Tangles.Generator`: generation, heuristic difficulty grading, command line,
+  console display and JSON export.
 - `src/Tangles.Player`: standalone Bolero WebAssembly player and static assets.
 - `tests/Tangles.Tests`: rule regressions, independent multi-seed witness checks,
   reproducibility, input validation, cancellation and export checks.
@@ -227,3 +238,14 @@ difficulty ratings, generation in the browser, or solution reveals. A
 `wasm-tools` workload is not required for this interpreted WebAssembly build;
 AOT/native optimisation is disabled. The .NET publish command may suggest
 installing that optional workload.
+
+## QL puzzle-pack loading layer
+
+`QL/Parser/pack.ssb` loads the generator's v1 JSON packs into named SSB records,
+with clue and rule validation similar to the F# loader. Applications use
+`packPuzzles` and `packPairs`, including nested endpoint coordinates and the
+coverage flag; JSON traversal stays inside the loader and its temporary tree is
+freed after loading. `pack_example.ssb` demonstrates this interface. See
+[the QL parser and loader guide](QL/Parser/README.md) for APIs, QL limits and
+interpreted/Turbo emulator checks. The separate `QL/GUI` drag-and-colour proof
+remains the foundation for the future puzzle player.

@@ -19,5 +19,6 @@
   <ItemGroup>
     <Compile Include="Tests.fs" />
     <Compile Include="PlayTests.fs" />
+    <Compile Include="DifficultyTests.fs" />
   </ItemGroup>
 </Project>

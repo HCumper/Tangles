@@ -1,25 +1,33 @@
 # JSON for QL Structured SuperBASIC
 
 `json.ssb` is a JSON reader written in SSB using the **SSB 2.8.0 record facility**.
-It translates to ordinary S*BASIC and is intended for interpreted QDOS/SMSQ/E
-programs or Turbo 5.09 compilation. This is QL code, not an F#/.NET parser.
+It translates to ordinary S*BASIC for interpreted SMSQ/E SBASIC or Turbo 5.09
+compilation. This is QL code, not an F#/.NET parser.
 
-`pack_example.ssb` reads the Tangles generator's JSON format and displays all
-puzzle IDs, board sizes and endpoint pairs. It does not implement the game,
-validate all game rules, or certify a stored solution/uniqueness claim.
+`pack.ssb` is the application loading layer, similar to `PuzzlePacks.read` in
+F#: it maps the temporary JSON tree into named puzzle/pair/cell records, validates
+the clues, then frees the tree. `pack_example.ssb` uses only those records to
+display puzzle IDs, board sizes and endpoint pairs. It does not implement the
+game or certify solvability, a stored solution, or uniqueness. The TurboPTR GUI
+is still the separate paint-grid proof in `QL/GUI`.
 
 ## Files and prerequisites
 
 - `json.ssb`: reusable parser and accessors.
+- `pack.ssb`: Tangles v1 schema-specific loader and game records.
 - `pack_example.ssb`: example for `src/Tangles.Player/wwwroot/packs/starter.json`.
 - `build_example.ssb`: Turbo build wrapper with the tested compiler settings.
 - `tools/test_json.py`: host-side fixture creation and real-emulator tests.
-- SSB **2.8.0**, including records; Toolkit II (`FOP_IN`, `FLEN`); Turbo Toolkit
-  when compiling. The library itself does not need BGET, machine-code helpers,
+- `tools/test_packs.py`: independent checks of loaded game records and invalid packs.
+- SSB **2.8.0**, including records and the MANIFEST-line preservation fix;
+  Toolkit II (`FOP_IN`, `FLEN`); Turbo Toolkit
+  when compiling or interpreting the source's `MANIFEST` declarations.
+  The compiled parser needs Toolkit II, but no manifest runtime support.
+  The library itself does not need BGET, machine-code helpers,
   a record runtime extension, a network connection or JSON preprocessing on a PC.
 
-Copy the sources to QL filenames `json_ssb` and `pack_example_ssb`, keeping LF
-line endings. Copy the JSON unchanged as `starter_json`. Set the example's data
+Copy the sources to QL filenames `json_ssb`, `pack_ssb` and `pack_example_ssb`,
+keeping LF line endings. Copy the JSON unchanged as `starter_json`. Set the example's data
 filename and include/work prefix to the mounted QL device. The supplied example
 uses `nfa1_` for the data file; that is a host-folder drive in SMSQmulator.
 
@@ -47,11 +55,82 @@ larger than one QL string. An expanded QL is needed for this pack and the exampl
 4,096-node capacity; this is not a claim that the full pack fits a stock 128 KB QL.
 Smaller documents can use smaller capacities.
 
-## Basic API
+## Puzzle-pack loading API
+
+Applications include `pack_ssb` (which includes `json_ssb`) and use named records:
+
+```basic
+#INCLUDE pack_ssb
+pack_load "nfa1_starter_json",4096
+IF packDoc.error% THEN PRINT packDoc.message$ : STOP
+PRINT packDoc.puzzleCount%
+PRINT packPuzzles(1).id$
+PRINT packPuzzles(1).width%;" by ";packPuzzles(1).height%
+firstPair% = packPuzzles(1).firstPair%
+PRINT packPairs(firstPair%).label$
+PRINT packPairs(firstPair%).start.x%;",";packPairs(firstPair%).start.y%
+PRINT packPairs(firstPair%).finish.x%;",";packPairs(firstPair%).finish.y%
+PRINT "Full coverage: ";packPuzzles(1).requireFullCoverage%
+pack_free
+STOP
+```
+
+| Operation/storage | Meaning |
+|---|---|
+| `pack_load file$, nodeCapacity%` | Load and validate a generator v1 pack. |
+| `pack_parse text$, nodeCapacity%` | Same operation for JSON already in a QL string. |
+| `pack_free` | Release the game records and clear pack diagnostics. |
+| `packDoc.error%`, `.message$`, `.errorPosition` | First failure and source byte position. Zero error means success. |
+| `packDoc.jsonError%` | Underlying JSON error class for `PACK_ERR_JSON%`; otherwise zero. |
+| `packDoc.formatVersion%`, `.requireFullCoverage%` | Validated format/rule settings. |
+| `packDoc.puzzleCount%`, `.pairCount%` | Number of published puzzles and total pairs. |
+| `packPuzzles(1..puzzleCount%)` | `TanglesPuzzle` records with `id$`, `width%`, `height%`, `requireFullCoverage%`, `firstPair%`, `pairCount%`. |
+| `packPairs(1..pairCount%)` | `TanglesPair` records with `label$`, nested `start.x%`/`start.y%` and `finish.x%`/`finish.y%`. |
+
+Each puzzle's pairs occupy the contiguous range starting at `firstPair%`, of
+length `pairCount%`. These are indices of game records, not JSON node handles.
+The JSON source, tree, frame stack and temporary endpoint occupancy map are
+released before either public loading routine returns. Game records remain
+usable after independent subsequent JSON parsing.
+
+One pack is held globally. A new load invalidates the previous model; any failure
+releases partial records and leaves both counts zero. Check `packDoc.error%`
+before accessing arrays. A caller retaining an old board across a failed import
+must copy its game records before loading. Reserve the `pack_` prefix and
+`packDoc`, `packPuzzles`, `packPairs`, `packOccupied%`, `packContext$`, `packAt`.
+`pack_free` leaves an independently loaded JSON document alone.
+
+The loader checks required fields and exact value types; format version 1;
+the three required true geometry flags; Boolean `requireFullCoverage`; 1..10000
+puzzles; integer board dimensions 1..64; at least one pair per puzzle; nonblank
+IDs/labels; distinct labels; integer endpoints inside the board; distinct,
+unshared endpoint cells; and conflicting reuse of puzzle IDs. Identical boards
+with the same ID are allowed. Pair order and endpoint direction form part of
+that identity, as in the F# records. Fields are case-sensitive, can be reordered
+or escaped, and the last duplicate member wins, matching `JsonElement` lookup.
+Integer fields reject fractions and exponent notation without floating-point
+rounding. Both coverage modes are retained; loading clues does not prove either
+mode solvable. Unknown metadata, stored solutions and verification claims are
+ignored after JSON syntax validation.
+
+QL limits are **1 MiB of input, 32 container levels**, the supplied JSON node
+capacity (maximum 32766), and **128 UTF-8 bytes** per ID/label. F# allows larger
+packs and counts its text limit in .NET characters; the byte limit here avoids
+silently truncating QL record strings. Decoded strings/keys also have the generic
+parser's 4096-byte accessor limit. The pair-record count is bounded at 32766.
+Unexpected operating-system errors and insufficient physical memory remain BASIC
+runtime errors; node capacity alone does not guarantee RAM is available.
+
+Pack failures use named Turbo MANIFEST constants: `PACK_ERR_JSON%` (1),
+`PACK_ERR_SCHEMA%` (2), `PACK_ERR_FORMAT%` (3), `PACK_ERR_RULES%` (4),
+`PACK_ERR_CLUES%` (5), `PACK_ERR_LIMIT%` (6). Parser diagnostics are copied before
+the tree is freed; schema errors identify the puzzle/pair and field where possible.
+
+## Generic JSON API
 
 ```basic
 #INCLUDE json_ssb
-json_load "nfa1_starter_json",4096,1048576,32
+json_load "nfa1_starter_json",4096,JSON_MAX_BYTES,32
 IF jsonDoc.error% THEN
   PRINT jsonDoc.message$;" at byte ";jsonDoc.errorPosition
   STOP
@@ -88,7 +167,19 @@ Reserve the `json_` prefix and these storage names in a calling program.
 | `json_boolean%(handle%)` | True = 1; false = 0. |
 | `json_raw$(handle%)` | Original JSON bytes for the complete value, including quotes/brackets. |
 
-Kinds: **1 object, 2 array, 3 string, 4 number, 5 true, 6 false, 7 null**.
+Node kinds have named Turbo `MANIFEST` constants:
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `JSON_KIND_OBJECT%` | 1 | Object |
+| `JSON_KIND_ARRAY%` | 2 | Array |
+| `JSON_KIND_STRING%` | 3 | String |
+| `JSON_KIND_NUMBER%` | 4 | Number |
+| `JSON_KIND_TRUE%` | 5 | True |
+| `JSON_KIND_FALSE%` | 6 | False |
+| `JSON_KIND_NULL%` | 7 | Null |
+
+For example, compare `jsonNodes(handle%).kind% = JSON_KIND_ARRAY%`.
 Null is a real node of kind 7; it is distinct from a missing member (handle 0).
 Objects preserve member order and duplicates; lookup returns the first match.
 Traverse siblings directly for large arrays rather than repeatedly calling
@@ -125,6 +216,20 @@ The limits are explicit:
 - Capacity does not guarantee physical RAM is available: an oversized DIM or
   an operating-system I/O failure can still raise a normal BASIC runtime error.
 
+The declarations at the top of `json.ssb` also name grammar phases, character
+codes, UTF-8/UTF-16 boundaries and limits such as `JSON_CHUNK_SIZE%`,
+`JSON_MAX_BYTES`, `JSON_MAX_NODES%`, `JSON_MAX_DEPTH%`, `JSON_MAX_TEXT%`,
+`JSON_NUMBER_CHARS%` and `JSON_MAX_EXPONENT%`. Turbo substitutes the literal
+values in compiled code. With Turbo Toolkit loaded, the interpreted assignments
+provide the same values. Treat every `JSON_*` name as read-only. Constants whose
+values exceed 32,767 have no `%` suffix, preserving QL real arithmetic for input
+sizes and Unicode. The numeric kind/error API and all limits are unchanged.
+
+Each `MANIFEST` and its assignments must remain on one physical BASIC line for
+Turbo to recognise the constants. Use the local SSB build with the 17 November
+2026 preservation fix; older record-expansion builds split those lines. The
+emulator harness verifies all 95 declarations survive translation intact.
+
 `jsonDoc.error%` is zero on success. The first error is retained with
 `message$`, `errorPosition`, `errorLine` and `errorColumn`. Positions and columns
 count input bytes, not Unicode display cells; CR, LF and CRLF are handled.
@@ -136,17 +241,17 @@ Call `json_free` when finished to reset the document and shrink its arrays back 
 their placeholders. All handles/spans then become invalid. Otherwise, arrays keep
 their largest allocated bounds and are reused by subsequent loads/parses.
 
-| Code | Meaning |
-|---|---|
-| 1 | Invalid configuration or file byte limit exceeded |
-| 2 | File open failure or short read |
-| 3 | JSON structure/literal/trailing input error |
-| 4 | String escape, Unicode or UTF-8 error |
-| 5 | Number syntax error |
-| 6 | Node capacity exhausted |
-| 7 | Nesting limit exceeded |
-| 8 | Wrong accessor type or invalid node handle |
-| 9 | Getter/conversion size or range limit |
+| Constant | Code | Meaning |
+|---|---|---|
+| `JSON_ERR_CONFIG%` | 1 | Invalid configuration or file byte limit exceeded |
+| `JSON_ERR_FILE%` | 2 | File open failure or short read |
+| `JSON_ERR_SYNTAX%` | 3 | JSON structure/literal/trailing input error |
+| `JSON_ERR_STRING%` | 4 | String escape, Unicode or UTF-8 error |
+| `JSON_ERR_NUMBER%` | 5 | Number syntax error |
+| `JSON_ERR_NODES%` | 6 | Node capacity exhausted |
+| `JSON_ERR_DEPTH%` | 7 | Nesting limit exceeded |
+| `JSON_ERR_ACCESSOR%` | 8 | Wrong accessor type or invalid node handle |
+| `JSON_ERR_LIMIT%` | 9 | Getter/conversion size or range limit |
 
 All JSON value types are supported. Whitespace is restricted to JSON's four
 ASCII whitespace bytes. Comments, single-quoted strings, trailing commas, invalid
@@ -167,6 +272,8 @@ With the existing local SSB build and emulator ROM installed:
 ```powershell
 python C:\Source\Tangles\QL\tools\test_json.py --ssb-root "C:\Source\Structured Super Basic" --packs C:\Source\Tangles\src\Tangles.Player\wwwroot\packs
 python C:\Source\Tangles\QL\tools\test_json.py --ssb-root "C:\Source\Structured Super Basic" --packs C:\Source\Tangles\src\Tangles.Player\wwwroot\packs --compile
+python C:\Source\Tangles\QL\tools\test_packs.py
+python C:\Source\Tangles\QL\tools\test_packs.py --compile
 ```
 
 The host creates fixtures, invokes the **real QL SSB translator**, and runs its
@@ -185,3 +292,19 @@ compilation used an 8 MB SMSQ/E emulator. The resulting compiled parser also
 passed the full suite in a fresh **2 MB** SMSQ/E emulator without running SSB or
 Turbo there. This is runtime validation, not a claim that SSB can translate this
 library with 2 MB. Classic QDOS ROMs and a stock 128 KB QL were not tested.
+
+`test_json.py --example --compile` builds and verifies the converted record-based
+example against all eight starter puzzle IDs and 48 endpoint pairs. The pack
+suite's 113 cases separately check every loaded record against Python's JSON decoder,
+including both supplied packs, both coverage flags, invalid schema/clues,
+Unicode, duplicate IDs/members, resource limits, reloads and tree disposal.
+Use `--work <new-folder>` to retain a build; local output under this folder's
+`build/` is ignored by Git. A compiled pack suite can be run without
+translating/compiling again using `test_packs.py --runtime-only <compiled-folder>
+--ram-mib 4 --work <new-folder>`. The suite reserves 1 MiB dataspace to exercise
+its 12000-node limit fixture. That reservation prevents the full suite launching
+in the tested 2 MiB emulator (SMSQ/E reports insufficient memory). The example
+wrapper retains its 256 KiB dataspace and successfully loads all eight starter
+puzzles and 48 pairs in a fresh 2 MiB emulator without translating or compiling.
+`pack-validation.json` records loading-layer verification separately from the
+generic parser's existing `validation.json`.

@@ -34,7 +34,9 @@ Usage: Tangles.Generator [options]
 
 Rules: orthogonal paths, no sharing or self-touching in both modes.
 Connect-only allows unused cells; full-coverage requires every square to be used.
-Solutions are validated. Uniqueness and difficulty are not assessed.
+Solutions are validated. Difficulty grades are provisional heuristic estimates.
+JSON includes the grade, score, measurements and scoring components.
+Uniqueness is not checked; grades have not been calibrated against human play.
 An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
 """
 

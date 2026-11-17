@@ -31,6 +31,121 @@
 ## Document position is the next byte (bytes+1 at EOF); used% includes partial
 ## trees on failure, but failed loads/parses set root% to zero. The first error
 ## is retained; tokenStart/tokenLength are temporary string-scan results.
+## Named constants are Turbo MANIFESTs: literals when compiled, values when
+## interpreted with Turbo Toolkit loaded. Treat every JSON_* name as read-only.
+## Ordinary zero/one counts and offsets remain literal.
+
+## Public node kinds; numeric values remain part of the accessor API.
+MANIFEST : JSON_KIND_OBJECT% = 1
+MANIFEST : JSON_KIND_ARRAY% = 2
+MANIFEST : JSON_KIND_STRING% = 3
+MANIFEST : JSON_KIND_NUMBER% = 4
+MANIFEST : JSON_KIND_TRUE% = 5
+MANIFEST : JSON_KIND_FALSE% = 6
+MANIFEST : JSON_KIND_NULL% = 7
+
+## Public error classes; accessor/limit errors can be cleared.
+MANIFEST : JSON_ERR_CONFIG% = 1
+MANIFEST : JSON_ERR_FILE% = 2
+MANIFEST : JSON_ERR_SYNTAX% = 3
+MANIFEST : JSON_ERR_STRING% = 4
+MANIFEST : JSON_ERR_NUMBER% = 5
+MANIFEST : JSON_ERR_NODES% = 6
+MANIFEST : JSON_ERR_DEPTH% = 7
+MANIFEST : JSON_ERR_ACCESSOR% = 8
+MANIFEST : JSON_ERR_LIMIT% = 9
+
+## Container grammar states.
+MANIFEST : JSON_PHASE_FIRST% = 0
+MANIFEST : JSON_PHASE_REQUIRED% = 1
+MANIFEST : JSON_PHASE_AFTER% = 2
+
+## Storage and conversion limits. Values above 32767 must not have a % suffix.
+MANIFEST : JSON_CHUNK_SIZE% = 512
+MANIFEST : JSON_MAX_BYTES = 1048576
+MANIFEST : JSON_MAX_NODES% = 32766
+MANIFEST : JSON_MAX_DEPTH% = 256
+MANIFEST : JSON_MAX_TEXT% = 4096
+MANIFEST : JSON_NUMBER_CHARS% = 128
+MANIFEST : JSON_MAX_EXPONENT% = 128
+MANIFEST : JSON_MESSAGE_CHARS% = 160
+MANIFEST : JSON_EOF% = -1
+
+## ASCII bytes used by the JSON grammar and escape decoder.
+MANIFEST : JSON_CH_BACKSPACE% = 8
+MANIFEST : JSON_CH_TAB% = 9
+MANIFEST : JSON_CH_LF% = 10
+MANIFEST : JSON_CH_FORMFEED% = 12
+MANIFEST : JSON_CH_CR% = 13
+MANIFEST : JSON_CH_SPACE% = 32
+MANIFEST : JSON_CH_QUOTE% = 34
+MANIFEST : JSON_CH_PLUS% = 43
+MANIFEST : JSON_CH_COMMA% = 44
+MANIFEST : JSON_CH_MINUS% = 45
+MANIFEST : JSON_CH_DOT% = 46
+MANIFEST : JSON_CH_SLASH% = 47
+MANIFEST : JSON_CH_ZERO% = 48
+MANIFEST : JSON_CH_ONE% = 49
+MANIFEST : JSON_CH_NINE% = 57
+MANIFEST : JSON_CH_COLON% = 58
+MANIFEST : JSON_CH_A_UPPER% = 65
+MANIFEST : JSON_CH_E_UPPER% = 69
+MANIFEST : JSON_CH_F_UPPER% = 70
+MANIFEST : JSON_CH_OPEN_ARRAY% = 91
+MANIFEST : JSON_CH_BACKSLASH% = 92
+MANIFEST : JSON_CH_CLOSE_ARRAY% = 93
+MANIFEST : JSON_CH_A_LOWER% = 97
+MANIFEST : JSON_CH_B% = 98
+MANIFEST : JSON_CH_E_LOWER% = 101
+MANIFEST : JSON_CH_F% = 102
+MANIFEST : JSON_CH_N% = 110
+MANIFEST : JSON_CH_R% = 114
+MANIFEST : JSON_CH_T% = 116
+MANIFEST : JSON_CH_U% = 117
+MANIFEST : JSON_CH_OPEN_OBJECT% = 123
+MANIFEST : JSON_CH_CLOSE_OBJECT% = 125
+
+## Hexadecimal escapes and decimal number conversion.
+MANIFEST : JSON_HEX_DIGITS% = 4
+MANIFEST : JSON_HEX_BASE% = 16
+MANIFEST : JSON_HEX_UPPER_BIAS% = 55
+MANIFEST : JSON_HEX_LOWER_BIAS% = 87
+MANIFEST : JSON_DECIMAL_BASE% = 10
+MANIFEST : JSON_UNICODE_TAIL% = 5
+MANIFEST : JSON_UNICODE_ESCAPE% = 6
+
+## UTF-8 lead/continuation ranges, payload radix, and scalar boundaries.
+MANIFEST : JSON_ASCII_LIMIT% = 128
+MANIFEST : JSON_UTF8_CONT_MIN% = 128
+MANIFEST : JSON_UTF8_CONT_MAX% = 191
+MANIFEST : JSON_UTF8_RADIX% = 64
+MANIFEST : JSON_UTF8_RADIX2% = 4096
+MANIFEST : JSON_UTF8_RADIX3 = 262144
+MANIFEST : JSON_UTF8_TWO% = 2
+MANIFEST : JSON_UTF8_THREE% = 3
+MANIFEST : JSON_UTF8_FOUR% = 4
+MANIFEST : JSON_UTF8_TWO_PREFIX% = 192
+MANIFEST : JSON_UTF8_TWO_FIRST% = 194
+MANIFEST : JSON_UTF8_TWO_LAST% = 223
+MANIFEST : JSON_UTF8_THREE_PREFIX% = 224
+MANIFEST : JSON_UTF8_THREE_LAST% = 239
+MANIFEST : JSON_UTF8_FOUR_PREFIX% = 240
+MANIFEST : JSON_UTF8_FOUR_LAST% = 244
+MANIFEST : JSON_UTF8_THREE_MIN% = 2048
+MANIFEST : JSON_BMP_LIMIT = 65536
+MANIFEST : JSON_UNICODE_MAX = 1114111
+MANIFEST : JSON_HIGH_FIRST = 55296
+MANIFEST : JSON_HIGH_LAST = 56319
+MANIFEST : JSON_LOW_FIRST = 56320
+MANIFEST : JSON_LOW_LAST = 57343
+MANIFEST : JSON_SURROGATE_RADIX% = 1024
+
+## Optional UTF-8 byte-order mark, accepted only at the document start.
+MANIFEST : JSON_BOM_FIRST% = 239
+MANIFEST : JSON_BOM_SECOND% = 187
+MANIFEST : JSON_BOM_THIRD% = 191
+MANIFEST : JSON_BOM_BYTES% = 3
+
 TYPE JsonDocument
   bytes
   position
@@ -43,7 +158,7 @@ TYPE JsonDocument
   errorPosition
   errorLine
   errorColumn
-  message$(160)
+  message$(JSON_MESSAGE_CHARS%)
   tokenStart
   tokenLength
 END TYPE
@@ -87,7 +202,7 @@ END TYPE
 DIM jsonDoc AS JsonDocument
 DIM jsonNodes(0) AS JsonNode
 DIM jsonFrames(0) AS JsonFrame
-DIM jsonChunks$(0,512)
+DIM jsonChunks$(0,JSON_CHUNK_SIZE%)
 jsonArena% = 0 : jsonStack% = 0 : jsonSlots% = 0
 
 ## INTERNAL: invalidate the old document, check limits, and size the arena.
@@ -103,16 +218,16 @@ DEFine PROCedure json_begin(VAL jbBytes, VAL jbCapacity%, VAL jbDepth%)
   LOCal jbChunk%,jbSlots%
   DIM jsonDoc AS JsonDocument
   jsonDoc.position = 1
-  IF jbBytes < 0 OR jbBytes > 1048576 THEN
-    json_fail 1,"Input limit is 1048576 bytes"
+  IF jbBytes < 0 OR jbBytes > JSON_MAX_BYTES THEN
+    json_fail JSON_ERR_CONFIG%,"Input limit is 1048576 bytes"
     RETurn
   END IF
-  IF jbCapacity% < 1 OR jbCapacity% > 32766 THEN
-    json_fail 1,"Node capacity must be 1..32766"
+  IF jbCapacity% < 1 OR jbCapacity% > JSON_MAX_NODES% THEN
+    json_fail JSON_ERR_CONFIG%,"Node capacity must be 1..32766"
     RETurn
   END IF
-  IF jbDepth% < 1 OR jbDepth% > 256 THEN
-    json_fail 1,"Depth limit must be 1..256"
+  IF jbDepth% < 1 OR jbDepth% > JSON_MAX_DEPTH% THEN
+    json_fail JSON_ERR_CONFIG%,"Depth limit must be 1..256"
     RETurn
   END IF
   jsonDoc.bytes = jbBytes
@@ -126,9 +241,9 @@ DEFine PROCedure json_begin(VAL jbBytes, VAL jbCapacity%, VAL jbDepth%)
     DIM jsonFrames(jbDepth%) AS JsonFrame
     jsonStack% = jbDepth%
   END IF
-  jbSlots% = INT(jbBytes/512)
+  jbSlots% = INT(jbBytes/JSON_CHUNK_SIZE%)
   IF jbSlots% > jsonSlots% THEN
-    DIM jsonChunks$(jbSlots%,512)
+    DIM jsonChunks$(jbSlots%,JSON_CHUNK_SIZE%)
     jsonSlots% = jbSlots%
   END IF
   ## Turbo may reuse string-array contents on DIM, and reused chunks hold the
@@ -144,7 +259,7 @@ DEFine PROCedure json_free
   DIM jsonDoc AS JsonDocument
   DIM jsonNodes(0) AS JsonNode
   DIM jsonFrames(0) AS JsonFrame
-  DIM jsonChunks$(0,512)
+  DIM jsonChunks$(0,JSON_CHUNK_SIZE%)
   jsonArena% = 0 : jsonStack% = 0 : jsonSlots% = 0
 END DEFine
 
@@ -164,27 +279,27 @@ DEFine PROCedure json_load(VAL jlFile$, VAL jlCapacity%, VAL jlMaxBytes, VAL jlD
   LOCal jlChannel%,jlSize,jlPosition,jlChunk%,jlOffset%,jlFill,jlByte$(1)
   json_begin 0,jlCapacity%,jlDepth%
   IF jsonDoc.error% THEN RETurn
-  IF jlMaxBytes < 0 OR jlMaxBytes > 1048576 THEN
-    json_fail 1,"File byte limit must be 0..1048576"
+  IF jlMaxBytes < 0 OR jlMaxBytes > JSON_MAX_BYTES THEN
+    json_fail JSON_ERR_CONFIG%,"File byte limit must be 0..1048576"
     RETurn
   END IF
   jlChannel% = FOP_IN(jlFile$)
   IF jlChannel% < 0 THEN
-    json_fail 2,"Cannot open JSON file"
+    json_fail JSON_ERR_FILE%,"Cannot open JSON file"
     RETurn
   END IF
   jlSize = FLEN(#jlChannel%)
   IF jlSize > jlMaxBytes OR jlSize < 0 THEN
     CLOSE #jlChannel%
-    json_fail 1,"JSON file exceeds byte limit"
+    json_fail JSON_ERR_CONFIG%,"JSON file exceeds byte limit"
     RETurn
   END IF
   json_begin jlSize,jlCapacity%,jlDepth%
   IF jsonDoc.error% THEN CLOSE #jlChannel% : RETurn
   FOR jlPosition = 1 TO jlSize
-    jlChunk% = INT((jlPosition-1)/512) : jlOffset% = jlPosition-512*jlChunk%
+    jlChunk% = INT((jlPosition-1)/JSON_CHUNK_SIZE%) : jlOffset% = jlPosition-JSON_CHUNK_SIZE%*jlChunk%
     IF jlOffset% = 1 THEN
-      jlFill = jlSize-jlPosition+1 : IF jlFill > 512 THEN jlFill = 512
+      jlFill = jlSize-jlPosition+1 : IF jlFill > JSON_CHUNK_SIZE% THEN jlFill = JSON_CHUNK_SIZE%
       jsonChunks$(jlChunk%) = FILL$(" ",jlFill)
     END IF
     jlByte$ = INKEY$(#jlChannel%,-1)
@@ -195,7 +310,7 @@ DEFine PROCedure json_load(VAL jlFile$, VAL jlCapacity%, VAL jlMaxBytes, VAL jlD
         jsonChunks$(jlChunk%) = jsonChunks$(jlChunk%,1 TO jlOffset%-1)
       END IF
       jsonDoc.position = jlPosition
-      json_fail 2,"Unexpected end while reading JSON file"
+      json_fail JSON_ERR_FILE%,"Unexpected end while reading JSON file"
       EXIT jlPosition
     END IF
     jsonChunks$(jlChunk%,jlOffset%) = jlByte$
@@ -216,7 +331,7 @@ DEFine PROCedure json_parse(VAL jpText$, VAL jpCapacity%, VAL jpDepth%)
   REPeat jpCopy
     IF jpPosition > LEN(jpText$) THEN EXIT jpCopy
     jpAmount% = LEN(jpText$)-jpPosition+1
-    IF jpAmount% > 512 THEN jpAmount% = 512
+    IF jpAmount% > JSON_CHUNK_SIZE% THEN jpAmount% = JSON_CHUNK_SIZE%
     jsonChunks$(jpChunk%) = jpText$(jpPosition TO jpPosition+jpAmount%-1)
     jpPosition = jpPosition+jpAmount% : jpChunk% = jpChunk%+1
   END REPeat jpCopy
@@ -229,10 +344,10 @@ END DEFine
 ## The loaded-length check also supports short-read diagnostics.
 DEFine FuNction json_byte%(VAL jcPosition)
   LOCal jcChunk%,jcOffset%
-  IF jcPosition < 1 OR jcPosition > jsonDoc.bytes THEN RETurn -1
-  jcChunk% = INT((jcPosition-1)/512)
-  jcOffset% = jcPosition-512*jcChunk%
-  IF jcOffset% > LEN(jsonChunks$(jcChunk%)) THEN RETurn -1
+  IF jcPosition < 1 OR jcPosition > jsonDoc.bytes THEN RETurn JSON_EOF%
+  jcChunk% = INT((jcPosition-1)/JSON_CHUNK_SIZE%)
+  jcOffset% = jcPosition-JSON_CHUNK_SIZE%*jcChunk%
+  IF jcOffset% > LEN(jsonChunks$(jcChunk%)) THEN RETurn JSON_EOF%
   RETurn CODE(jsonChunks$(jcChunk%,jcOffset%))
 END DEFine
 
@@ -256,11 +371,11 @@ DEFine PROCedure json_failat(VAL joCode%, VAL joAt, VAL joMessage$)
   jsonDoc.errorLine = 1 : jsonDoc.errorColumn = 1 : joCR% = 0
   FOR joPosition = 1 TO joAt-1
     joByte% = json_byte%(joPosition)
-    IF joByte% = 13 THEN
+    IF joByte% = JSON_CH_CR% THEN
       jsonDoc.errorLine = jsonDoc.errorLine+1
       jsonDoc.errorColumn = 1 : joCR% = 1
     ELSE
-      IF joByte% = 10 THEN
+      IF joByte% = JSON_CH_LF% THEN
         IF NOT joCR% THEN jsonDoc.errorLine = jsonDoc.errorLine+1
         jsonDoc.errorColumn = 1
       ELSE
@@ -275,7 +390,7 @@ END DEFine
 ## the caller can keep using the same document. Load, parse, capacity and depth
 ## errors (classes 1 to 7) stay set: their documents have no usable root.
 DEFine PROCedure json_clear
-  IF jsonDoc.error% < 8 THEN RETurn
+  IF jsonDoc.error% < JSON_ERR_ACCESSOR% THEN RETurn
   jsonDoc.error% = 0 : jsonDoc.message$ = ""
   jsonDoc.errorPosition = 0 : jsonDoc.errorLine = 0 : jsonDoc.errorColumn = 0
 END DEFine
@@ -287,7 +402,7 @@ DEFine PROCedure json_space
   LOCal jwByte%
   REPeat jwSkip
     jwByte% = json_byte%(jsonDoc.position)
-    IF jwByte% <> 32 AND jwByte% <> 9 AND jwByte% <> 10 AND jwByte% <> 13 THEN EXIT jwSkip
+    IF jwByte% <> JSON_CH_SPACE% AND jwByte% <> JSON_CH_TAB% AND jwByte% <> JSON_CH_LF% AND jwByte% <> JSON_CH_CR% THEN EXIT jwSkip
     jsonDoc.position = jsonDoc.position+1
   END REPeat jwSkip
 END DEFine
@@ -295,7 +410,7 @@ END DEFine
 ## INTERNAL ASCII digit predicate. Locale-specific digit characters are not
 ## JSON number digits. The EOF sentinel naturally returns false as well.
 DEFine FuNction json_digit%(VAL jdByte%)
-  RETurn jdByte% >= 48 AND jdByte% <= 57
+  RETurn jdByte% >= JSON_CH_ZERO% AND jdByte% <= JSON_CH_NINE%
 END DEFine
 
 ## INTERNAL: read four hex digits at jhPosition; accept either letter case.
@@ -305,17 +420,17 @@ END DEFine
 DEFine FuNction json_hex4(VAL jhPosition)
   LOCal jhIndex%,jhByte%,jhDigit%,jhValue
   jhValue = 0
-  FOR jhIndex% = 0 TO 3
+  FOR jhIndex% = 0 TO JSON_HEX_DIGITS%-1
     jhByte% = json_byte%(jhPosition+jhIndex%) : jhDigit% = -1
-    IF jhByte% >= 48 AND jhByte% <= 57 THEN jhDigit% = jhByte%-48
-    IF jhByte% >= 65 AND jhByte% <= 70 THEN jhDigit% = jhByte%-55
-    IF jhByte% >= 97 AND jhByte% <= 102 THEN jhDigit% = jhByte%-87
+    IF jhByte% >= JSON_CH_ZERO% AND jhByte% <= JSON_CH_NINE% THEN jhDigit% = jhByte%-JSON_CH_ZERO%
+    IF jhByte% >= JSON_CH_A_UPPER% AND jhByte% <= JSON_CH_F_UPPER% THEN jhDigit% = jhByte%-JSON_HEX_UPPER_BIAS%
+    IF jhByte% >= JSON_CH_A_LOWER% AND jhByte% <= JSON_CH_F% THEN jhDigit% = jhByte%-JSON_HEX_LOWER_BIAS%
     IF jhDigit% < 0 THEN
       jsonDoc.position = jhPosition+jhIndex%
-      json_fail 4,"Expected four hexadecimal escape digits"
+      json_fail JSON_ERR_STRING%,"Expected four hexadecimal escape digits"
       RETurn 0
     END IF
-    jhValue = jhValue*16+jhDigit%
+    jhValue = jhValue*JSON_HEX_BASE%+jhDigit%
   END FOR jhIndex%
   RETurn jhValue
 END DEFine
@@ -329,24 +444,24 @@ END DEFine
 DEFine FuNction json_utf8size%(VAL juPosition)
   LOCal juByte%,juLength%,juIndex%,juNext%,juCode
   juByte% = json_byte%(juPosition) : juLength% = 0 : juCode = 0
-  IF juByte% >= 194 AND juByte% <= 223 THEN juLength% = 2 : juCode = juByte%-192
-  IF juByte% >= 224 AND juByte% <= 239 THEN juLength% = 3 : juCode = juByte%-224
-  IF juByte% >= 240 AND juByte% <= 244 THEN juLength% = 4 : juCode = juByte%-240
-  IF juLength% = 0 THEN json_fail 4,"Invalid UTF-8 leading byte" : RETurn 0
+  IF juByte% >= JSON_UTF8_TWO_FIRST% AND juByte% <= JSON_UTF8_TWO_LAST% THEN juLength% = JSON_UTF8_TWO% : juCode = juByte%-JSON_UTF8_TWO_PREFIX%
+  IF juByte% >= JSON_UTF8_THREE_PREFIX% AND juByte% <= JSON_UTF8_THREE_LAST% THEN juLength% = JSON_UTF8_THREE% : juCode = juByte%-JSON_UTF8_THREE_PREFIX%
+  IF juByte% >= JSON_UTF8_FOUR_PREFIX% AND juByte% <= JSON_UTF8_FOUR_LAST% THEN juLength% = JSON_UTF8_FOUR% : juCode = juByte%-JSON_UTF8_FOUR_PREFIX%
+  IF juLength% = 0 THEN json_fail JSON_ERR_STRING%,"Invalid UTF-8 leading byte" : RETurn 0
   FOR juIndex% = 1 TO juLength%-1
     juNext% = json_byte%(juPosition+juIndex%)
-    IF juNext% < 128 OR juNext% > 191 THEN
+    IF juNext% < JSON_UTF8_CONT_MIN% OR juNext% > JSON_UTF8_CONT_MAX% THEN
       jsonDoc.position = juPosition+juIndex%
-      json_fail 4,"Invalid UTF-8 continuation byte"
+      json_fail JSON_ERR_STRING%,"Invalid UTF-8 continuation byte"
       RETurn 0
     END IF
-    juCode = juCode*64+juNext%-128
+    juCode = juCode*JSON_UTF8_RADIX%+juNext%-JSON_UTF8_CONT_MIN%
   END FOR juIndex%
-  IF (juLength% = 3 AND juCode < 2048) OR (juLength% = 4 AND juCode < 65536) THEN
-    json_fail 4,"Overlong UTF-8 sequence" : RETurn 0
+  IF (juLength% = JSON_UTF8_THREE% AND juCode < JSON_UTF8_THREE_MIN%) OR (juLength% = JSON_UTF8_FOUR% AND juCode < JSON_BMP_LIMIT) THEN
+    json_fail JSON_ERR_STRING%,"Overlong UTF-8 sequence" : RETurn 0
   END IF
-  IF juCode > 1114111 OR (juCode >= 55296 AND juCode <= 57343) THEN
-    json_fail 4,"Invalid Unicode scalar" : RETurn 0
+  IF juCode > JSON_UNICODE_MAX OR (juCode >= JSON_HIGH_FIRST AND juCode <= JSON_LOW_LAST) THEN
+    json_fail JSON_ERR_STRING%,"Invalid Unicode scalar" : RETurn 0
   END IF
   RETurn juLength%
 END DEFine
@@ -364,39 +479,39 @@ DEFine PROCedure json_scanstring
   jsonDoc.tokenStart = jsonDoc.position
   REPeat jsScan
     jsByte% = json_byte%(jsonDoc.position)
-    IF jsByte% = 34 THEN
+    IF jsByte% = JSON_CH_QUOTE% THEN
       jsonDoc.tokenLength = jsonDoc.position-jsonDoc.tokenStart
       jsonDoc.position = jsonDoc.position+1
       RETurn
     END IF
-    IF jsByte% < 32 THEN json_fail 4,"Unterminated string or unescaped control byte" : RETurn
-    IF jsByte% = 92 THEN
+    IF jsByte% < JSON_CH_SPACE% THEN json_fail JSON_ERR_STRING%,"Unterminated string or unescaped control byte" : RETurn
+    IF jsByte% = JSON_CH_BACKSLASH% THEN
       jsonDoc.position = jsonDoc.position+1
       jsEscape% = json_byte%(jsonDoc.position)
-      IF jsEscape% = 117 THEN
+      IF jsEscape% = JSON_CH_U% THEN
         jsUnit = json_hex4(jsonDoc.position+1)
         IF jsonDoc.error% THEN RETurn
-        jsonDoc.position = jsonDoc.position+5
-        IF jsUnit >= 55296 AND jsUnit <= 56319 THEN
-          IF json_byte%(jsonDoc.position) <> 92 OR json_byte%(jsonDoc.position+1) <> 117 THEN
-            json_fail 4,"High surrogate requires a low surrogate escape" : RETurn
+        jsonDoc.position = jsonDoc.position+JSON_UNICODE_TAIL%
+        IF jsUnit >= JSON_HIGH_FIRST AND jsUnit <= JSON_HIGH_LAST THEN
+          IF json_byte%(jsonDoc.position) <> JSON_CH_BACKSLASH% OR json_byte%(jsonDoc.position+1) <> JSON_CH_U% THEN
+            json_fail JSON_ERR_STRING%,"High surrogate requires a low surrogate escape" : RETurn
           END IF
           jsLow = json_hex4(jsonDoc.position+2)
           IF jsonDoc.error% THEN RETurn
-          IF jsLow < 56320 OR jsLow > 57343 THEN json_fail 4,"Invalid low surrogate" : RETurn
-          jsonDoc.position = jsonDoc.position+6
+          IF jsLow < JSON_LOW_FIRST OR jsLow > JSON_LOW_LAST THEN json_fail JSON_ERR_STRING%,"Invalid low surrogate" : RETurn
+          jsonDoc.position = jsonDoc.position+JSON_UNICODE_ESCAPE%
         ELSE
-          IF jsUnit >= 56320 AND jsUnit <= 57343 THEN json_fail 4,"Unpaired low surrogate" : RETurn
+          IF jsUnit >= JSON_LOW_FIRST AND jsUnit <= JSON_LOW_LAST THEN json_fail JSON_ERR_STRING%,"Unpaired low surrogate" : RETurn
         END IF
       ELSE
-        IF jsEscape% <> 34 AND jsEscape% <> 92 AND jsEscape% <> 47 AND jsEscape% <> 98 AND jsEscape% <> 102 AND jsEscape% <> 110 AND jsEscape% <> 114 AND jsEscape% <> 116 THEN
-          json_fail 4,"Invalid JSON string escape" : RETurn
+        IF jsEscape% <> JSON_CH_QUOTE% AND jsEscape% <> JSON_CH_BACKSLASH% AND jsEscape% <> JSON_CH_SLASH% AND jsEscape% <> JSON_CH_B% AND jsEscape% <> JSON_CH_F% AND jsEscape% <> JSON_CH_N% AND jsEscape% <> JSON_CH_R% AND jsEscape% <> JSON_CH_T% THEN
+          json_fail JSON_ERR_STRING%,"Invalid JSON string escape" : RETurn
         END IF
         jsonDoc.position = jsonDoc.position+1
       END IF
     ELSE
       jsLength% = 1
-      IF jsByte% >= 128 THEN jsLength% = json_utf8size%(jsonDoc.position)
+      IF jsByte% >= JSON_ASCII_LIMIT% THEN jsLength% = json_utf8size%(jsonDoc.position)
       IF jsonDoc.error% THEN RETurn
       jsonDoc.position = jsonDoc.position+jsLength%
     END IF
@@ -410,31 +525,31 @@ END DEFine
 ## remain valid JSON; json_number applies QL conversion limits later.
 DEFine PROCedure json_scannumber
   LOCal jnByte%
-  IF json_byte%(jsonDoc.position) = 45 THEN jsonDoc.position = jsonDoc.position+1
+  IF json_byte%(jsonDoc.position) = JSON_CH_MINUS% THEN jsonDoc.position = jsonDoc.position+1
   jnByte% = json_byte%(jsonDoc.position)
-  IF jnByte% = 48 THEN
+  IF jnByte% = JSON_CH_ZERO% THEN
     jsonDoc.position = jsonDoc.position+1
   ELSE
-    IF jnByte% < 49 OR jnByte% > 57 THEN json_fail 5,"Expected integer digits" : RETurn
+    IF jnByte% < JSON_CH_ONE% OR jnByte% > JSON_CH_NINE% THEN json_fail JSON_ERR_NUMBER%,"Expected integer digits" : RETurn
     REPeat jnInteger
       jsonDoc.position = jsonDoc.position+1
       IF NOT json_digit%(json_byte%(jsonDoc.position)) THEN EXIT jnInteger
     END REPeat jnInteger
   END IF
-  IF json_byte%(jsonDoc.position) = 46 THEN
+  IF json_byte%(jsonDoc.position) = JSON_CH_DOT% THEN
     jsonDoc.position = jsonDoc.position+1
-    IF NOT json_digit%(json_byte%(jsonDoc.position)) THEN json_fail 5,"Fraction requires digits" : RETurn
+    IF NOT json_digit%(json_byte%(jsonDoc.position)) THEN json_fail JSON_ERR_NUMBER%,"Fraction requires digits" : RETurn
     REPeat jnFraction
       jsonDoc.position = jsonDoc.position+1
       IF NOT json_digit%(json_byte%(jsonDoc.position)) THEN EXIT jnFraction
     END REPeat jnFraction
   END IF
   jnByte% = json_byte%(jsonDoc.position)
-  IF jnByte% = 69 OR jnByte% = 101 THEN
+  IF jnByte% = JSON_CH_E_UPPER% OR jnByte% = JSON_CH_E_LOWER% THEN
     jsonDoc.position = jsonDoc.position+1
     jnByte% = json_byte%(jsonDoc.position)
-    IF jnByte% = 43 OR jnByte% = 45 THEN jsonDoc.position = jsonDoc.position+1
-    IF NOT json_digit%(json_byte%(jsonDoc.position)) THEN json_fail 5,"Exponent requires digits" : RETurn
+    IF jnByte% = JSON_CH_PLUS% OR jnByte% = JSON_CH_MINUS% THEN jsonDoc.position = jsonDoc.position+1
+    IF NOT json_digit%(json_byte%(jsonDoc.position)) THEN json_fail JSON_ERR_NUMBER%,"Exponent requires digits" : RETurn
     REPeat jnExponent
       jsonDoc.position = jsonDoc.position+1
       IF NOT json_digit%(json_byte%(jsonDoc.position)) THEN EXIT jnExponent
@@ -449,7 +564,7 @@ DEFine PROCedure json_literal(VAL jtText$)
   LOCal jtIndex%
   FOR jtIndex% = 1 TO LEN(jtText$)
     IF json_byte%(jsonDoc.position) <> CODE(jtText$(jtIndex%)) THEN
-      json_fail 3,"Invalid JSON literal" : RETurn
+      json_fail JSON_ERR_SYNTAX%,"Invalid JSON literal" : RETurn
     END IF
     jsonDoc.position = jsonDoc.position+1
   END FOR jtIndex%
@@ -465,7 +580,7 @@ END DEFine
 DEFine FuNction json_value%
   LOCal jvNode%,jvByte%
   json_space
-  IF jsonDoc.used% >= jsonDoc.capacity% THEN json_fail 6,"JSON node capacity exhausted" : RETurn 0
+  IF jsonDoc.used% >= jsonDoc.capacity% THEN json_fail JSON_ERR_NODES%,"JSON node capacity exhausted" : RETurn 0
   jsonDoc.used% = jsonDoc.used%+1 : jvNode% = jsonDoc.used%
   jsonNodes(jvNode%).kind% = 0 : jsonNodes(jvNode%).first% = 0
   jsonNodes(jvNode%).next% = 0 : jsonNodes(jvNode%).count% = 0
@@ -474,23 +589,23 @@ DEFine FuNction json_value%
   jsonNodes(jvNode%).start = jsonDoc.position
   jvByte% = json_byte%(jsonDoc.position)
   SELect ON jvByte%
-    ON jvByte% = 123
-      jsonNodes(jvNode%).kind% = 1 : jsonDoc.position = jsonDoc.position+1
-    ON jvByte% = 91
-      jsonNodes(jvNode%).kind% = 2 : jsonDoc.position = jsonDoc.position+1
-    ON jvByte% = 34
-      jsonNodes(jvNode%).kind% = 3 : json_scanstring
-    ON jvByte% = 116
-      jsonNodes(jvNode%).kind% = 5 : json_literal "true"
-    ON jvByte% = 102
-      jsonNodes(jvNode%).kind% = 6 : json_literal "false"
-    ON jvByte% = 110
-      jsonNodes(jvNode%).kind% = 7 : json_literal "null"
+    ON jvByte% = JSON_CH_OPEN_OBJECT%
+      jsonNodes(jvNode%).kind% = JSON_KIND_OBJECT% : jsonDoc.position = jsonDoc.position+1
+    ON jvByte% = JSON_CH_OPEN_ARRAY%
+      jsonNodes(jvNode%).kind% = JSON_KIND_ARRAY% : jsonDoc.position = jsonDoc.position+1
+    ON jvByte% = JSON_CH_QUOTE%
+      jsonNodes(jvNode%).kind% = JSON_KIND_STRING% : json_scanstring
+    ON jvByte% = JSON_CH_T%
+      jsonNodes(jvNode%).kind% = JSON_KIND_TRUE% : json_literal "true"
+    ON jvByte% = JSON_CH_F%
+      jsonNodes(jvNode%).kind% = JSON_KIND_FALSE% : json_literal "false"
+    ON jvByte% = JSON_CH_N%
+      jsonNodes(jvNode%).kind% = JSON_KIND_NULL% : json_literal "null"
     ON jvByte% = REMAINDER
-      IF jvByte% = 45 OR json_digit%(jvByte%) THEN
-        jsonNodes(jvNode%).kind% = 4 : json_scannumber
+      IF jvByte% = JSON_CH_MINUS% OR json_digit%(jvByte%) THEN
+        jsonNodes(jvNode%).kind% = JSON_KIND_NUMBER% : json_scannumber
       ELSE
-        json_fail 3,"Expected a JSON value"
+        json_fail JSON_ERR_SYNTAX%,"Expected a JSON value"
       END IF
   END SELect
   IF jsonDoc.error% THEN RETurn 0
@@ -504,10 +619,10 @@ END DEFine
 ## Reused frames reset phase/last, while key spans are overwritten before use.
 DEFine PROCedure json_push(VAL jkNode%)
   LOCal jkDepth%
-  IF jsonDoc.depth% >= jsonDoc.maxDepth% THEN json_fail 7,"JSON nesting limit exceeded" : RETurn
+  IF jsonDoc.depth% >= jsonDoc.maxDepth% THEN json_fail JSON_ERR_DEPTH%,"JSON nesting limit exceeded" : RETurn
   jsonDoc.depth% = jsonDoc.depth%+1 : jkDepth% = jsonDoc.depth%
   jsonFrames(jkDepth%).node% = jkNode%
-  jsonFrames(jkDepth%).phase% = 0 : jsonFrames(jkDepth%).last% = 0
+  jsonFrames(jkDepth%).phase% = JSON_PHASE_FIRST% : jsonFrames(jkDepth%).last% = 0
 END DEFine
 
 ## INTERNAL iterative grammar driver: parse one root and its nested containers,
@@ -523,41 +638,41 @@ END DEFine
 DEFine PROCedure json_read
   LOCal jrFrame%,jrParent%,jrKind%,jrByte%,jrChild%,jrLast%,jrClose%,jrPhase%
   ## Permit a UTF-8 BOM only at the start of a document.
-  IF json_byte%(1) = 239 AND json_byte%(2) = 187 AND json_byte%(3) = 191 THEN jsonDoc.position = 4
+  IF json_byte%(1) = JSON_BOM_FIRST% AND json_byte%(2) = JSON_BOM_SECOND% AND json_byte%(3) = JSON_BOM_THIRD% THEN jsonDoc.position = JSON_BOM_BYTES%+1
   jsonDoc.root% = json_value%
   IF jsonDoc.error% THEN jsonDoc.root% = 0 : RETurn
   jrParent% = jsonDoc.root%
-  IF jsonNodes(jrParent%).kind% <= 2 THEN json_push jrParent%
+  IF jsonNodes(jrParent%).kind% <= JSON_KIND_ARRAY% THEN json_push jrParent%
   REPeat jrParse
     IF jsonDoc.error% OR jsonDoc.depth% = 0 THEN EXIT jrParse
     jrFrame% = jsonDoc.depth% : jrParent% = jsonFrames(jrFrame%).node%
     jrKind% = jsonNodes(jrParent%).kind% : jrPhase% = jsonFrames(jrFrame%).phase%
-    jrClose% = 93 : IF jrKind% = 1 THEN jrClose% = 125
+    jrClose% = JSON_CH_CLOSE_ARRAY% : IF jrKind% = JSON_KIND_OBJECT% THEN jrClose% = JSON_CH_CLOSE_OBJECT%
     json_space : jrByte% = json_byte%(jsonDoc.position)
 ## A close is legal for an empty container (phase 0) or after an item
 ## (phase 2), but never immediately after a comma (phase 1).
-    IF jrByte% = jrClose% AND jrPhase% <> 1 THEN
+    IF jrByte% = jrClose% AND jrPhase% <> JSON_PHASE_REQUIRED% THEN
       jsonDoc.position = jsonDoc.position+1
       jsonNodes(jrParent%).length = jsonDoc.position-jsonNodes(jrParent%).start
       jsonDoc.depth% = jsonDoc.depth%-1
     ELSE
-      IF jrPhase% = 2 THEN
-        IF jrByte% <> 44 THEN json_fail 3,"Expected comma or container end" : EXIT jrParse
-        jsonDoc.position = jsonDoc.position+1 : jsonFrames(jrFrame%).phase% = 1
+      IF jrPhase% = JSON_PHASE_AFTER% THEN
+        IF jrByte% <> JSON_CH_COMMA% THEN json_fail JSON_ERR_SYNTAX%,"Expected comma or container end" : EXIT jrParse
+        jsonDoc.position = jsonDoc.position+1 : jsonFrames(jrFrame%).phase% = JSON_PHASE_REQUIRED%
       ELSE
-        IF jrKind% = 1 THEN
-          IF jrByte% <> 34 THEN json_fail 3,"Expected an object member name" : EXIT jrParse
+        IF jrKind% = JSON_KIND_OBJECT% THEN
+          IF jrByte% <> JSON_CH_QUOTE% THEN json_fail JSON_ERR_SYNTAX%,"Expected an object member name" : EXIT jrParse
           json_scanstring
           IF jsonDoc.error% THEN EXIT jrParse
           jsonFrames(jrFrame%).keyStart = jsonDoc.tokenStart
           jsonFrames(jrFrame%).keyLength = jsonDoc.tokenLength
           json_space
-          IF json_byte%(jsonDoc.position) <> 58 THEN json_fail 3,"Expected colon after member name" : EXIT jrParse
+          IF json_byte%(jsonDoc.position) <> JSON_CH_COLON% THEN json_fail JSON_ERR_SYNTAX%,"Expected colon after member name" : EXIT jrParse
           jsonDoc.position = jsonDoc.position+1
         END IF
         jrChild% = json_value%
         IF jsonDoc.error% THEN EXIT jrParse
-        IF jrKind% = 1 THEN
+        IF jrKind% = JSON_KIND_OBJECT% THEN
           jsonNodes(jrChild%).keyStart = jsonFrames(jrFrame%).keyStart
           jsonNodes(jrChild%).keyLength = jsonFrames(jrFrame%).keyLength
         END IF
@@ -569,15 +684,15 @@ DEFine PROCedure json_read
         ELSE
           jsonNodes(jrLast%).next% = jrChild%
         END IF
-        jsonFrames(jrFrame%).last% = jrChild% : jsonFrames(jrFrame%).phase% = 2
+        jsonFrames(jrFrame%).last% = jrChild% : jsonFrames(jrFrame%).phase% = JSON_PHASE_AFTER%
         jsonNodes(jrParent%).count% = jsonNodes(jrParent%).count%+1
-        IF jsonNodes(jrChild%).kind% <= 2 THEN json_push jrChild%
+        IF jsonNodes(jrChild%).kind% <= JSON_KIND_ARRAY% THEN json_push jrChild%
       END IF
     END IF
   END REPeat jrParse
   IF NOT jsonDoc.error% THEN
     json_space
-    IF jsonDoc.position <= jsonDoc.bytes THEN json_fail 3,"Unexpected text after JSON value"
+    IF jsonDoc.position <= jsonDoc.bytes THEN json_fail JSON_ERR_SYNTAX%,"Unexpected text after JSON value"
   END IF
   IF jsonDoc.error% THEN jsonDoc.root% = 0
 END DEFine
@@ -589,7 +704,7 @@ END DEFine
 DEFine FuNction json_valid%(VAL jaNode%)
   IF jsonDoc.error% THEN RETurn 0
   IF jaNode% < 1 OR jaNode% > jsonDoc.used% THEN
-    json_fail 8,"Invalid JSON node handle" : RETurn 0
+    json_fail JSON_ERR_ACCESSOR%,"Invalid JSON node handle" : RETurn 0
   END IF
   RETurn 1
 END DEFine
@@ -617,7 +732,7 @@ DEFine FuNction json_keyis%(VAL jiStart, VAL jiLength, VAL jiName$)
   IF jiLength > LEN(jiName$) THEN RETurn json_equal%(json_decode$(jiStart,jiLength),jiName$)
   FOR jiIndex = 1 TO jiLength
     jiByte% = json_byte%(jiStart+jiIndex-1)
-    IF jiByte% = 92 OR jiByte% <> CODE(jiName$(jiIndex)) THEN RETurn 0
+    IF jiByte% = JSON_CH_BACKSLASH% OR jiByte% <> CODE(jiName$(jiIndex)) THEN RETurn 0
   END FOR jiIndex
   RETurn 1
 END DEFine
@@ -627,23 +742,23 @@ END DEFine
 ## Real-valued locals avoid the QL signed 16-bit limit; output is at most four bytes.
 ## QL display-character conversion is deliberately not implicit.
 DEFine FuNction json_utf8$(VAL jyCode)
-  LOCal jyOut$(4),jyLast,jyMiddle,jyUpper
+  LOCal jyOut$(JSON_UTF8_FOUR%),jyLast,jyMiddle,jyUpper
   ## Turbo's MOD can coerce operands to signed integers. Use real arithmetic
   ## for Unicode scalars above 32767, including supplementary characters.
-  jyLast = jyCode-64*INT(jyCode/64)
-  jyMiddle = INT(jyCode/64)-64*INT(jyCode/4096)
-  jyUpper = INT(jyCode/4096)-64*INT(jyCode/262144)
-  IF jyCode < 128 THEN RETurn CHR$(jyCode)
-  IF jyCode < 2048 THEN
-    jyOut$ = CHR$(192+INT(jyCode/64)) & CHR$(128+jyLast)
+  jyLast = jyCode-JSON_UTF8_RADIX%*INT(jyCode/JSON_UTF8_RADIX%)
+  jyMiddle = INT(jyCode/JSON_UTF8_RADIX%)-JSON_UTF8_RADIX%*INT(jyCode/JSON_UTF8_RADIX2%)
+  jyUpper = INT(jyCode/JSON_UTF8_RADIX2%)-JSON_UTF8_RADIX%*INT(jyCode/JSON_UTF8_RADIX3)
+  IF jyCode < JSON_ASCII_LIMIT% THEN RETurn CHR$(jyCode)
+  IF jyCode < JSON_UTF8_THREE_MIN% THEN
+    jyOut$ = CHR$(JSON_UTF8_TWO_PREFIX%+INT(jyCode/JSON_UTF8_RADIX%)) & CHR$(JSON_UTF8_CONT_MIN%+jyLast)
     RETurn jyOut$
   END IF
-  IF jyCode < 65536 THEN
-    jyOut$ = CHR$(224+INT(jyCode/4096)) & CHR$(128+jyMiddle)
-    RETurn jyOut$ & CHR$(128+jyLast)
+  IF jyCode < JSON_BMP_LIMIT THEN
+    jyOut$ = CHR$(JSON_UTF8_THREE_PREFIX%+INT(jyCode/JSON_UTF8_RADIX2%)) & CHR$(JSON_UTF8_CONT_MIN%+jyMiddle)
+    RETurn jyOut$ & CHR$(JSON_UTF8_CONT_MIN%+jyLast)
   END IF
-  jyOut$ = CHR$(240+INT(jyCode/262144)) & CHR$(128+jyUpper)
-  RETurn jyOut$ & CHR$(128+jyMiddle) & CHR$(128+jyLast)
+  jyOut$ = CHR$(JSON_UTF8_FOUR_PREFIX%+INT(jyCode/JSON_UTF8_RADIX3)) & CHR$(JSON_UTF8_CONT_MIN%+jyUpper)
+  RETurn jyOut$ & CHR$(JSON_UTF8_CONT_MIN%+jyMiddle) & CHR$(JSON_UTF8_CONT_MIN%+jyLast)
 END DEFine
 
 ## INTERNAL: decode a validated string/key CONTENT span; its end is exclusive.
@@ -654,31 +769,31 @@ END DEFine
 ## Check the 4096-byte OUTPUT limit before appending; escaped and decoded lengths
 ## can differ. Report overflow at the span's start, without silent truncation.
 DEFine FuNction json_decode$(VAL jxStart, VAL jxLength)
-  LOCal jxOut$(4096),jxPart$(4),jxPosition,jxEnd,jxByte%,jxEscape%,jxUnit,jxLow
+  LOCal jxOut$(JSON_MAX_TEXT%),jxPart$(JSON_UTF8_FOUR%),jxPosition,jxEnd,jxByte%,jxEscape%,jxUnit,jxLow
   jxOut$ = "" : jxPosition = jxStart : jxEnd = jxStart+jxLength
   REPeat jxDecode
     IF jxPosition >= jxEnd OR jsonDoc.error% THEN EXIT jxDecode
     jxByte% = json_byte%(jxPosition) : jxPosition = jxPosition+1
     jxPart$ = CHR$(jxByte%)
-    IF jxByte% = 92 THEN
+    IF jxByte% = JSON_CH_BACKSLASH% THEN
       jxEscape% = json_byte%(jxPosition) : jxPosition = jxPosition+1
       SELect ON jxEscape%
-        ON jxEscape% = 98 : jxPart$ = CHR$(8)
-        ON jxEscape% = 102 : jxPart$ = CHR$(12)
-        ON jxEscape% = 110 : jxPart$ = CHR$(10)
-        ON jxEscape% = 114 : jxPart$ = CHR$(13)
-        ON jxEscape% = 116 : jxPart$ = CHR$(9)
-        ON jxEscape% = 117
-          jxUnit = json_hex4(jxPosition) : jxPosition = jxPosition+4
-          IF jxUnit >= 55296 AND jxUnit <= 56319 THEN
-            jxLow = json_hex4(jxPosition+2) : jxPosition = jxPosition+6
-            jxUnit = 65536+(jxUnit-55296)*1024+jxLow-56320
+        ON jxEscape% = JSON_CH_B% : jxPart$ = CHR$(JSON_CH_BACKSPACE%)
+        ON jxEscape% = JSON_CH_F% : jxPart$ = CHR$(JSON_CH_FORMFEED%)
+        ON jxEscape% = JSON_CH_N% : jxPart$ = CHR$(JSON_CH_LF%)
+        ON jxEscape% = JSON_CH_R% : jxPart$ = CHR$(JSON_CH_CR%)
+        ON jxEscape% = JSON_CH_T% : jxPart$ = CHR$(JSON_CH_TAB%)
+        ON jxEscape% = JSON_CH_U%
+          jxUnit = json_hex4(jxPosition) : jxPosition = jxPosition+JSON_HEX_DIGITS%
+          IF jxUnit >= JSON_HIGH_FIRST AND jxUnit <= JSON_HIGH_LAST THEN
+            jxLow = json_hex4(jxPosition+2) : jxPosition = jxPosition+JSON_UNICODE_ESCAPE%
+            jxUnit = JSON_BMP_LIMIT+(jxUnit-JSON_HIGH_FIRST)*JSON_SURROGATE_RADIX%+jxLow-JSON_LOW_FIRST
           END IF
           jxPart$ = json_utf8$(jxUnit)
         ON jxEscape% = REMAINDER : jxPart$ = CHR$(jxEscape%)
       END SELect
     END IF
-    IF LEN(jxOut$)+LEN(jxPart$) > 4096 THEN json_failat 9,jxStart,"Decoded string exceeds 4096 bytes" : RETurn ""
+    IF LEN(jxOut$)+LEN(jxPart$) > JSON_MAX_TEXT% THEN json_failat JSON_ERR_LIMIT%,jxStart,"Decoded string exceeds 4096 bytes" : RETurn ""
     jxOut$ = jxOut$ & jxPart$
   END REPeat jxDecode
   RETurn jxOut$
@@ -693,7 +808,7 @@ END DEFine
 DEFine FuNction json_member%(VAL jmNode%, VAL jmName$)
   LOCal jmChild%
   IF NOT json_valid%(jmNode%) THEN RETurn 0
-  IF jsonNodes(jmNode%).kind% <> 1 THEN json_failat 8,jsonNodes(jmNode%).start,"Object required" : RETurn 0
+  IF jsonNodes(jmNode%).kind% <> JSON_KIND_OBJECT% THEN json_failat JSON_ERR_ACCESSOR%,jsonNodes(jmNode%).start,"Object required" : RETurn 0
   jmChild% = jsonNodes(jmNode%).first%
   REPeat jmFind
     IF jmChild% = 0 OR jsonDoc.error% THEN EXIT jmFind
@@ -708,7 +823,7 @@ END DEFine
 ## is not an object member (keyStart = 0) is accessor misuse (error 8).
 DEFine FuNction json_name$(VAL jnmNode%)
   IF NOT json_valid%(jnmNode%) THEN RETurn ""
-  IF jsonNodes(jnmNode%).keyStart = 0 THEN json_failat 8,jsonNodes(jnmNode%).start,"Object member required" : RETurn ""
+  IF jsonNodes(jnmNode%).keyStart = 0 THEN json_failat JSON_ERR_ACCESSOR%,jsonNodes(jnmNode%).start,"Object member required" : RETurn ""
   RETurn json_decode$(jsonNodes(jnmNode%).keyStart,jsonNodes(jnmNode%).keyLength)
 END DEFine
 
@@ -719,7 +834,7 @@ END DEFine
 DEFine FuNction json_at%(VAL jaArray%, VAL jaIndex%)
   LOCal jaChild%,jaCount%
   IF NOT json_valid%(jaArray%) THEN RETurn 0
-  IF jsonNodes(jaArray%).kind% <> 2 THEN json_failat 8,jsonNodes(jaArray%).start,"Array required" : RETurn 0
+  IF jsonNodes(jaArray%).kind% <> JSON_KIND_ARRAY% THEN json_failat JSON_ERR_ACCESSOR%,jsonNodes(jaArray%).start,"Array required" : RETurn 0
   IF jaIndex% < 0 THEN RETurn 0
   jaChild% = jsonNodes(jaArray%).first% : jaCount% = 0
   REPeat jaFind
@@ -734,7 +849,7 @@ END DEFine
 ## error% still zero. A wrong type also returns "" but sets error% = 8.
 DEFine FuNction json_string$(VAL jgNode%)
   IF NOT json_valid%(jgNode%) THEN RETurn ""
-  IF jsonNodes(jgNode%).kind% <> 3 THEN json_failat 8,jsonNodes(jgNode%).start,"String required" : RETurn ""
+  IF jsonNodes(jgNode%).kind% <> JSON_KIND_STRING% THEN json_failat JSON_ERR_ACCESSOR%,jsonNodes(jgNode%).start,"String required" : RETurn ""
   RETurn json_decode$(jsonNodes(jgNode%).start+1,jsonNodes(jgNode%).length-2)
 END DEFine
 
@@ -743,9 +858,9 @@ END DEFine
 ## Return at most 4096 bytes; larger values report error 9 and remain accessible
 ## through start/length spans and json_byte%.
 DEFine FuNction json_raw$(VAL jqNode%)
-  LOCal jqOut$(4096),jqIndex,jqStart
+  LOCal jqOut$(JSON_MAX_TEXT%),jqIndex,jqStart
   IF NOT json_valid%(jqNode%) THEN RETurn ""
-  IF jsonNodes(jqNode%).length > 4096 THEN json_failat 9,jsonNodes(jqNode%).start,"Raw value exceeds 4096 bytes" : RETurn ""
+  IF jsonNodes(jqNode%).length > JSON_MAX_TEXT% THEN json_failat JSON_ERR_LIMIT%,jsonNodes(jqNode%).start,"Raw value exceeds 4096 bytes" : RETurn ""
   jqOut$ = "" : jqStart = jsonNodes(jqNode%).start
   FOR jqIndex = 0 TO jsonNodes(jqNode%).length-1
     jqOut$ = jqOut$ & CHR$(json_byte%(jqStart+jqIndex))
@@ -762,18 +877,18 @@ END DEFine
 ## Keep large seeds in real variables, not %-suffixed integers.
 ## Use json_raw$ for exact decimal text rather than rounded arithmetic.
 DEFine FuNction json_number(VAL jzNode%)
-  LOCal jzText$(128),jzIndex%,jzByte%,jzExp%,jzSeen%,jzValue
+  LOCal jzText$(JSON_NUMBER_CHARS%),jzIndex%,jzByte%,jzExp%,jzSeen%,jzValue
   IF NOT json_valid%(jzNode%) THEN RETurn 0
-  IF jsonNodes(jzNode%).kind% <> 4 THEN json_failat 8,jsonNodes(jzNode%).start,"Number required" : RETurn 0
-  IF jsonNodes(jzNode%).length > 128 THEN json_failat 9,jsonNodes(jzNode%).start,"Number conversion exceeds 128 characters" : RETurn 0
+  IF jsonNodes(jzNode%).kind% <> JSON_KIND_NUMBER% THEN json_failat JSON_ERR_ACCESSOR%,jsonNodes(jzNode%).start,"Number required" : RETurn 0
+  IF jsonNodes(jzNode%).length > JSON_NUMBER_CHARS% THEN json_failat JSON_ERR_LIMIT%,jsonNodes(jzNode%).start,"Number conversion exceeds 128 characters" : RETurn 0
   jzText$ = json_raw$(jzNode%) : jzExp% = 0 : jzSeen% = 0
   FOR jzIndex% = 1 TO LEN(jzText$)
     jzByte% = CODE(jzText$(jzIndex%))
     IF jzSeen% AND json_digit%(jzByte%) THEN
-      jzExp% = jzExp%*10+jzByte%-48
-      IF jzExp% > 128 THEN json_failat 9,jsonNodes(jzNode%).start,"Number exponent exceeds conversion range" : RETurn 0
+      jzExp% = jzExp%*JSON_DECIMAL_BASE%+jzByte%-JSON_CH_ZERO%
+      IF jzExp% > JSON_MAX_EXPONENT% THEN json_failat JSON_ERR_LIMIT%,jsonNodes(jzNode%).start,"Number exponent exceeds conversion range" : RETurn 0
     END IF
-    IF jzByte% = 69 OR jzByte% = 101 THEN jzSeen% = 1
+    IF jzByte% = JSON_CH_E_UPPER% OR jzByte% = JSON_CH_E_LOWER% THEN jzSeen% = 1
   END FOR jzIndex%
   jzValue = jzText$
   RETurn jzValue
@@ -784,8 +899,8 @@ END DEFine
 ## error% is checked: legitimate false leaves error% zero; misuse sets error 8.
 DEFine FuNction json_boolean%(VAL jbNode%)
   IF NOT json_valid%(jbNode%) THEN RETurn 0
-  IF jsonNodes(jbNode%).kind% = 5 THEN RETurn 1
-  IF jsonNodes(jbNode%).kind% = 6 THEN RETurn 0
-  json_failat 8,jsonNodes(jbNode%).start,"Boolean required"
+  IF jsonNodes(jbNode%).kind% = JSON_KIND_TRUE% THEN RETurn 1
+  IF jsonNodes(jbNode%).kind% = JSON_KIND_FALSE% THEN RETurn 0
+  json_failat JSON_ERR_ACCESSOR%,jsonNodes(jbNode%).start,"Boolean required"
   RETurn 0
 END DEFine

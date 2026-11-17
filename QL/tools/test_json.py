@@ -3,10 +3,11 @@
 Uses an existing local SSB 2.8.0 / Turbo / SMSQmulator installation. Fixtures,
 ROM and toolchain binaries stay outside the repository. No user drives mount.
 """
-import argparse,datetime,hashlib,json,os,shutil,subprocess,time
+import argparse,datetime,hashlib,json,os,re,shutil,subprocess,time
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
+PARSER=ROOT/'Parser'
 class Obj(list): pass
 class Num(str): pass
 def decoded(raw):
@@ -105,15 +106,16 @@ def main():
     folder=(args.work or Path(os.environ['TEMP'])/'tangles-json-tests'/str(time.time_ns())).resolve();folder.mkdir(parents=True)
     tool=args.ssb_root
     for name in ['ssb280_exe','parser_task','codegen_task','ttk','env_bin']:shutil.copy2(tool/'build/compiled-app'/name,folder/name)
-    shutil.copy2(ROOT/'json.ssb',folder/'json_ssb');cases=fixtures()
+    shutil.copy2(PARSER/'json.ssb',folder/'json_ssb');cases=fixtures()
+    shutil.copy2(PARSER/'pack.ssb',folder/'pack_ssb')
     for i,c in enumerate(cases):(folder/f'f{i:03d}').write_bytes(c['data'])
     packs={}
     for src in sorted(args.packs.glob('*.json')):
         name=src.stem.replace('-','')+'_json';packs[name]=src.read_bytes();(folder/name).write_bytes(packs[name])
     source=driver(cases,packs)
     if args.example:
-        example=(ROOT/'pack_example.ssb').read_text(encoding='ascii')
-        source=example.replace('#INCLUDE json_ssb','#INCLUDE json_ssb\nOPEN_NEW #9,"nfa1_result"').replace('PRINT ','PRINT #9,')
+        example=(PARSER/'pack_example.ssb').read_text(encoding='ascii')
+        source=example.replace('#INCLUDE pack_ssb','#INCLUDE pack_ssb\nOPEN_NEW #9,"nfa1_result"').replace('PRINT ','PRINT #9,')
         before,after=source.rsplit('\nSTOP\n',1)
         source=before+'\nCLOSE #9\nOPEN_NEW #9,"nfa1_done":PRINT #9,"OK":CLOSE #9\nSTOP\n'+after
         (folder/'starter_json').write_bytes((args.packs/'starter.json').read_bytes())
@@ -144,6 +146,13 @@ def main():
     print('Running actual SMSQ/E'+(' + Turbo' if args.compile else ' interpreted')+': '+str(folder),flush=True)
     run=subprocess.run(command,capture_output=True,timeout=args.timeout+30);(folder/'emulator.log').write_bytes(run.stdout+run.stderr)
     errors=[]
+    # Turbo's MANIFEST applies only to assignments on the same BASIC line.
+    # An older SSB record expander split these into ordinary runtime variables.
+    manifest_count=len(re.findall(r'^MANIFEST\s*:',(PARSER/'json.ssb').read_text('ascii'),re.M))
+    if args.example:manifest_count+=len(re.findall(r'^MANIFEST\s*:',(PARSER/'pack.ssb').read_text('ascii'),re.M))
+    translated=(folder/'output_bas').read_text('latin1') if (folder/'output_bas').exists() else ''
+    manifests_preserved=len(re.findall(r'^\d+\s+MANIFEST\s*:',translated,re.M))==manifest_count
+    if not manifests_preserved:errors.append('SSB must preserve MANIFEST and its assignments on the same BASIC line; update the local translator')
     if run.returncode:errors.append('emulator returned '+str(run.returncode))
     if (folder/'errorlog').exists():errors.append((folder/'errorlog').read_text('latin1'))
     if not (folder/'done').exists():errors.append('no completion marker')
@@ -159,6 +168,6 @@ def main():
             if [''.join(x.split()) for x in expected]!=[''.join(x.split()) for x in actual]:errors.append('Example output differs from starter pack IDs/dimensions/endpoints')
         else:errors+=verify(folder,cases,packs)
     else:errors.append('no result file')
-    report={'passed':not errors,'compiled':args.compile,'example':args.example,'ramMiB':args.ram_mib,'caseCount':0 if args.example else len(cases),'packCount':1 if args.example else len(packs),'packNodes':{k:len(expected_nodes(v)) for k,v in packs.items()},'packSha256':{k:hashlib.sha256(v).hexdigest() for k,v in packs.items()},'librarySha256':hashlib.sha256((ROOT/'json.ssb').read_bytes()).hexdigest(),'errors':errors[:30],'folder':str(folder),'testedAt':datetime.datetime.now(datetime.timezone.utc).isoformat()}
+    report={'passed':not errors,'compiled':args.compile,'example':args.example,'ramMiB':args.ram_mib,'caseCount':0 if args.example else len(cases),'packCount':1 if args.example else len(packs),'packNodes':{k:len(expected_nodes(v)) for k,v in packs.items()},'packSha256':{k:hashlib.sha256(v).hexdigest() for k,v in packs.items()},'librarySha256':hashlib.sha256((PARSER/'json.ssb').read_bytes()).hexdigest(),'manifestCount':manifest_count,'manifestsPreserved':manifests_preserved,'errors':errors[:30],'folder':str(folder),'testedAt':datetime.datetime.now(datetime.timezone.utc).isoformat()}
     (folder/'verification.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2));return 0 if report['passed'] else 1
 if __name__=='__main__':raise SystemExit(main())

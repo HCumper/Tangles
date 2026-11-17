@@ -1,0 +1,326 @@
+## Tangles v1 loading layer. Consumers include pack_ssb instead of json_ssb.
+## All JSON navigation stays here; only validated clues become game records.
+## pack_load / pack_parse replace ONE current pack. Check packDoc.error% first.
+## Both outcomes free the JSON tree. Failure clears all published model counts.
+#INCLUDE json_ssb
+
+MANIFEST : PACK_TEXT_CHARS% = 128
+MANIFEST : PACK_MESSAGE_CHARS% = 160
+MANIFEST : PACK_MAX_SIDE% = 64
+MANIFEST : PACK_MAX_PUZZLES% = 10000
+MANIFEST : PACK_MAX_PAIRS% = 32766
+MANIFEST : PACK_DEPTH% = 32
+MANIFEST : PACK_FORMAT% = 1
+MANIFEST : PACK_INTEGER_MAX% = 32767
+MANIFEST : PACK_ERR_JSON% = 1
+MANIFEST : PACK_ERR_SCHEMA% = 2
+MANIFEST : PACK_ERR_FORMAT% = 3
+MANIFEST : PACK_ERR_RULES% = 4
+MANIFEST : PACK_ERR_CLUES% = 5
+MANIFEST : PACK_ERR_LIMIT% = 6
+
+## Non-ASCII whitespace in .NET's string predicate.
+MANIFEST : PACK_WS_NEL% = 133
+MANIFEST : PACK_WS_NBSP% = 160
+MANIFEST : PACK_WS_OGHAM% = 5760
+MANIFEST : PACK_WS_EN_QUAD% = 8192
+MANIFEST : PACK_WS_HAIR% = 8202
+MANIFEST : PACK_WS_LINE% = 8232
+MANIFEST : PACK_WS_PARAGRAPH% = 8233
+MANIFEST : PACK_WS_NARROW% = 8239
+MANIFEST : PACK_WS_MEDIUM% = 8287
+MANIFEST : PACK_WS_IDEO% = 12288
+
+TYPE TanglesCell
+  x%
+  y%
+END TYPE
+TYPE TanglesPair
+  label$(PACK_TEXT_CHARS%)
+  start AS TanglesCell
+  finish AS TanglesCell
+END TYPE
+TYPE TanglesPuzzle
+  id$(PACK_TEXT_CHARS%)
+  width%
+  height%
+  requireFullCoverage%
+  firstPair%
+  pairCount%
+END TYPE
+TYPE TanglesPack
+  formatVersion%
+  requireFullCoverage%
+  puzzleCount%
+  pairCount%
+  error%
+  jsonError%
+  errorPosition
+  message$(PACK_MESSAGE_CHARS%)
+END TYPE
+
+DIM packDoc AS TanglesPack
+DIM packPuzzles(0) AS TanglesPuzzle
+DIM packPairs(0) AS TanglesPair
+DIM packOccupied%(0,0),packContext$(PACK_TEXT_CHARS%)
+packAt = 0 : packContext$ = "Pack"
+
+## PUBLIC: release records and clear diagnostics. This does not touch a JSON
+## document subsequently loaded independently by another part of a program.
+DEFine PROCedure pack_free
+  pack_release
+  DIM packDoc AS TanglesPack
+  packAt = 0 : packContext$ = "Pack"
+END DEFine
+
+## PUBLIC: file limit 1 MiB, depth 32. 4096 nodes suffice for starter.json.
+DEFine PROCedure pack_load(VAL plFile$, VAL plCapacity%)
+  pack_free
+  json_load plFile$,plCapacity%,JSON_MAX_BYTES,PACK_DEPTH%
+  pack_finish
+END DEFine
+
+## PUBLIC: small documents already held in a QL string.
+DEFine PROCedure pack_parse(VAL ppText$, VAL ppCapacity%)
+  pack_free
+  json_parse ppText$,ppCapacity%,PACK_DEPTH%
+  pack_finish
+END DEFine
+
+DEFine PROCedure pack_finish
+  IF jsonDoc.error% THEN
+    pack_jsonerror
+  ELSE
+    pack_read
+    IF jsonDoc.error% THEN pack_jsonerror
+  END IF
+  json_free
+  DIM packOccupied%(0,0)
+  IF packDoc.error% THEN pack_release
+END DEFine
+
+DEFine PROCedure pack_release
+  DIM packPuzzles(0) AS TanglesPuzzle
+  DIM packPairs(0) AS TanglesPair
+  DIM packOccupied%(0,0)
+  packDoc.formatVersion% = 0 : packDoc.requireFullCoverage% = 0
+  packDoc.puzzleCount% = 0 : packDoc.pairCount% = 0
+END DEFine
+
+DEFine PROCedure pack_fail(VAL pfCode%, VAL pfMessage$)
+  LOCal pfFull$(PACK_MESSAGE_CHARS%+PACK_TEXT_CHARS%+2)
+  IF packDoc.error% THEN RETurn
+  packDoc.error% = pfCode% : packDoc.errorPosition = packAt
+  pfFull$ = packContext$ & ": " & pfMessage$
+  IF LEN(pfFull$) > PACK_MESSAGE_CHARS% THEN pfFull$ = pfFull$(1 TO PACK_MESSAGE_CHARS%)
+  packDoc.message$ = pfFull$
+END DEFine
+
+DEFine PROCedure pack_jsonerror
+  IF packDoc.error% THEN RETurn
+  packAt = jsonDoc.errorPosition
+  pack_fail PACK_ERR_JSON%,jsonDoc.message$
+  packDoc.jsonError% = jsonDoc.error%
+END DEFine
+
+## Byte equality avoids BASIC's case/number-aware string collation.
+DEFine FuNction pack_equal%(VAL peLeft$, VAL peRight$)
+  LOCal peIndex%
+  IF LEN(peLeft$) <> LEN(peRight$) THEN RETurn 0
+  FOR peIndex% = 1 TO LEN(peLeft$)
+    IF CODE(peLeft$(peIndex%)) <> CODE(peRight$(peIndex%)) THEN RETurn 0
+  END FOR peIndex%
+  RETurn 1
+END DEFine
+
+## Required member lookup; last duplicate wins, as with JsonElement in F#.
+## kind%=0 accepts any type, used only by the Boolean reader.
+DEFine FuNction pack_member%(VAL pmParent%, VAL pmName$, VAL pmKind%)
+  LOCal pmNode%,pmFound%,pmKey$(JSON_MAX_TEXT%)
+  IF packDoc.error% THEN RETurn 0
+  packAt = jsonNodes(pmParent%).start
+  IF jsonNodes(pmParent%).kind% <> JSON_KIND_OBJECT% THEN pack_fail PACK_ERR_SCHEMA%,"Object required" : RETurn 0
+  pmFound% = 0 : pmNode% = jsonNodes(pmParent%).first%
+  REPeat pmSearch
+    IF pmNode% = 0 THEN EXIT pmSearch
+    pmKey$ = json_name$(pmNode%)
+    IF jsonDoc.error% THEN pack_jsonerror : RETurn 0
+    IF pack_equal%(pmKey$,pmName$) THEN pmFound% = pmNode%
+    pmNode% = jsonNodes(pmNode%).next%
+  END REPeat pmSearch
+  IF pmFound% = 0 THEN pack_fail PACK_ERR_SCHEMA%,"Missing field '" & pmName$ & "'" : RETurn 0
+  packAt = jsonNodes(pmFound%).start
+  IF pmKind% <> 0 THEN
+    IF jsonNodes(pmFound%).kind% <> pmKind% THEN pack_fail PACK_ERR_SCHEMA%,"Wrong type for '" & pmName$ & "'" : RETurn 0
+  END IF
+  RETurn pmFound%
+END DEFine
+
+## Read integral tokens without floating-point rounding or unsafe conversion.
+## Fractions/exponents are rejected like GetInt32; -0 is accepted. Accumulation
+## is bounded before assigning a signed % value, even for huge number tokens.
+DEFine FuNction pack_integer%(VAL piParent%, VAL piName$, VAL piMin%, VAL piMax%)
+  LOCal piNode%,piPosition,piEnd,piValue,piSign%,piByte%
+  piNode% = pack_member%(piParent%,piName$,JSON_KIND_NUMBER%)
+  IF packDoc.error% THEN RETurn 0
+  piPosition = jsonNodes(piNode%).start : piEnd = piPosition+jsonNodes(piNode%).length
+  piSign% = 1 : piValue = 0
+  IF json_byte%(piPosition) = JSON_CH_MINUS% THEN piSign% = -1 : piPosition = piPosition+1
+  FOR piPosition = piPosition TO piEnd-1
+    piByte% = json_byte%(piPosition)
+    IF piByte% < JSON_CH_ZERO% OR piByte% > JSON_CH_NINE% THEN pack_fail PACK_ERR_SCHEMA%,"Integer required for '" & piName$ & "'" : RETurn 0
+    piValue = piValue*JSON_DECIMAL_BASE%+piByte%-JSON_CH_ZERO%
+    IF piValue > piMax% THEN pack_fail PACK_ERR_SCHEMA%,"Out of range: '" & piName$ & "'" : RETurn 0
+  END FOR piPosition
+  piValue = piValue*piSign%
+  IF piValue < piMin% THEN pack_fail PACK_ERR_SCHEMA%,"Out of range: '" & piName$ & "'" : RETurn 0
+  RETurn piValue
+END DEFine
+
+DEFine FuNction pack_flag%(VAL pbParent%, VAL pbName$)
+  LOCal pbNode%,pbKind%
+  pbNode% = pack_member%(pbParent%,pbName$,0)
+  IF packDoc.error% THEN RETurn 0
+  pbKind% = jsonNodes(pbNode%).kind%
+  IF pbKind% <> JSON_KIND_TRUE% AND pbKind% <> JSON_KIND_FALSE% THEN pack_fail PACK_ERR_SCHEMA%,"Boolean required for '" & pbName$ & "'" : RETurn 0
+  RETurn json_boolean%(pbNode%)
+END DEFine
+
+## Unicode whitespace recognised by .NET IsNullOrWhiteSpace. Input strings
+## have already passed the JSON parser's UTF-8 validation.
+DEFine FuNction pack_blank%(VAL pwText$)
+  LOCal pwIndex%,pwSize%,pwByte%,pwCode,pwTail%
+  pwIndex% = 1
+  REPeat pwScan
+    IF pwIndex% > LEN(pwText$) THEN EXIT pwScan
+    pwByte% = CODE(pwText$(pwIndex%)) : pwSize% = 1 : pwCode = pwByte%
+    IF pwByte% >= JSON_UTF8_TWO_PREFIX% THEN
+      pwSize% = 2 : pwCode = pwByte%-JSON_UTF8_TWO_PREFIX%
+      IF pwByte% >= JSON_UTF8_THREE_PREFIX% THEN pwSize% = 3 : pwCode = pwByte%-JSON_UTF8_THREE_PREFIX%
+      IF pwByte% >= JSON_UTF8_FOUR_PREFIX% THEN pwSize% = 4 : pwCode = pwByte%-JSON_UTF8_FOUR_PREFIX%
+      FOR pwTail% = 1 TO pwSize%-1
+        pwCode = JSON_UTF8_RADIX%*pwCode+CODE(pwText$(pwIndex%+pwTail%))-JSON_UTF8_CONT_MIN%
+      END FOR pwTail%
+    END IF
+    IF NOT (pwCode >= JSON_CH_TAB% AND pwCode <= JSON_CH_CR%) THEN
+      IF pwCode <> JSON_CH_SPACE% AND pwCode <> PACK_WS_NEL% AND pwCode <> PACK_WS_NBSP% AND pwCode <> PACK_WS_OGHAM% THEN
+        IF NOT (pwCode >= PACK_WS_EN_QUAD% AND pwCode <= PACK_WS_HAIR%) THEN
+          IF pwCode <> PACK_WS_LINE% AND pwCode <> PACK_WS_PARAGRAPH% AND pwCode <> PACK_WS_NARROW% AND pwCode <> PACK_WS_MEDIUM% AND pwCode <> PACK_WS_IDEO% THEN RETurn 0
+        END IF
+      END IF
+    END IF
+    pwIndex% = pwIndex%+pwSize%
+  END REPeat pwScan
+  RETurn 1
+END DEFine
+
+DEFine FuNction pack_text$(VAL ptParent%, VAL ptName$)
+  LOCal ptNode%,ptText$(JSON_MAX_TEXT%)
+  ptNode% = pack_member%(ptParent%,ptName$,JSON_KIND_STRING%)
+  IF packDoc.error% THEN RETurn ""
+  ptText$ = json_string$(ptNode%)
+  IF jsonDoc.error% THEN pack_jsonerror : RETurn ""
+  IF LEN(ptText$) > PACK_TEXT_CHARS% THEN pack_fail PACK_ERR_LIMIT%,"Text exceeds 128 UTF-8 bytes: '" & ptName$ & "'" : RETurn ""
+  IF pack_blank%(ptText$) THEN pack_fail PACK_ERR_SCHEMA%,"Blank field '" & ptName$ & "'" : RETurn ""
+  RETurn ptText$
+END DEFine
+
+## First pass maps headers and sizes exact arrays. Second pass maps pairs.
+## Metadata, stored solutions and verification claims never enter game records.
+DEFine PROCedure pack_read
+  LOCal prRoot%,prRules%,prEntries%,prEntry%,prPairArray%,prPair%,prPoint%
+  LOCal prPuzzle%,prOther%,prIndex%,prSlot%,prOld%,prX%,prY%,prTotal,prFlag%
+  prRoot% = jsonDoc.root% : packAt = jsonNodes(prRoot%).start
+  packDoc.formatVersion% = pack_integer%(prRoot%,"formatVersion",0,PACK_INTEGER_MAX%)
+  IF packDoc.error% THEN RETurn
+  IF packDoc.formatVersion% <> PACK_FORMAT% THEN pack_fail PACK_ERR_FORMAT%,"Unsupported formatVersion" : RETurn
+  prRules% = pack_member%(prRoot%,"rules",JSON_KIND_OBJECT%)
+  prFlag% = pack_flag%(prRules%,"orthogonalOnly")
+  IF NOT packDoc.error% AND NOT prFlag% THEN pack_fail PACK_ERR_RULES%,"orthogonalOnly must be true"
+  prFlag% = pack_flag%(prRules%,"noSharedCells")
+  IF NOT packDoc.error% AND NOT prFlag% THEN pack_fail PACK_ERR_RULES%,"noSharedCells must be true"
+  prFlag% = pack_flag%(prRules%,"noSelfTouching")
+  IF NOT packDoc.error% AND NOT prFlag% THEN pack_fail PACK_ERR_RULES%,"noSelfTouching must be true"
+  packDoc.requireFullCoverage% = pack_flag%(prRules%,"requireFullCoverage")
+  prEntries% = pack_member%(prRoot%,"puzzles",JSON_KIND_ARRAY%)
+  IF packDoc.error% THEN RETurn
+  packDoc.puzzleCount% = jsonNodes(prEntries%).count%
+  IF packDoc.puzzleCount% < 1 OR packDoc.puzzleCount% > PACK_MAX_PUZZLES% THEN pack_fail PACK_ERR_LIMIT%,"Pack must contain 1..10000 puzzles" : RETurn
+  DIM packPuzzles(packDoc.puzzleCount%) AS TanglesPuzzle
+  prEntry% = jsonNodes(prEntries%).first% : prTotal = 0
+  FOR prPuzzle% = 1 TO packDoc.puzzleCount%
+    packContext$ = "Puzzle " & prPuzzle%
+    packPuzzles(prPuzzle%).id$ = pack_text$(prEntry%,"id")
+    packPuzzles(prPuzzle%).width% = pack_integer%(prEntry%,"width",1,PACK_MAX_SIDE%)
+    packPuzzles(prPuzzle%).height% = pack_integer%(prEntry%,"height",1,PACK_MAX_SIDE%)
+    packPuzzles(prPuzzle%).requireFullCoverage% = packDoc.requireFullCoverage%
+    prPairArray% = pack_member%(prEntry%,"pairs",JSON_KIND_ARRAY%)
+    IF packDoc.error% THEN RETurn
+    packPuzzles(prPuzzle%).pairCount% = jsonNodes(prPairArray%).count%
+    IF packPuzzles(prPuzzle%).pairCount% = 0 THEN pack_fail PACK_ERR_CLUES%,"At least one endpoint pair is required" : RETurn
+    IF packPuzzles(prPuzzle%).pairCount% > packPuzzles(prPuzzle%).width%*packPuzzles(prPuzzle%).height%/2 THEN pack_fail PACK_ERR_CLUES%,"Too many endpoint pairs" : RETurn
+    IF prTotal+packPuzzles(prPuzzle%).pairCount% > PACK_MAX_PAIRS% THEN pack_fail PACK_ERR_LIMIT%,"Too many pairs in pack" : RETurn
+    packPuzzles(prPuzzle%).firstPair% = prTotal+1
+    prTotal = prTotal+packPuzzles(prPuzzle%).pairCount%
+    prEntry% = jsonNodes(prEntry%).next%
+  END FOR prPuzzle%
+  packDoc.pairCount% = prTotal
+  DIM packPairs(packDoc.pairCount%) AS TanglesPair
+  prEntry% = jsonNodes(prEntries%).first%
+  FOR prPuzzle% = 1 TO packDoc.puzzleCount%
+    DIM packOccupied%(packPuzzles(prPuzzle%).width%-1,packPuzzles(prPuzzle%).height%-1)
+    FOR prY% = 0 TO packPuzzles(prPuzzle%).height%-1
+      FOR prX% = 0 TO packPuzzles(prPuzzle%).width%-1
+        packOccupied%(prX%,prY%) = 0
+      END FOR prX%
+    END FOR prY%
+    prPairArray% = pack_member%(prEntry%,"pairs",JSON_KIND_ARRAY%)
+    prPair% = jsonNodes(prPairArray%).first%
+    FOR prIndex% = 1 TO packPuzzles(prPuzzle%).pairCount%
+      packContext$ = "Puzzle " & prPuzzle% & ", pair " & prIndex%
+      prSlot% = packPuzzles(prPuzzle%).firstPair%+prIndex%-1
+      packPairs(prSlot%).label$ = pack_text$(prPair%,"label")
+      prPoint% = pack_member%(prPair%,"start",JSON_KIND_OBJECT%)
+      packPairs(prSlot%).start.x% = pack_integer%(prPoint%,"x",0,packPuzzles(prPuzzle%).width%-1)
+      packPairs(prSlot%).start.y% = pack_integer%(prPoint%,"y",0,packPuzzles(prPuzzle%).height%-1)
+      prPoint% = pack_member%(prPair%,"finish",JSON_KIND_OBJECT%)
+      packPairs(prSlot%).finish.x% = pack_integer%(prPoint%,"x",0,packPuzzles(prPuzzle%).width%-1)
+      packPairs(prSlot%).finish.y% = pack_integer%(prPoint%,"y",0,packPuzzles(prPuzzle%).height%-1)
+      IF packDoc.error% THEN RETurn
+      FOR prOld% = packPuzzles(prPuzzle%).firstPair% TO prSlot%-1
+        IF pack_equal%(packPairs(prOld%).label$,packPairs(prSlot%).label$) THEN pack_fail PACK_ERR_CLUES%,"Duplicate pair label" : RETurn
+      END FOR prOld%
+      prX% = packPairs(prSlot%).start.x% : prY% = packPairs(prSlot%).start.y%
+      IF packOccupied%(prX%,prY%) THEN pack_fail PACK_ERR_CLUES%,"Endpoint cells must be distinct and unshared" : RETurn
+      packOccupied%(prX%,prY%) = 1
+      prX% = packPairs(prSlot%).finish.x% : prY% = packPairs(prSlot%).finish.y%
+      IF packOccupied%(prX%,prY%) THEN pack_fail PACK_ERR_CLUES%,"Endpoint cells must be distinct and unshared" : RETurn
+      packOccupied%(prX%,prY%) = 1
+      prPair% = jsonNodes(prPair%).next%
+    END FOR prIndex%
+    ## Identical repeated IDs are allowed; conflicting boards are rejected.
+    FOR prOther% = 1 TO prPuzzle%-1
+      IF pack_equal%(packPuzzles(prOther%).id$,packPuzzles(prPuzzle%).id$) THEN
+        IF NOT pack_same%(prOther%,prPuzzle%) THEN pack_fail PACK_ERR_CLUES%,"Same puzzle ID describes different boards" : RETurn
+      END IF
+    END FOR prOther%
+    prEntry% = jsonNodes(prEntry%).next%
+  END FOR prPuzzle%
+END DEFine
+
+DEFine FuNction pack_same%(VAL psLeft%, VAL psRight%)
+  LOCal psIndex%,psA%,psB%
+  IF packPuzzles(psLeft%).width% <> packPuzzles(psRight%).width% THEN RETurn 0
+  IF packPuzzles(psLeft%).height% <> packPuzzles(psRight%).height% THEN RETurn 0
+  IF packPuzzles(psLeft%).pairCount% <> packPuzzles(psRight%).pairCount% THEN RETurn 0
+  FOR psIndex% = 0 TO packPuzzles(psLeft%).pairCount%-1
+    psA% = packPuzzles(psLeft%).firstPair%+psIndex%
+    psB% = packPuzzles(psRight%).firstPair%+psIndex%
+    IF NOT pack_equal%(packPairs(psA%).label$,packPairs(psB%).label$) THEN RETurn 0
+    IF packPairs(psA%).start.x% <> packPairs(psB%).start.x% THEN RETurn 0
+    IF packPairs(psA%).start.y% <> packPairs(psB%).start.y% THEN RETurn 0
+    IF packPairs(psA%).finish.x% <> packPairs(psB%).finish.x% THEN RETurn 0
+    IF packPairs(psA%).finish.y% <> packPairs(psB%).finish.y% THEN RETurn 0
+  END FOR psIndex%
+  RETurn 1
+END DEFine

@@ -11,7 +11,7 @@ let private cell x y = { X = x; Y = y }
 
 let private withPath width height cells =
     let pair = { Label = "A"; Start = List.head cells; Finish = List.last cells }
-    { Width = width; Height = height; Pairs = [ pair ] }, [ { Label = "A"; Cells = cells } ]
+    { Width = width; Height = height; RequireFullCoverage = false; Pairs = [ pair ] }, [ { Label = "A"; Cells = cells } ]
 
 let private generate options =
     match Generation.generate CancellationToken.None options with
@@ -28,7 +28,7 @@ let ``separate paths may run alongside each other`` () =
     let a = [ cell 0 0; cell 1 0 ]
     let b = [ cell 0 1; cell 1 1 ]
     let board =
-        { Width = 2; Height = 2
+        { Width = 2; Height = 2; RequireFullCoverage = false
           Pairs =
             [ { Label = "A"; Start = a.Head; Finish = List.last a }
               { Label = "B"; Start = b.Head; Finish = List.last b } ] }
@@ -53,7 +53,7 @@ let ``revisiting a cell is rejected`` () =
 [<Fact>]
 let ``shared cells are rejected`` () =
     let board =
-        { Width = 3; Height = 3
+        { Width = 3; Height = 3; RequireFullCoverage = false
           Pairs =
             [ { Label = "A"; Start = cell 0 1; Finish = cell 2 1 }
               { Label = "B"; Start = cell 1 0; Finish = cell 1 2 } ] }
@@ -96,6 +96,7 @@ let private independentlyCheck options (generated: GeneratedPuzzle) =
     Assert.Equal(options.Height, generated.Puzzle.Height)
     Assert.Equal(options.PairCount, generated.Puzzle.Pairs.Length)
     Assert.Equal(options.PairCount, generated.Solution.Length)
+    Assert.Equal(options.Mode = FullCoverage, generated.Puzzle.RequireFullCoverage)
     let occupied = Collections.Generic.HashSet<int * int>()
 
     for path in generated.Solution do
@@ -116,6 +117,8 @@ let private independentlyCheck options (generated: GeneratedPuzzle) =
                 let distance = abs (a.X - b.X) + abs (a.Y - b.Y)
                 if j = i + 1 then Assert.Equal(1, distance)
                 else Assert.NotEqual(1, distance)
+
+    if options.Mode = FullCoverage then Assert.Equal(options.Width * options.Height, occupied.Count)
 
 [<Theory>]
 [<InlineData(1, 12, 2, 3, 6)>]
@@ -221,3 +224,79 @@ let ``command line rejects malformed and contradictory requests`` () =
           [| "--force" |]
           [| "--output"; "--seed"; "1" |] ]
     for args in invalid do Assert.True(CommandLine.parse 0 args |> Result.isError)
+
+[<Theory>]
+[<InlineData(1, 12, 2, 3, 9)>]
+[<InlineData(2, 2, 2, 2, 2)>]
+[<InlineData(3, 3, 2, 2, 7)>]
+[<InlineData(7, 5, 4, 4, 16)>]
+[<InlineData(8, 8, 6, 4, 16)>]
+[<InlineData(16, 16, 16, 4, 16)>]
+let ``full coverage witnesses fill every cell without self contact across seeds`` width height pairs minimum maximum =
+    for seed in 0 .. 39 do
+        let options =
+            { Generation.defaults seed with
+                Mode = FullCoverage; Width = width; Height = height; PairCount = pairs
+                MinPathLength = minimum; MaxPathLength = maximum }
+        let generated = generate options
+        independentlyCheck options generated
+        Assert.Empty(Validation.solution generated.Puzzle generated.Solution)
+        Assert.InRange(generated.Attempts, 1, options.MaxAttempts)
+
+[<Fact>]
+let ``full coverage generation is reproducible`` () =
+    let options = { Generation.defaults -123 with Mode = FullCoverage }
+    let first, second = generate options, generate options
+    Assert.Equal(first, second)
+    Assert.Equal(Export.toJson (Export.createPack options [| first |]), Export.toJson (Export.createPack options [| second |]))
+
+[<Fact>]
+let ``full coverage rejects insufficient capacity and impossible single paths`` () =
+    let invalid =
+        [ { Generation.defaults 0 with Mode = FullCoverage; Width = 8; Height = 8; PairCount = 3 }
+          { Generation.defaults 0 with Mode = FullCoverage; Width = 2; Height = 2; PairCount = 1; MinPathLength = 2 } ]
+    for options in invalid do
+        Assert.NotEmpty(Generation.validateOptions options)
+        Assert.True(Generation.generate CancellationToken.None options |> Result.isError)
+
+[<Fact>]
+let ``full coverage bounded search failure is not reported as impossibility`` () =
+    let options = { Generation.defaults 0 with Mode = FullCoverage; MaxAttempts = 1 }
+    match Generation.generate CancellationToken.None options with
+    | Ok _ -> failwith "The initial striped traversal cannot be split into six induced paths."
+    | Error message -> Assert.Contains("does not prove impossibility", message)
+
+[<Fact>]
+let ``full coverage search respects cancellation`` () =
+    use cancellation = new CancellationTokenSource()
+    cancellation.Cancel()
+    Assert.Throws<OperationCanceledException>(fun () ->
+        Generation.generate cancellation.Token { Generation.defaults 0 with Mode = FullCoverage } |> ignore)
+    |> ignore
+
+[<Fact>]
+let ``coverage rule changes identity and cannot be mislabelled during export`` () =
+    let options = { Generation.defaults 42 with Mode = FullCoverage }
+    let full = generate options
+    let fullPack = Export.createPack options [| full |]
+    Assert.True(fullPack.Rules.RequireFullCoverage)
+    Assert.Equal("full-coverage", fullPack.Generation.Mode)
+    let connect = { full with Puzzle = { full.Puzzle with RequireFullCoverage = false } }
+    let connectPack = Export.createPack { options with Mode = ConnectOnly } [| connect |]
+    Assert.NotEqual<string>(fullPack.Puzzles[0].Id, connectPack.Puzzles[0].Id)
+    Assert.Throws<ArgumentException>(fun () -> Export.createPack options [| connect |] |> ignore) |> ignore
+    Assert.Throws<ArgumentException>(fun () -> Export.createPack { options with Mode = ConnectOnly } [| full |] |> ignore) |> ignore
+    let incomplete = { full with Solution = full.Solution.Tail }
+    Assert.Throws<ArgumentException>(fun () -> Export.createPack options [| incomplete |] |> ignore) |> ignore
+
+[<Fact>]
+let ``coverage modes are explicit on the command line with connect only as default`` () =
+    let parse args =
+        match CommandLine.parse 42 args with
+        | Ok (Generate options) -> options.Generation.Mode
+        | other -> failwith $"Unexpected command result: {other}"
+    Assert.Equal(ConnectOnly, parse [||])
+    Assert.Equal(ConnectOnly, parse [| "--mode"; "connect-only" |])
+    Assert.Equal(FullCoverage, parse [| "--mode"; "full-coverage" |])
+    for args in [ [| "--mode" |]; [| "--mode"; "invalid" |]; [| "--mode"; "connect-only"; "--mode"; "full-coverage" |] ] do
+        Assert.True(CommandLine.parse 42 args |> Result.isError)

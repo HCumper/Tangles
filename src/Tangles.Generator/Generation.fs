@@ -4,8 +4,11 @@ open System
 open System.Threading
 open Tangles.Core
 
+type GenerationMode = ConnectOnly | FullCoverage
+
 type GenerationOptions =
-    { Width: int
+    { Mode: GenerationMode
+      Width: int
       Height: int
       PairCount: int
       MinPathLength: int
@@ -21,7 +24,8 @@ type GeneratedPuzzle =
 
 module Generation =
     let defaults seed =
-        { Width = 8
+        { Mode = ConnectOnly
+          Width = 8
           Height = 8
           PairCount = 6
           MinPathLength = 4
@@ -43,7 +47,12 @@ module Generation =
               "Maximum attempts must be between 1 and 10000."
           if int64 options.PairCount * int64 options.MinPathLength
              > int64 options.Width * int64 options.Height then
-              "The requested pairs and minimum path length do not fit on the board." ]
+              "The requested pairs and minimum path length do not fit on the board."
+          if options.Mode = FullCoverage then
+              if int64 options.PairCount * int64 options.MaxPathLength < int64 options.Width * int64 options.Height then
+                  "Full coverage requires enough pairs and maximum path length to cover every square."
+              if options.PairCount = 1 && options.Width > 1 && options.Height > 1 then
+                  "One path cannot fill a two-dimensional rectangle without touching itself." ]
 
     let private shuffle (random: Random) (items: 'a array) =
         for i in items.Length - 1 .. -1 .. 1 do
@@ -115,6 +124,137 @@ module Generation =
 
         if found then Some (path.ToArray()) else None
 
+    /// Each candidate is a Hamiltonian traversal. Split it into disjoint induced
+    /// paths: any nonconsecutive neighbouring cells must be in different paths.
+    /// Backbite moves preserve the traversal; bounded local search seeks layouts
+    /// which can be split into exactly the requested number of paths.
+    let private tryCover (random: Random) (cancellation: CancellationToken)
+                         (neighbours: int array array) options =
+        let count = options.Width * options.Height
+        let maximum = min count options.MaxPathLength
+        // Begin with fewer stripes on rectangles; randomise either orientation on squares.
+        let transpose = if options.Width = options.Height then random.Next(2) = 0 else options.Width < options.Height
+        let flipX, flipY = random.Next(2) = 0, random.Next(2) = 0
+        let columns, rows = if transpose then options.Height, options.Width else options.Width, options.Height
+        let initial =
+            [| for row in 0 .. rows - 1 do
+                   for offset in 0 .. columns - 1 do
+                       let column = if row % 2 = 0 then offset else columns - 1 - offset
+                       let x, y = if transpose then row, column else column, row
+                       let x = if flipX then options.Width - 1 - x else x
+                       let y = if flipY then options.Height - 1 - y else y
+                       yield y * options.Width + x |]
+
+        let analyse (order: int array) =
+            let positions = Array.zeroCreate count
+            for i in 0 .. count - 1 do positions[order[i]] <- i
+            // left[j] is the earliest permitted start of a segment ending at j.
+            let left = Array.zeroCreate count
+            let mutable bound = 0
+            for j in 0 .. count - 1 do
+                cancellation.ThrowIfCancellationRequested()
+                for neighbour in neighbours[order[j]] do
+                    if positions[neighbour] < j - 1 then bound <- max bound (positions[neighbour] + 1)
+                left[j] <- bound
+            let ends = Array.zeroCreate count
+            let mutable finish = 0
+            for start in 0 .. count - 1 do
+                finish <- max finish start
+                while finish < count && left[finish] <= start do finish <- finish + 1
+                ends[start] <- min finish (start + maximum)
+            let needed = Array.create (count + 1) (count + 1)
+            needed[count] <- 0
+            for start in count - 1 .. -1 .. 0 do
+                cancellation.ThrowIfCancellationRequested()
+                for finish in start + options.MinPathLength .. ends[start] do
+                    needed[start] <- min needed[start] (1 + needed[finish])
+            positions, ends, needed[0]
+
+        let partition (order: int array) (ends: int array) =
+            // Prefix sums make each range-of-possible-cuts query constant-time.
+            let possible = Array.init (options.PairCount + 1) (fun _ -> Array.zeroCreate<bool> (count + 1))
+            possible[0][count] <- true
+            let prefix = Array.zeroCreate<int> (count + 2)
+            for paths in 1 .. options.PairCount do
+                cancellation.ThrowIfCancellationRequested()
+                prefix[0] <- 0
+                for i in 0 .. count do prefix[i + 1] <- prefix[i] + (if possible[paths - 1][i] then 1 else 0)
+                let first = max 0 (count - paths * maximum)
+                let last = count - paths * options.MinPathLength
+                for start in first .. last do
+                    let minimumEnd = start + options.MinPathLength
+                    let maximumEnd = ends[start]
+                    possible[paths][start] <- minimumEnd <= maximumEnd && prefix[maximumEnd + 1] > prefix[minimumEnd]
+            if not (possible[options.PairCount][0]) then None
+            else
+                let paths = ResizeArray<int array>()
+                let mutable start = 0
+                for remaining in options.PairCount .. -1 .. 1 do
+                    cancellation.ThrowIfCancellationRequested()
+                    let cuts =
+                        [| for finish in start + options.MinPathLength .. ends[start] do
+                               if possible[remaining - 1][finish] then yield finish |]
+                    let finish = cuts[random.Next cuts.Length]
+                    paths.Add order[start .. finish - 1]
+                    start <- finish
+                let result = paths.ToArray()
+                shuffle random result
+                for path in result do if random.Next(2) = 0 then Array.Reverse path
+                Some result
+
+        let mutate (order: int array) (positions: int array) =
+            let candidate = Array.copy order
+            let front = random.Next(2) = 0
+            let endpoint, adjacent = if front then order[0], order[1] else order[count - 1], order[count - 2]
+            let choices = neighbours[endpoint] |> Array.filter ((<>) adjacent)
+            if choices.Length > 0 then
+                let join = positions[choices[random.Next choices.Length]]
+                if front then Array.Reverse(candidate, 0, join)
+                else Array.Reverse(candidate, join + 1, count - join - 1)
+            candidate
+
+        let mutable order = initial
+        let initialPositions, _, initialScore = analyse order
+        let mutable positions = initialPositions
+        let mutable score = initialScore
+        let mutable attempt = 0
+        let mutable firstSuccess: int option = None
+        let mutable result = None
+        // Keep a valid witness while exploring a few further layouts for variety.
+        let refinement = min 32 count
+        while attempt < options.MaxAttempts
+              && (firstSuccess.IsNone || attempt - firstSuccess.Value < refinement) do
+            cancellation.ThrowIfCancellationRequested()
+            if firstSuccess.IsNone && attempt > 0 && attempt % 64 = 0 then
+                order <- initial
+                let resetPositions, _, resetScore = analyse order
+                positions <- resetPositions
+                score <- resetScore
+            attempt <- attempt + 1
+            let candidate = if attempt = 1 then order else mutate order positions
+            let nextPositions, ends, nextScore = analyse candidate
+            if nextScore <= options.PairCount then
+                match partition candidate ends with
+                | Some paths ->
+                    result <- Some paths
+                    if firstSuccess.IsNone then firstSuccess <- Some attempt
+                | None -> ()
+            if nextScore <= score || random.NextDouble() < exp (float (score - nextScore) / 0.4) then
+                order <- candidate
+                positions <- nextPositions
+                score <- nextScore
+        result |> Option.map (fun paths -> paths, attempt)
+
+    let private makeGenerated options attempt (solution: SolutionPath list) =
+        let board =
+            { Width = options.Width
+              Height = options.Height
+              RequireFullCoverage = options.Mode = FullCoverage
+              Pairs =
+                solution |> List.map (fun path ->
+                    { Label = path.Label; Start = List.head path.Cells; Finish = List.last path.Cells }) }
+        { Puzzle = board; Solution = solution; Seed = options.Seed; Attempts = attempt }
+
     let generate (cancellation: CancellationToken) options : Result<GeneratedPuzzle, string> =
         match validateOptions options with
         | _ :: _ as errors -> Error (String.concat " " errors)
@@ -133,7 +273,18 @@ module Generation =
             let mutable attempt = 0
             let mutable result = None
 
-            while result.IsNone && attempt < options.MaxAttempts do
+            if options.Mode = FullCoverage then
+                match tryCover random cancellation neighbours options with
+                | Some (paths, attempts) ->
+                    let solution =
+                        paths |> Array.mapi (fun i indices ->
+                            { Label = label i
+                              Cells = indices |> Array.map (fun index -> { X = index % options.Width; Y = index / options.Width }) |> List.ofArray })
+                        |> List.ofArray
+                    result <- Some (makeGenerated options attempts solution)
+                | None -> ()
+
+            while options.Mode = ConnectOnly && result.IsNone && attempt < options.MaxAttempts do
                 cancellation.ThrowIfCancellationRequested()
                 attempt <- attempt + 1
                 let occupied = Array.create cellCount false
@@ -171,21 +322,14 @@ module Generation =
                 if not failed then
                     let solution = List.ofSeq paths
 
-                    let board =
-                        { Width = options.Width
-                          Height = options.Height
-                          Pairs =
-                            solution
-                            |> List.map (fun path ->
-                                { Label = path.Label
-                                  Start = List.head path.Cells
-                                  Finish = List.last path.Cells }) }
-
-                    result <- Some { Puzzle = board; Solution = solution; Seed = options.Seed; Attempts = attempt }
+                    result <- Some (makeGenerated options attempt solution)
 
             match result with
             | None ->
-                Error $"No candidate found after {options.MaxAttempts} attempts (seed {options.Seed}). Try another seed or fewer/shorter paths. This does not prove impossibility."
+                let suggestion =
+                    if options.Mode = FullCoverage then "Try another seed, more attempts, or different pair/path-length settings."
+                    else "Try another seed or fewer/shorter paths."
+                Error $"No candidate found after {options.MaxAttempts} attempts (seed {options.Seed}). {suggestion} This does not prove impossibility."
             | Some generated ->
                 match Validation.solution generated.Puzzle generated.Solution with
                 | [] -> Ok generated

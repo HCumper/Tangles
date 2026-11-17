@@ -18,6 +18,7 @@ module CommandLine =
 
 Usage: Tangles.Generator [options]
 
+  --mode MODE        connect-only (default) or full-coverage
   --width N          Board width, 1..64 (default 8)
   --height N         Board height, 1..64 (default 8)
   --pairs N          Number of endpoint pairs (default 6)
@@ -31,7 +32,8 @@ Usage: Tangles.Generator [options]
   --force            Allow replacing an existing output file
   --help, -h         Show this help
 
-Rules: orthogonal paths, no sharing or self-touching; unused cells are allowed.
+Rules: orthogonal paths, no sharing or self-touching in both modes.
+Connect-only allows unused cells; full-coverage requires every square to be used.
 Solutions are validated. Uniqueness and difficulty are not assessed.
 An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
 """
@@ -61,14 +63,19 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
                     options <- { options with ShowSolution = true }
                 elif arg = "--force" then
                     options <- { options with Force = true }
-                elif arg = "--output" || numeric.Contains arg then
+                elif arg = "--output" || arg = "--mode" || numeric.Contains arg then
                     if index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal) then
                         error <- Some $"Missing value for {arg}."
                     else
                         index <- index + 1
                         let value = args[index]
 
-                        if arg = "--output" then
+                        if arg = "--mode" then
+                            match value with
+                            | "connect-only" -> options <- { options with Generation = { options.Generation with Mode = ConnectOnly } }
+                            | "full-coverage" -> options <- { options with Generation = { options.Generation with Mode = FullCoverage } }
+                            | _ -> error <- Some "Mode must be connect-only or full-coverage."
+                        elif arg = "--output" then
                             if String.IsNullOrWhiteSpace value then error <- Some "Output path must not be empty."
                             else options <- { options with OutputPath = Some value }
                         else

@@ -2,7 +2,8 @@
 
 A .NET 11 / F# puzzle generator and Bolero WebAssembly player. The generator constructs
 non-overlapping paths, hides their interiors, and retains an independently
-validated solution. Unused cells are allowed.
+validated solution. Choose connect-only puzzles, which allow unused cells,
+or full-coverage puzzles, which require every square to be filled.
 
 ## Build and run
 
@@ -15,18 +16,24 @@ dotnet run --project src/Tangles.Generator -- --help
 dotnet run --project src/Tangles.Generator -- --seed 42 --show-solution
 dotnet run --project src/Tangles.Generator -- --width 7 --height 5 --pairs 4 --seed 42
 dotnet run --project src/Tangles.Generator -- --count 20 --seed 42 --output puzzles/batch.json
+dotnet run --project src/Tangles.Generator -- --mode full-coverage --seed 42 --show-solution
+dotnet run --project src/Tangles.Generator -- --mode full-coverage --count 20 --seed 42 --output puzzles/full.json
 dotnet test Tangles.slnx
 ```
 
 With no options, generate an 8x8 puzzle with six pairs and a random seed.
+`--mode connect-only` is the default and keeps the original generation method.
+Use `--mode full-coverage` to require every square in a final solution.
 Use `--width` and `--height` independently for rectangular boards (1..64 each).
 The pair count must fit the board and minimum path length. Small boards will
 usually need fewer pairs and a shorter minimum length.
 
 `--min-length` (default 4) and `--max-length` (default 16) count cells including
-endpoints. The maximum is a limit, not a required length; it is capped by the
-space available while reserving the minimum for remaining paths. A failed
-attempt to grow a longer path may fall back to the minimum length.
+endpoints. The maximum is a limit, not a required length. In connect-only mode
+it is capped by the space available while reserving the minimum for remaining
+paths; a failed attempt to grow a longer path may fall back to the minimum.
+For full coverage, the board size must lie between `pairs * min-length` and
+`pairs * max-length`. Every returned path still obeys both length bounds.
 
 Existing output files are preserved unless `--force` is supplied. The parent
 directory is created if necessary. A batch is written only after every puzzle
@@ -43,7 +50,9 @@ or an existing output file, 130 cancellation.
 - Orthogonally adjacent cells of the same path must be consecutive along it:
   no self-touching. Diagonal contact is allowed.
 - Different paths may run alongside one another.
-- Unused cells are allowed. Full coverage is also valid; it is not required.
+- Connect-only mode allows unused cells; full coverage is also a valid answer.
+- Full-coverage mode requires every square to be occupied in the final answer.
+  Partial routes may leave gaps while the puzzle is being played.
 - Any solution satisfying the rules is accepted by the shared validator,
   including reversed paths and alternatives to the stored solution.
 - Uniqueness is not required.
@@ -57,6 +66,21 @@ cannot place the requested number, it restarts the board. Each path search has
 a 2,048-node budget; `--max-attempts` (default 500) limits board attempts.
 Exhaustion is reported as failure to find a candidate, never as proof that
 the configuration is impossible. Dense or unusually long requests can fail.
+
+Full-coverage mode uses `hamiltonian-path-partition-v1`. It starts with a traversal
+visiting every square once, then changes it with endpoint backbite moves (joining
+an endpoint to another neighbouring square and reversing the affected section).
+Dynamic programming splits that traversal into exactly the requested number of
+paths within the length limits. A segment is allowed only if its nonconsecutive
+cells never touch orthogonally, preserving the no-self-touching rule. The segments
+therefore cover the board without sharing cells.
+
+The search favours traversals needing fewer segments, periodically restarts when
+unsuccessful, and retains a valid witness while exploring up to 32 further
+candidates for variety. `--max-attempts` bounds all candidate evaluations. Valid
+settings can still exhaust that search; another seed, a larger attempt limit or
+different pair/length settings may help. One path cannot fill a two-dimensional
+rectangle under the no-self-touching rule, and is rejected in this mode.
 
 The shared validator separately checks the returned witness before it is
 displayed or saved. This initial version does **not** assess difficulty,
@@ -75,7 +99,8 @@ The pack contains `formatVersion`, explicit `rules`, `generation` settings,
 and a `puzzles` array. Every puzzle includes:
 
 - `id`: SHA-256-based identifier of its labelled, oriented endpoint layout;
-  rotations, reflections and label permutations are not normalised.
+  full-coverage IDs also include the coverage rule. Existing connect-only IDs
+  are preserved. Rotations, reflections and label permutations are not normalised.
 - `width`, `height`, `seed`, and candidate `attempts`.
 - `pairs`: labels with `start` and `finish` coordinates.
 - `solution`: labels with ordered `cells` arrays, including endpoints.
@@ -86,6 +111,11 @@ Coordinates are zero-based `{ "x": 0, "y": 0 }`, with the origin at the top
 left. Puzzle clues are the dimensions and endpoint pairs; solution cells are
 separate and should not be exposed during play. No timestamp is included, so
 the same batch settings produce identical JSON on the same runtime.
+
+`rules.requireFullCoverage` selects the completion rule for the whole pack.
+`generation.mode` is `connect-only` or `full-coverage`, and `generation.algorithm`
+records the corresponding algorithm. Both modes use format version 1: the
+coverage flag was already part of that format. Each pack uses one rule set.
 
 ## Layout
 
@@ -123,8 +153,14 @@ A small practice puzzle is available at `/?pack=packs/quick-start.json`.
 - Undo restores one drawing stroke. Reset clears the board and is undoable.
 - Keyboard: Tab to the board; arrows move the cursor; Space/Enter starts or
   stops drawing. Escape stops drawing; Ctrl+Z/Cmd+Z undoes.
-- Any valid connection of every pair completes a puzzle. Empty squares are
-  allowed. The player never compares the answer with a stored solution.
+- Any valid connection of every pair completes a connect-only puzzle.
+- Full-coverage packs also require every square to be filled. The player displays
+  the coverage rule and a filled-square count, and keeps the puzzle incomplete
+  if all pairs are connected but gaps remain.
+- The pack badge says **Full coverage** or **Connections only**, using the JSON
+  `rules.requireFullCoverage` flag. The introduction, instructions and footer
+  explain the selected rule, including when another pack is imported.
+- The player never compares the answer with a stored solution.
 
 Valid partial progress is saved in this browser's local storage per puzzle.
 Undo history is not persisted. Storage can be unavailable or cleared by the
@@ -137,7 +173,8 @@ Use **Load puzzle pack** to select the generator's v1 JSON output (up to 5 MB).
 The file is read locally; it is not uploaded. Unsupported versions/rules and
 invalid endpoint layouts are rejected without replacing the current puzzle.
 Only clues are loaded into game state; stored solutions and verification claims
-are ignored. Duplicate identical puzzles are permitted; conflicting boards with
+are ignored. The pack's coverage rule is retained and enforced. Duplicate
+identical puzzles are permitted; conflicting boards with
 the same ID are rejected. Imported clues are validated, but arbitrary imported
 packs are not independently checked for solvability.
 

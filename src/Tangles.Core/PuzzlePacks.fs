@@ -15,7 +15,11 @@ module PuzzlePacks =
         | _ -> failwith $"Missing field '{name}'."
 
     let private integer name element = (property name element).GetInt32()
-    let private flag name element = (property name element).GetBoolean()
+    let private flag name element =
+        match (property name element).ValueKind with
+        | JsonValueKind.True -> true
+        | JsonValueKind.False -> false
+        | _ -> failwith $"Field '{name}' must be true or false."
     let private text name element =
         let value = (property name element).GetString()
         if String.IsNullOrWhiteSpace value || value.Length > 128 then failwith $"Invalid '{name}'."
@@ -33,8 +37,9 @@ module PuzzlePacks =
             if integer "formatVersion" root <> 1 then failwith "This pack version is not supported."
             let rules = property "rules" root
             if not (flag "orthogonalOnly" rules && flag "noSharedCells" rules && flag "noSelfTouching" rules)
-               || flag "requireFullCoverage" rules then
-                failwith "This player requires orthogonal paths, no shared cells, no self-touching, and optional coverage."
+               then
+                failwith "This player requires orthogonal paths, no shared cells, and no self-touching."
+            let requireFullCoverage = flag "requireFullCoverage" rules
             let entries = property "puzzles" root
             if entries.GetArrayLength() < 1 || entries.GetArrayLength() > 10000 then
                 failwith "A pack must contain between 1 and 10,000 puzzles."
@@ -54,7 +59,7 @@ module PuzzlePacks =
                               Start = cell (property "start" p)
                               Finish = cell (property "finish" p) })
                         |> List.ofSeq
-                    let board = { Width = width; Height = height; Pairs = pairs }
+                    let board = { Width = width; Height = height; RequireFullCoverage = requireFullCoverage; Pairs = pairs }
                     match Validation.puzzle board with
                     | [] -> { Id = text "id" entry; Puzzle = board }
                     | errors -> failwith (String.concat " " errors))

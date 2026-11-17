@@ -8,7 +8,7 @@ open Xunit
 
 let private c x y = { X = x; Y = y }
 let private board =
-    { Width = 4; Height = 3
+    { Width = 4; Height = 3; RequireFullCoverage = false
       Pairs = [ { Label = "A"; Start = c 0 0; Finish = c 2 0 }
                 { Label = "B"; Start = c 0 2; Finish = c 2 2 } ] }
 let private require = function Ok value -> value | Error error -> failwith error
@@ -46,7 +46,7 @@ let ``either endpoint can start a replacement path`` () =
 
 [<Fact>]
 let ``self contact is rejected while drawing`` () =
-    let puzzle = { Width = 4; Height = 4; Pairs = [ { Label = "A"; Start = c 0 0; Finish = c 3 3 } ] }
+    let puzzle = { Width = 4; Height = 4; RequireFullCoverage = false; Pairs = [ { Label = "A"; Start = c 0 0; Finish = c 3 3 } ] }
     let state = Play.create puzzle |> Play.start (c 0 0) |> require
     let state = [ c 1 0; c 2 0; c 2 1 ] |> List.fold (fun state cell -> Play.move cell state |> require) state
     Assert.True(Play.move (c 1 1) state |> Result.isError)
@@ -118,7 +118,7 @@ let ``pack reader rejects unsupported rules versions malformed clues and conflic
     version["formatVersion"] <- JsonValue.Create(2)
     Assert.True(PuzzlePacks.read (version.ToJsonString()) |> Result.isError)
     let rules = JsonNode.Parse(generatedPack ())
-    rules["rules"]["requireFullCoverage"] <- JsonValue.Create(true)
+    rules["rules"]["noSelfTouching"] <- JsonValue.Create(false)
     Assert.True(PuzzlePacks.read (rules.ToJsonString()) |> Result.isError)
     let clues = JsonNode.Parse(generatedPack ())
     let cluePuzzle = (clues["puzzles"]).AsArray().[0]
@@ -137,3 +137,60 @@ let ``pack reader rejects unsupported rules versions malformed clues and conflic
 let ``partial validation forbids passing through an endpoint`` () =
     let paths = [ { Label = "A"; Cells = [ c 0 0; c 1 0; c 2 0; c 3 0 ] } ]
     Assert.NotEmpty(Validation.partialSolution board paths)
+
+[<Fact>]
+let ``full coverage does not complete when every pair is connected but squares remain`` () =
+    let full = { board with RequireFullCoverage = true }
+    let state = Play.create full |> draw [ c 0 0; c 1 0; c 2 0 ] |> draw [ c 0 2; c 1 2; c 2 2 ]
+    Assert.Equal(2, Play.completedCount state)
+    Assert.False(Play.isComplete state)
+    Assert.Contains("Every square must be covered.", Validation.solution full (Play.paths state))
+    Assert.Empty(Validation.partialSolution full (Play.paths state))
+    let saved = PuzzlePacks.writeProgress (Play.paths state)
+    Assert.True(PuzzlePacks.readProgress full saved |> Result.isOk)
+
+[<Fact>]
+let ``full coverage packs load and their witnesses can be completed through player operations`` () =
+    for seed in 0 .. 19 do
+        let options = { Generation.defaults seed with Mode = FullCoverage }
+        let generated = Generation.generate CancellationToken.None options |> require
+        let pack = Export.createPack options [| generated |] |> Export.toJson |> PuzzlePacks.read |> require
+        let puzzle = pack.Puzzles[0].Puzzle
+        Assert.True(puzzle.RequireFullCoverage)
+        let state = generated.Solution |> List.fold (fun state path -> draw path.Cells state) (Play.create puzzle)
+        Assert.True(Play.isComplete state)
+        Assert.Equal(puzzle.Width * puzzle.Height, Play.paths state |> List.sumBy (fun path -> path.Cells.Length))
+
+[<Fact>]
+let ``existing packs retain optional coverage`` () =
+    let pack = generatedPack () |> PuzzlePacks.read |> require
+    Assert.False(pack.Puzzles[0].Puzzle.RequireFullCoverage)
+
+[<Theory>]
+[<InlineData(false)>]
+[<InlineData(true)>]
+let ``player coverage rule comes from the JSON rules flag rather than generation metadata`` (fullCoverage: bool) =
+    let document = JsonNode.Parse(generatedPack ())
+    document["rules"]["requireFullCoverage"] <- JsonValue.Create(fullCoverage)
+    document["generation"]["mode"] <- JsonValue.Create(if fullCoverage then "connect-only" else "full-coverage")
+    let pack = PuzzlePacks.read (document.ToJsonString()) |> require
+    Assert.Equal(fullCoverage, pack.Puzzles[0].Puzzle.RequireFullCoverage)
+
+[<Theory>]
+[<InlineData("null")>]
+[<InlineData("\"true\"")>]
+[<InlineData("0")>]
+let ``player rejects an invalid coverage flag with a useful message`` invalidFlag =
+    let document = JsonNode.Parse(generatedPack ())
+    document["rules"]["requireFullCoverage"] <- JsonNode.Parse(invalidFlag: string)
+    match PuzzlePacks.read (document.ToJsonString()) with
+    | Ok _ -> failwith "Invalid coverage flag was accepted."
+    | Error message -> Assert.Contains("Field 'requireFullCoverage' must be true or false.", message)
+
+[<Fact>]
+let ``player requires an explicit coverage rule instead of guessing`` () =
+    let document = JsonNode.Parse(generatedPack ())
+    document["rules"].AsObject().Remove("requireFullCoverage") |> ignore
+    match PuzzlePacks.read (document.ToJsonString()) with
+    | Ok _ -> failwith "Missing coverage flag was accepted."
+    | Error message -> Assert.Contains("Missing field 'requireFullCoverage'.", message)

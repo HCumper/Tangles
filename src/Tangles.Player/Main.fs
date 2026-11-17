@@ -204,6 +204,9 @@ type App() as this =
         let completed = game |> Option.map Play.completedCount |> Option.defaultValue 0
         let pairCount = game |> Option.map (fun g -> g.Puzzle.Pairs.Length) |> Option.defaultValue 0
         let solved = game |> Option.exists Play.isComplete
+        let fullCoverage = game |> Option.exists _.Puzzle.RequireFullCoverage
+        let filled = game |> Option.map (Play.paths >> List.sumBy (fun path -> path.Cells.Length)) |> Option.defaultValue 0
+        let squareCount = game |> Option.map (fun state -> state.Puzzle.Width * state.Puzzle.Height) |> Option.defaultValue 0
         div {
             attr.``class`` "shell"
             header {
@@ -217,9 +220,28 @@ type App() as this =
                     div {
                         p { attr.``class`` "eyebrow"; "THE CONNECTION GAME" }
                         h1 { "Find a way through." }
-                        p { attr.``class`` "lede"; "Connect each matching pair. Empty squares can stay empty." }
+                        p {
+                            attr.``class`` "lede"
+                            if game.IsNone then "Load a puzzle pack to begin."
+                            elif fullCoverage then "Connect each matching pair and fill every square."
+                            else "Connect each matching pair. Empty squares can stay empty."
+                        }
                     }
-                    div { attr.``class`` "collection-tag"; span { attr.``class`` "small-dot" }; packName }
+                    div {
+                        attr.``class`` "collection-tag"
+                        span { attr.``class`` "small-dot" }
+                        div {
+                            attr.``class`` "pack-summary"
+                            span { packName }
+                            if game.IsSome then
+                                span {
+                                    attr.id "pack-mode"
+                                    attr.``class`` "pack-mode"
+                                    "aria-live" => "polite"
+                                    if fullCoverage then "Full coverage" else "Connections only"
+                                }
+                        }
+                    }
                 }
                 div {
                     attr.``class`` "play-layout"
@@ -252,7 +274,13 @@ type App() as this =
                             attr.``class`` (if solved then "progress-card solved" else "progress-card")
                             p { attr.``class`` "eyebrow"; if solved then "NICELY UNTANGLED" else "YOUR CONNECTIONS" }
                             div { attr.``class`` "progress-number"; string completed; span { $" / {pairCount}" } }
-                            p { if solved then "Every pair has found its way." else "One connection at a time." }
+                            p {
+                                if solved && fullCoverage then "Every pair connected. Every square filled."
+                                elif solved then "Every pair has found its way."
+                                elif fullCoverage && completed = pairCount then "All pairs connected. Adjust your paths to fill the remaining squares."
+                                else "One connection at a time."
+                            }
+                            if fullCoverage then p { $"{filled} / {squareCount} squares filled" }
                             div {
                                 attr.``class`` "pair-list"
                                 match game with
@@ -293,6 +321,11 @@ type App() as this =
                                 li { "Drag from a letter to its matching partner." }
                                 li { "Keep paths apart. A path cannot touch its own sides." }
                                 li { "Retrace to shorten a path, or start again from either endpoint." }
+                                if game.IsSome then
+                                    li {
+                                        if fullCoverage then "Fill every square to finish the puzzle."
+                                        else "Empty squares are allowed once every pair is connected."
+                                    }
                             }
                             p { attr.id "board-help"; attr.``class`` "keyboard-help"; "Keyboard: focus the board, use arrows to move, Space to start or stop drawing. Ctrl+Z undoes." }
                         }
@@ -308,7 +341,11 @@ type App() as this =
                 }
                 div { attr.``class`` "notice"; "role" => "status"; "aria-live" => "polite"; if notice <> "" then notice elif solved then "Puzzle complete. Any valid route counts." else "" }
             }
-            footer { "No timer. No need to fill the board. Just find your way." }
+            footer {
+                if game.IsNone then "No timer. Just find your way."
+                elif fullCoverage then "No timer. Connect every pair and fill the board."
+                else "No timer. No need to fill the board. Just find your way."
+            }
         }
 
     interface IDisposable with

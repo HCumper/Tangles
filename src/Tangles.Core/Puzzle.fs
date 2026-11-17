@@ -11,6 +11,7 @@ type EndpointPair =
 type Puzzle =
     { Width: int
       Height: int
+      RequireFullCoverage: bool
       Pairs: EndpointPair list }
 
 type SolutionPath =

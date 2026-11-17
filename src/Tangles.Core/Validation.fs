@@ -69,9 +69,11 @@ module Validation =
         if requireComplete then
             for pair in board.Pairs do
                 if not (labels.Contains pair.Label) then errors.Add $"Missing solution path: {pair.Label}."
+            if board.RequireFullCoverage && int64 occupied.Count <> int64 board.Width * int64 board.Height then
+                errors.Add "Every square must be covered."
         errors |> Seq.distinct |> List.ofSeq
 
-    /// Complete connect-only solution; unused cells and either orientation are allowed.
+    /// Complete solution; coverage follows the puzzle rule. Either orientation is allowed.
     let solution board paths = validatePaths true board paths
 
     /// Partial player routes obey the same geometry and endpoint rules.

@@ -17,6 +17,8 @@ button:focus-visible,select:focus-visible,a:focus-visible,.file-button:focus-wit
 h1 { margin:0; font-family:Georgia,"Times New Roman",serif; font-size:43px; font-weight:400; letter-spacing:-1.5px; }
 .lede { margin:11px 0 0; color:#6c776d; font-size:14px; line-height:1.6; }
 .collection-tag { flex-shrink:0; display:flex; align-items:center; gap:7px; border:1px solid var(--line); border-radius:30px; padding:9px 12px; font-size:11px; color:#626f61; max-width:240px; overflow-wrap:anywhere; }
+.pack-summary { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.pack-mode { color:var(--accent); font-weight:750; }
 .small-dot { width:6px; height:6px; border-radius:100%; background:#72976b; flex-shrink:0; }
 .play-layout { display:grid; grid-template-columns:minmax(0,1fr) 275px; gap:28px; align-items:start; }
 .board-panel { min-width:0; }

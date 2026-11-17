@@ -33,6 +33,7 @@ module Export =
 
     type GenerationSettings =
         { Algorithm: string
+          Mode: string
           Seed: int
           Width: int
           Height: int
@@ -55,12 +56,16 @@ module Export =
             |> List.map (fun p -> $"{p.Label}:{p.Start.X},{p.Start.Y}:{p.Finish.X},{p.Finish.Y}")
             |> String.concat ";"
 
-        let canonical = $"tangles-v1:{board.Width}x{board.Height}:{pairs}"
+        // Keep existing connect-only IDs; separate full-coverage progress/identity.
+        let rule = if board.RequireFullCoverage then ":full-coverage" else ""
+        let canonical = $"tangles-v1{rule}:{board.Width}x{board.Height}:{pairs}"
         let hash = SHA256.HashData(Encoding.UTF8.GetBytes canonical)
         "tangles-" + Convert.ToHexString(hash).ToLowerInvariant()
 
     let createPack (options: GenerationOptions) (generated: GeneratedPuzzle array) =
         for item in generated do
+            if item.Puzzle.RequireFullCoverage <> (options.Mode = FullCoverage) then
+                invalidArg (nameof generated) "Puzzle coverage must match the generation mode of the pack."
             match Validation.solution item.Puzzle item.Solution with
             | [] -> ()
             | errors -> invalidArg (nameof generated) (String.concat " " errors)
@@ -70,9 +75,10 @@ module Export =
             { OrthogonalOnly = true
               NoSharedCells = true
               NoSelfTouching = true
-              RequireFullCoverage = false }
+              RequireFullCoverage = options.Mode = FullCoverage }
           Generation =
-            { Algorithm = "random-path-growth-v1"
+            { Algorithm = if options.Mode = FullCoverage then "hamiltonian-path-partition-v1" else "random-path-growth-v1"
+              Mode = if options.Mode = FullCoverage then "full-coverage" else "connect-only"
               Seed = options.Seed
               Width = options.Width
               Height = options.Height
@@ -126,6 +132,7 @@ module Export =
     let printPuzzle showSolution (generated: GeneratedPuzzle) =
         let board = generated.Puzzle
         printfn "\n%dx%d, %d pairs, seed %d, %d attempt(s)" board.Width board.Height board.Pairs.Length generated.Seed generated.Attempts
+        printfn "Mode: %s" (if board.RequireFullCoverage then "full-coverage (every square must be filled)" else "connect-only (unused squares allowed)")
         let endpoints = board.Pairs |> Seq.collect (fun p -> [ p.Start, p.Label; p.Finish, p.Label ])
         printGrid "Puzzle (. = empty):" board.Width board.Height endpoints
 

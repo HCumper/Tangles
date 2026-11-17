@@ -194,3 +194,21 @@ let ``player requires an explicit coverage rule instead of guessing`` () =
     match PuzzlePacks.read (document.ToJsonString()) with
     | Ok _ -> failwith "Missing coverage flag was accepted."
     | Error message -> Assert.Contains("Missing field 'requireFullCoverage'.", message)
+
+[<Fact>]
+let ``pack catalogue reads names and paths without copying puzzle metadata`` () =
+    let json = """{"packs":[{"name":"Starter collection","path":"packs/starter.json"},{"name":"Full coverage","path":"packs/full-coverage.json"}]}"""
+    let entries = PuzzlePacks.readCatalog json |> require
+    Assert.Equal(2, entries.Length)
+    Assert.Equal("Starter collection", entries[0].Name)
+    Assert.Equal("packs/full-coverage.json", entries[1].Path)
+
+[<Theory>]
+[<InlineData("not json")>]
+[<InlineData("[]")>]
+[<InlineData("{\"packs\":[]}")>]
+[<InlineData("{\"packs\":{}}")>]
+[<InlineData("{\"packs\":[{\"name\":\"Starter\"}]}")>]
+[<InlineData("{\"packs\":[{\"name\":\" \",\"path\":\"packs/starter.json\"}]}")>]
+let ``malformed pack catalogues are rejected`` json =
+    Assert.True(PuzzlePacks.readCatalog json |> Result.isError)

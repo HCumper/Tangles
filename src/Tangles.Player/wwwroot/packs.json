@@ -1,0 +1,7 @@
+{
+  "packs": [
+    { "name": "Starter collection", "path": "packs/starter.json" },
+    { "name": "Full coverage collection", "path": "packs/full-coverage.json" },
+    { "name": "Quick start", "path": "packs/quick-start.json" }
+  ]
+}

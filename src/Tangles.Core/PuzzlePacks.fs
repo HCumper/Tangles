@@ -7,6 +7,7 @@ open System.Text
 
 type PlayablePuzzle = { Id: string; Puzzle: Puzzle }
 type PlayablePack = { Puzzles: PlayablePuzzle array }
+type PackCatalogEntry = { Name: string; Path: string }
 
 module PuzzlePacks =
     let private property name (element: JsonElement) =
@@ -26,6 +27,21 @@ module PuzzlePacks =
         value
 
     let private cell (element: JsonElement) = { X = integer "x" element; Y = integer "y" element }
+
+    /// Static hosts list available packs explicitly; descriptions come from the
+    /// validated packs themselves rather than duplicated catalogue metadata.
+    let readCatalog (json: string) : Result<PackCatalogEntry array, string> =
+        try
+            if json.Length > 1024 * 1024 then failwith "The pack list is too large."
+            use document = JsonDocument.Parse(json, JsonDocumentOptions(MaxDepth = 8))
+            let entries = property "packs" document.RootElement
+            if entries.GetArrayLength() < 1 || entries.GetArrayLength() > 1000 then
+                failwith "The pack list must contain between 1 and 1,000 entries."
+            entries.EnumerateArray()
+            |> Seq.map (fun entry -> { Name = text "name" entry; Path = text "path" entry })
+            |> Array.ofSeq
+            |> Ok
+        with error -> Error ("Could not load pack list: " + error.Message)
 
     /// Load only clues from the generator's v1 format. Stored solutions and
     /// verification claims are deliberately not part of the playable model.

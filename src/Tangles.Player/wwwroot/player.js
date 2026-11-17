@@ -1,4 +1,4 @@
-// Browser adapters only: geometry, pointer/keyboard input, local files and storage.
+// Browser adapters only: geometry, input, pack URLs, local files and storage.
 // Puzzle rules and every accepted move live in the shared F# library.
 window.tangles = (() => {
   let reference;
@@ -144,6 +144,12 @@ window.tangles = (() => {
   }
   return {
     attach,
+    selectPack: source => {
+      const url = new URL(window.location.href);
+      if (source) url.searchParams.set("pack", source);
+      else url.searchParams.delete("pack");
+      window.history.replaceState(null, "", url);
+    },
     load: key => { try { return localStorage.getItem(key); } catch { return null; } },
     save: (key, json) => { try { localStorage.setItem(key, json); return true; } catch { return false; } }
   };

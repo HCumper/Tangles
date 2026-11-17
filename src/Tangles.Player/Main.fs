@@ -16,13 +16,34 @@ let private palette =
 
 let private coordinate value = string (value * 64 + 32)
 
+type private PackChoice =
+    { Key: string
+      Name: string
+      Source: string option
+      Pack: PlayablePack }
+
+let private packDimensions (loaded: PlayablePack) =
+    loaded.Puzzles
+    |> Array.map (fun entry -> entry.Puzzle.Width, entry.Puzzle.Height)
+    |> Array.distinct
+    |> Array.sort
+    |> Array.map (fun (width, height) -> $"{width} × {height}")
+    |> String.concat ", "
+
+let private packDescription (loaded: PlayablePack) =
+    let coverage = if loaded.Puzzles[0].Puzzle.RequireFullCoverage then "Full coverage required" else "Connections only"
+    let count = if loaded.Puzzles.Length = 1 then "1 puzzle" else $"{loaded.Puzzles.Length} puzzles"
+    $"{packDimensions loaded} · {coverage} · {count}"
+
 type App() as this =
     inherit Component()
 
     let mutable pack: PlayablePack option = None
     let mutable game: PlayState option = None
     let mutable current = 0
-    let mutable packName = "Starter collection"
+    let mutable choices: PackChoice array = [||]
+    let mutable selectedPack = ""
+    let mutable nextImport = 0
     let mutable notice = ""
     let mutable busy = true
     let mutable reference: DotNetObjectReference<App> option = None
@@ -80,6 +101,28 @@ type App() as this =
             this.Refresh()
     }
 
+    member private _.UsePack(choice: PackChoice, updateUrl: bool) = task {
+        busy <- true
+        this.Refresh()
+        do! this.Save()
+        pack <- Some choice.Pack
+        selectedPack <- choice.Key
+        game <- None
+        if updateUrl then
+            try
+                do! this.JS.InvokeVoidAsync("tangles.selectPack", [| box (defaultArg choice.Source null) |]).AsTask()
+            with _ -> ()
+        busy <- false
+        do! this.Select(0)
+    }
+
+    member private _.ChoosePack(key: string) = task {
+        if not busy && key <> selectedPack then
+            match choices |> Array.tryFind (fun choice -> choice.Key = key) with
+            | Some choice -> do! this.UsePack(choice, true)
+            | None -> ()
+    }
+
     member private _.Load(json: string, name: string) = task {
         match PuzzlePacks.read json with
         | Error error ->
@@ -87,31 +130,97 @@ type App() as this =
             busy <- false
             this.Refresh()
         | Ok loaded ->
-            do! this.Save()
-            pack <- Some loaded
-            packName <- name
-            game <- None
-            busy <- false
-            do! this.Select(0)
+            let key =
+                match choices |> Array.tryFind (fun choice -> choice.Source.IsNone && choice.Name = name) with
+                | Some previous -> previous.Key
+                | None -> nextImport <- nextImport + 1; $"import:{nextImport}"
+            let choice = { Key = key; Name = name; Source = None; Pack = loaded }
+            choices <- Array.append (choices |> Array.filter (fun previous -> previous.Key <> key)) [| choice |]
+            do! this.UsePack(choice, true)
+    }
+
+    member private _.PackTarget(source: string) =
+        let target = Uri(this.Http.BaseAddress, source)
+        if target.Authority <> this.Http.BaseAddress.Authority || target.Scheme <> this.Http.BaseAddress.Scheme then
+            failwith "Puzzle pack URLs must be on the same site."
+        target
+
+    member private _.FetchPack(name: string, source: string) = task {
+        let target = this.PackTarget source
+        let! json = this.Http.GetStringAsync target
+        match PuzzlePacks.read json with
+        | Error error -> return failwith error
+        | Ok loaded ->
+            return
+                { Key = target.AbsoluteUri; Name = name
+                  Source = Some (this.Http.BaseAddress.MakeRelativeUri(target).ToString()); Pack = loaded }
     }
 
     override _.OnInitializedAsync() = task {
         try
+            let warnings = ResizeArray<string>()
+            let! catalog = task {
+                try
+                    let! json = this.Http.GetStringAsync "packs.json"
+                    return PuzzlePacks.readCatalog json
+                with _ -> return Error "The pack list could not be loaded."
+            }
+            let entries =
+                match catalog with
+                | Ok entries -> entries
+                | Error _ ->
+                    warnings.Add "The pack list could not be loaded. You can still open a JSON puzzle pack."
+                    [| { Name = "Starter collection"; Path = "packs/starter.json" } |]
+            let! results =
+                entries
+                |> Array.map (fun entry -> task {
+                    try
+                        let! choice = this.FetchPack(entry.Name, entry.Path)
+                        return Ok choice
+                    with _ -> return Error entry.Name
+                })
+                |> Task.WhenAll
+            choices <- results |> Array.choose (function Ok choice -> Some choice | Error _ -> None) |> Array.distinctBy _.Key
+            let unavailable = results |> Array.choose (function Error name -> Some name | Ok _ -> None)
+            if unavailable.Length > 0 then warnings.Add ("Some packs are unavailable: " + String.concat ", " unavailable + ".")
             let requested =
                 (Uri this.Navigation.Uri).Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)
                 |> Array.tryPick (fun parameter ->
                     let parts = parameter.Split('=', 2)
                     if parts.Length = 2 && parts[0] = "pack" then Some (Uri.UnescapeDataString parts[1]) else None)
-            let source = defaultArg requested "packs/starter.json"
-            let target = Uri(this.Http.BaseAddress, source)
-            if target.Authority <> this.Http.BaseAddress.Authority || target.Scheme <> this.Http.BaseAddress.Scheme then
-                failwith "Puzzle pack URLs must be on the same site."
-            let! json = this.Http.GetStringAsync target
-            let name = if requested.IsNone then "Starter collection" else target.Segments |> Array.last |> Uri.UnescapeDataString
-            do! this.Load(json, name)
+            let! requestedChoice = task {
+                match requested with
+                | None -> return None
+                | Some source ->
+                    try
+                        let target = this.PackTarget source
+                        match choices |> Array.tryFind (fun choice -> choice.Key = target.AbsoluteUri) with
+                        | Some choice -> return Some choice
+                        | None ->
+                            let name = target.Segments |> Array.last |> Uri.UnescapeDataString
+                            let! choice = this.FetchPack(name, source)
+                            choices <- Array.append choices [| choice |]
+                            return Some choice
+                    with _ ->
+                        warnings.Add "The requested pack could not be loaded. Choose another pack or open a JSON file."
+                        return None
+            }
+            let initial =
+                requestedChoice
+                |> Option.orElseWith (fun () ->
+                    let defaultKey = (this.PackTarget "packs/starter.json").AbsoluteUri
+                    choices |> Array.tryFind (fun choice -> choice.Key = defaultKey) |> Option.orElse (Array.tryHead choices))
+            match initial with
+            | Some choice ->
+                do! this.UsePack(choice, false)
+                if warnings.Count > 0 then notice <- String.concat " " (Seq.append [ notice ] warnings) |> _.Trim()
+            | None ->
+                busy <- false
+                notice <- "No packs could be loaded. Open a JSON puzzle pack to begin."
         with _ ->
             busy <- false
             notice <- "The puzzle pack could not be loaded. Choose a generator JSON pack to begin."
+        this.Refresh()
     }
 
     override _.OnAfterRenderAsync(_) = task {
@@ -120,7 +229,9 @@ type App() as this =
     }
 
     [<JSInvokable>]
-    member _.ImportPack(json: string, name: string) = this.Load(json, name)
+    member _.ImportPack(json: string, name: string) = task {
+        if not busy then do! this.Load(json, name)
+    }
 
     [<JSInvokable>]
     member _.FileError(message: string) =
@@ -228,18 +339,24 @@ type App() as this =
                         }
                     }
                     div {
-                        attr.``class`` "collection-tag"
-                        span { attr.``class`` "small-dot" }
-                        div {
-                            attr.``class`` "pack-summary"
-                            span { packName }
-                            if game.IsSome then
-                                span {
-                                    attr.id "pack-mode"
-                                    attr.``class`` "pack-mode"
-                                    "aria-live" => "polite"
-                                    if fullCoverage then "Full coverage" else "Connections only"
-                                }
+                        attr.``class`` "pack-picker"
+                        label { attr.``class`` "pack-label"; attr.``for`` "pack-choice"; "Choose a pack" }
+                        select {
+                            attr.id "pack-choice"; attr.value selectedPack; attr.disabled (busy || choices.Length = 0)
+                            "aria-describedby" => "pack-description"
+                            on.change (fun event -> this.ChoosePack(string event.Value) |> ignore)
+                            if choices.Length = 0 then option { attr.value ""; if busy then "Loading packs…" else "Open a JSON puzzle pack" }
+                            for choice in choices do
+                                option { attr.value choice.Key; $"{choice.Name} — {packDescription choice.Pack}" }
+                        }
+                        p {
+                            attr.id "pack-description"; attr.``class`` "pack-description"; "aria-live" => "polite"
+                            match pack with
+                            | Some loaded ->
+                                span { packDimensions loaded; " · " }
+                                span { attr.id "pack-mode"; attr.``class`` "pack-mode"; if fullCoverage then "Full coverage required" else "Connections only" }
+                                span { " · "; if loaded.Puzzles.Length = 1 then "1 puzzle" else $"{loaded.Puzzles.Length} puzzles" }
+                            | None -> "Choose a collection or open your own JSON pack."
                         }
                     }
                 }

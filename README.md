@@ -140,8 +140,11 @@ Start the development preview from the repository root:
 dotnet run --project src/Tangles.Player -- --urls http://localhost:5094
 ```
 
-Open the displayed URL. Eight generator-produced 8x8 puzzles are bundled.
-A small practice puzzle is available at `/?pack=packs/quick-start.json`.
+Open the displayed URL and use **Choose a pack**. The bundled choices are the
+eight-puzzle 8x8 starter collection, an eight-puzzle 8x8 full-coverage collection,
+and a small 3x3 quick-start pack. Each option describes its dimensions, coverage
+rule and puzzle count. Descriptions are derived from the validated pack data;
+packs with several board sizes list each distinct size.
 
 ### Playing
 
@@ -157,7 +160,7 @@ A small practice puzzle is available at `/?pack=packs/quick-start.json`.
 - Full-coverage packs also require every square to be filled. The player displays
   the coverage rule and a filled-square count, and keeps the puzzle incomplete
   if all pairs are connected but gaps remain.
-- The pack badge says **Full coverage** or **Connections only**, using the JSON
+- The pack description says **Full coverage required** or **Connections only**, using the JSON
   `rules.requireFullCoverage` flag. The introduction, instructions and footer
   explain the selected rule, including when another pack is imported.
 - The player never compares the answer with a stored solution.
@@ -170,6 +173,10 @@ loaded again after a reload unless supplied as a static pack URL.
 ### Loading generator packs
 
 Use **Load puzzle pack** to select the generator's v1 JSON output (up to 5 MB).
+Imported packs join the drop-down list for the current visit, so you can switch
+back without selecting the file again. Importing the same filename replaces
+that imported entry. Switching packs saves the current puzzle's progress and
+restores saved progress when another puzzle is selected.
 The file is read locally; it is not uploaded. Unsupported versions/rules and
 invalid endpoint layouts are rejected without replacing the current puzzle.
 Only clues are loaded into game state; stored solutions and verification claims
@@ -180,6 +187,20 @@ packs are not independently checked for solvability.
 
 Alternatively copy a pack to `src/Tangles.Player/wwwroot/packs/` and open
 `?pack=packs/your-pack.json`. Pack URLs must be on the same site.
+Selecting a hosted pack also updates this URL so it can be bookmarked or reloaded.
+
+To add a hosted pack to the drop-down list, add its name and path to the `packs`
+array in `src/Tangles.Player/wwwroot/packs.json`, for example:
+
+```json
+{ "name": "My collection", "path": "packs/my-pack.json" }
+```
+
+Only the name and path belong in this catalogue; sizes and coverage rules are
+read from each puzzle pack. Available packs are fetched once at startup and
+cached for switching during the visit. An unavailable entry does not prevent
+playing the other packs. Local imports are kept in memory and are not uploaded
+or included in a hosted-pack URL.
 
 ### Publish as static files
 

@@ -1,0 +1,585 @@
+{
+  "board": {
+    "width": 8,
+    "height": 8,
+    "pairs": 6,
+    "minLength": 4,
+    "maxLength": 16
+  },
+  "baselineAlgorithm": "hamiltonian-path-partition-v2",
+  "selectionAlgorithm": "solver-guided-hamiltonian-partition-v1",
+  "baselinePackSha256": "64CAE7479EA9D1A3CF978A304C1AE0509E78FF372157C3E374F7E6AE33AD0695",
+  "measuredAssemblySha256": "242F211B571C7411E4C9A6D1AE9713D84F2385C3036A2455D5BFBECA025BE7D0",
+  "sourceSha256": {
+    "src/Tangles.Generator/Solver.fs": "d5f8a3b3ddf4dc02c778b8afb5ae3ff83da24f6840318216f5c4b7240ccbe40c",
+    "src/Tangles.Generator/GenerationPolicy.fs": "d157432028ccc9e4b40421289adddd0ac4c4b98bd53fcb6a06ab5e2ff4af82e3",
+    "src/Tangles.Generator/GuidedGeneration.fs": "b4ec96b37e0abf27d54bbc7e18946104b9e354b65a494ef902f936be36b6042e",
+    "src/Tangles.Generator/CoverageSearch.fs": "398e108e61e8aac3cc732ff2878032f047fb1c28f5f2b0a8c93b18ce3533b0f9",
+    "src/Tangles.Generator/Generation.fs": "625be15bd0a30c4d46c659a1f6995700ad258369db8e059412c87b711fafa190",
+    "src/Tangles.Generator/Difficulty.fs": "44e8402e33b091dcaa25fd0df619f1bbce961bce9dfb30a616e9096384d6ea53",
+    "src/Tangles.Generator/Export.fs": "0039bcc8734e8b3156ddfc73bb69e4f34f8ff821f545657c675ca673c5d28a27",
+    "src/Tangles.Generator/Program.fs": "db9f7fbfd7d936739ce599b807d0ed37fa2df1389cafcfe14c4b8fa9c9e385b3",
+    "src/Tangles.Generator/CommandLine.fs": "9a8e79a735448a16a662a4252a877ff4fa05d71f9603438d6b705b9288995bd3",
+    "tools/benchmark-reasoning.fsx": "cbe289b00a17f6c80cb0620c8505a4f00c281cd8079be024942a68a4cf6477ab"
+  },
+  "options": {
+    "target": "hard",
+    "maxAttempts": 500,
+    "candidates": 100,
+    "improveSteps": 100,
+    "solverWork": 2000000
+  },
+  "requested": 40,
+  "accepted": 40,
+  "before": {
+    "count": 40,
+    "tiers": {
+      "local": 26,
+      "trial": 13,
+      "search": 1
+    },
+    "grades": {
+      "easy": 26,
+      "hard": 13,
+      "unrated": 1
+    },
+    "uniqueness": {
+      "unique": 39,
+      "multiple": 1
+    },
+    "meanTrialSteps": 6.625,
+    "trialRange": [
+      0,
+      41
+    ],
+    "distinctClueLayouts": 38,
+    "meanMilliseconds": 1.9873175,
+    "medianMilliseconds": 1.65795
+  },
+  "after": {
+    "count": 40,
+    "tiers": {
+      "trial": 40
+    },
+    "grades": {
+      "hard": 40
+    },
+    "uniqueness": {
+      "unique": 40
+    },
+    "meanTrialSteps": 36.4,
+    "trialRange": [
+      8,
+      58
+    ],
+    "distinctClueLayouts": 40,
+    "meanMilliseconds": 90.5129675,
+    "medianMilliseconds": 78.57825
+  },
+  "meanStartingTrialSteps": 18.55,
+  "meanRefinementGain": 17.85,
+  "pythonReferenceSamples": [
+    {
+      "index": 0,
+      "seed": 269548474,
+      "tier": "C",
+      "trials": 8,
+      "solutions": 1,
+      "searchNodes": 7,
+      "seconds": 0.03474049997748807
+    },
+    {
+      "index": 5,
+      "seed": 818126015,
+      "tier": "C",
+      "trials": 26,
+      "solutions": 1,
+      "searchNodes": 63,
+      "seconds": 1.0216367000248283
+    },
+    {
+      "index": 10,
+      "seed": 1514302668,
+      "tier": "C",
+      "trials": 31,
+      "solutions": 1,
+      "searchNodes": 11,
+      "seconds": 0.5888759999652393
+    },
+    {
+      "index": 15,
+      "seed": 558871098,
+      "tier": "C",
+      "trials": 37,
+      "solutions": 1,
+      "searchNodes": 7,
+      "seconds": 2.104280999978073
+    },
+    {
+      "index": 20,
+      "seed": 1252327179,
+      "tier": "C",
+      "trials": 37,
+      "solutions": 1,
+      "searchNodes": 25,
+      "seconds": 1.1195588000118732
+    },
+    {
+      "index": 25,
+      "seed": 503774878,
+      "tier": "C",
+      "trials": 42,
+      "solutions": 1,
+      "searchNodes": 6,
+      "seconds": 1.474723199964501
+    },
+    {
+      "index": 30,
+      "seed": 302596119,
+      "tier": "C",
+      "trials": 43,
+      "solutions": 1,
+      "searchNodes": 29,
+      "seconds": 2.5422566999914125
+    },
+    {
+      "index": 39,
+      "seed": 1487325104,
+      "tier": "C",
+      "trials": 58,
+      "solutions": 1,
+      "searchNodes": 3,
+      "seconds": 1.278308599954471
+    }
+  ],
+  "largerBoardExample": {
+    "generation": {
+      "algorithm": "solver-guided-hamiltonian-partition-v1",
+      "mode": "full-coverage",
+      "seed": 42,
+      "width": 12,
+      "height": 12,
+      "pairCount": 12,
+      "minPathLength": 3,
+      "maxPathLength": 32,
+      "maxAttempts": 5000,
+      "selection": {
+        "target": "hard",
+        "candidateLimit": 10,
+        "improvementLimit": 0,
+        "solverWorkLimit": 20000000,
+        "assess": false,
+        "requireUnique": false,
+        "avoidShortest": false,
+        "batchRequests": 1,
+        "rejectedSearches": 0,
+        "rejectedDuplicates": 0,
+        "batchCandidateBudget": 20,
+        "batchCandidatesConsidered": 1
+      }
+    },
+    "analysis": {
+      "method": "cell-domain-reasoning-v1",
+      "boardKey": "AFA0E50C074A4BB9BB5BD489E2F638C26E83D124E29A5F3550C49F4CD98EA1AE",
+      "mode": "full-coverage",
+      "status": "complete",
+      "limitReason": "",
+      "tier": "trial",
+      "grade": "hard",
+      "score": 79,
+      "provisional": true,
+      "solvedByReasoning": true,
+      "localDeductions": 873,
+      "routeDeductions": 374,
+      "routePasses": 2,
+      "trialSteps": 73,
+      "trialAssumptions": 271,
+      "searchNodes": 0,
+      "solutionCount": 1,
+      "solutionCountLimit": 2,
+      "solutionCountComplete": true,
+      "uniqueness": "unique",
+      "work": 2355864,
+      "workLimit": 20000000
+    }
+  },
+  "checks": {
+    "solutionBuild": "passed, no warnings or errors",
+    "testsPassed": 125,
+    "exhaustiveTwoPair3x3Cases": 756,
+    "singlePairCases": 72,
+    "samplePuzzlesCompletedThroughPlayer": 21,
+    "sampleScoreAudit": "passed",
+    "midRunCancellationMilliseconds": 27.0,
+    "cancellationTimerMilliseconds": 25
+  },
+  "notes": [
+    "Grades are provisional; no human-play calibration.",
+    "Fast timing excludes baseline solver analysis; guided timing includes selection, solving and improvement.",
+    "JSON, console output and independent checker are outside the measured intervals.",
+    "Single warmed Release run on Windows and .NET 11; timing is indicative.",
+    "Python trial counts differ with scan order; all eight samples were unique and required its trial tier."
+  ],
+  "cases": [
+    {
+      "seed": 42,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 33,
+      "startingTrials": 16
+    },
+    {
+      "seed": 1434747710,
+      "beforeTier": "trial",
+      "beforeGrade": "hard",
+      "beforeTrials": 12,
+      "afterTier": "trial",
+      "afterTrials": 38,
+      "startingTrials": 20
+    },
+    {
+      "seed": 302596119,
+      "beforeTier": "trial",
+      "beforeGrade": "hard",
+      "beforeTrials": 18,
+      "afterTier": "trial",
+      "afterTrials": 43,
+      "startingTrials": 16
+    },
+    {
+      "seed": 269548474,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 8,
+      "startingTrials": 1
+    },
+    {
+      "seed": 1122627734,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 34,
+      "startingTrials": 34
+    },
+    {
+      "seed": 361709742,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 37,
+      "startingTrials": 13
+    },
+    {
+      "seed": 563913476,
+      "beforeTier": "trial",
+      "beforeGrade": "hard",
+      "beforeTrials": 39,
+      "afterTier": "trial",
+      "afterTrials": 43,
+      "startingTrials": 11
+    },
+    {
+      "seed": 1555655117,
+      "beforeTier": "trial",
+      "beforeGrade": "hard",
+      "beforeTrials": 41,
+      "afterTier": "trial",
+      "afterTrials": 54,
+      "startingTrials": 54
+    },
+    {
+      "seed": 1101493307,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 22,
+      "startingTrials": 7
+    },
+    {
+      "seed": 372913049,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 48,
+      "startingTrials": 48
+    },
+    {
+      "seed": 1634773126,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 53,
+      "startingTrials": 26
+    },
+    {
+      "seed": 503774878,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 40,
+      "startingTrials": 18
+    },
+    {
+      "seed": 552593494,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 47,
+      "startingTrials": 9
+    },
+    {
+      "seed": 1085775344,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 29,
+      "startingTrials": 7
+    },
+    {
+      "seed": 687695533,
+      "beforeTier": "trial",
+      "beforeGrade": "hard",
+      "beforeTrials": 9,
+      "afterTier": "trial",
+      "afterTrials": 26,
+      "startingTrials": 23
+    },
+    {
+      "seed": 818126015,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 26,
+      "startingTrials": 31
+    },
+    {
+      "seed": 558871098,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 33,
+      "startingTrials": 0
+    },
+    {
+      "seed": 1111217775,
+      "beforeTier": "search",
+      "beforeGrade": "unrated",
+      "beforeTrials": 11,
+      "afterTier": "trial",
+      "afterTrials": 25,
+      "startingTrials": 0
+    },
+    {
+      "seed": 75846583,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 37,
+      "startingTrials": 37
+    },
+    {
+      "seed": 1748346701,
+      "beforeTier": "trial",
+      "beforeGrade": "hard",
+      "beforeTrials": 6,
+      "afterTier": "trial",
+      "afterTrials": 30,
+      "startingTrials": 0
+    },
+    {
+      "seed": 1239520805,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 41,
+      "startingTrials": 0
+    },
+    {
+      "seed": 853561429,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 36,
+      "startingTrials": 10
+    },
+    {
+      "seed": 326832151,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 38,
+      "startingTrials": 4
+    },
+    {
+      "seed": 193515357,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 30,
+      "startingTrials": 0
+    },
+    {
+      "seed": 1514302668,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 29,
+      "startingTrials": 5
+    },
+    {
+      "seed": 1752737390,
+      "beforeTier": "trial",
+      "beforeGrade": "hard",
+      "beforeTrials": 8,
+      "afterTier": "trial",
+      "afterTrials": 29,
+      "startingTrials": 14
+    },
+    {
+      "seed": 1159577995,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 26,
+      "startingTrials": 8
+    },
+    {
+      "seed": 94805257,
+      "beforeTier": "trial",
+      "beforeGrade": "hard",
+      "beforeTrials": 30,
+      "afterTier": "trial",
+      "afterTrials": 25,
+      "startingTrials": 23
+    },
+    {
+      "seed": 1527192852,
+      "beforeTier": "trial",
+      "beforeGrade": "hard",
+      "beforeTrials": 26,
+      "afterTier": "trial",
+      "afterTrials": 18,
+      "startingTrials": 15
+    },
+    {
+      "seed": 317314903,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 41,
+      "startingTrials": 28
+    },
+    {
+      "seed": 1946077082,
+      "beforeTier": "trial",
+      "beforeGrade": "hard",
+      "beforeTrials": 35,
+      "afterTier": "trial",
+      "afterTrials": 48,
+      "startingTrials": 19
+    },
+    {
+      "seed": 1487325104,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 58,
+      "startingTrials": 51
+    },
+    {
+      "seed": 1108990006,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 53,
+      "startingTrials": 30
+    },
+    {
+      "seed": 400244687,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 34,
+      "startingTrials": 22
+    },
+    {
+      "seed": 89141974,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 57,
+      "startingTrials": 48
+    },
+    {
+      "seed": 661853736,
+      "beforeTier": "trial",
+      "beforeGrade": "hard",
+      "beforeTrials": 18,
+      "afterTier": "trial",
+      "afterTrials": 40,
+      "startingTrials": 10
+    },
+    {
+      "seed": 1252327179,
+      "beforeTier": "trial",
+      "beforeGrade": "hard",
+      "beforeTrials": 4,
+      "afterTier": "trial",
+      "afterTrials": 36,
+      "startingTrials": 19
+    },
+    {
+      "seed": 1763223987,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 27,
+      "startingTrials": 0
+    },
+    {
+      "seed": 8492999,
+      "beforeTier": "trial",
+      "beforeGrade": "hard",
+      "beforeTrials": 8,
+      "afterTier": "trial",
+      "afterTrials": 33,
+      "startingTrials": 23
+    },
+    {
+      "seed": 1150454279,
+      "beforeTier": "local",
+      "beforeGrade": "easy",
+      "beforeTrials": 0,
+      "afterTier": "trial",
+      "afterTrials": 51,
+      "startingTrials": 42
+    }
+  ]
+}

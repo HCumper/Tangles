@@ -31,7 +31,15 @@ module Export =
           Pairs: EndpointPair array
           Solution: PathDocument array
           Difficulty: Difficulty.Assessment
+          Selection: GenerationPolicy.Statistics option
+          ShortestRoutes: Solver.ShortestRouteScreen option
           Verification: Verification }
+
+    type SelectionSettings =
+        { Target: string; CandidateLimit: int; ImprovementLimit: int; SolverWorkLimit: int
+          Assess: bool; RequireUnique: bool; AvoidShortest: bool
+          BatchRequests: int option; RejectedSearches: int option; RejectedDuplicates: int option
+          BatchCandidateBudget: int option; BatchCandidatesConsidered: int option }
 
     type GenerationSettings =
         { Algorithm: string
@@ -42,7 +50,8 @@ module Export =
           PairCount: int
           MinPathLength: int
           MaxPathLength: int
-          MaxAttempts: int }
+          MaxAttempts: int
+          Selection: SelectionSettings option }
 
     type PuzzlePack =
         { FormatVersion: int
@@ -66,6 +75,17 @@ module Export =
 
     let createPackWithCancellation (cancellation: CancellationToken) (options: GenerationOptions) (generated: GeneratedPuzzle array) =
         cancellation.ThrowIfCancellationRequested()
+        let settings (quality: GenerationPolicy.Report option) =
+            quality |> Option.map (fun q ->
+                { Target = q.Selection.Target; CandidateLimit = q.Selection.CandidateLimit; ImprovementLimit = q.Selection.ImprovementLimit
+                  SolverWorkLimit = q.Selection.SolverWorkLimit; Assess = q.Selection.Assess; RequireUnique = q.Selection.RequireUnique; AvoidShortest = q.Selection.AvoidShortest
+                  BatchRequests = None; RejectedSearches = None; RejectedDuplicates = None
+                  BatchCandidateBudget = None; BatchCandidatesConsidered = None })
+        let selection = generated |> Array.tryHead |> Option.bind (fun p -> settings p.Quality)
+        let algorithm (item: GeneratedPuzzle) =
+            item.Quality |> Option.map (fun q -> q.Selection.Algorithm)
+            |> Option.defaultValue (if options.Mode = FullCoverage then Generation.fullCoverageAlgorithm else "random-path-growth-v1")
+        let algorithmName = generated |> Array.tryHead |> Option.map algorithm |> Option.defaultValue (if options.Mode = FullCoverage then Generation.fullCoverageAlgorithm else "random-path-growth-v1")
         for item in generated do
             cancellation.ThrowIfCancellationRequested()
             if item.Puzzle.RequireFullCoverage <> (options.Mode = FullCoverage) then
@@ -73,6 +93,12 @@ module Export =
             match Validation.solution item.Puzzle item.Solution with
             | [] -> ()
             | errors -> invalidArg (nameof generated) (String.concat " " errors)
+            if settings item.Quality <> selection || algorithm item <> algorithmName then
+                invalidArg (nameof generated) "All puzzles in a pack must use the same selection policy and generation algorithm."
+            match item.Quality |> Option.bind _.Reasoning with
+            | Some report when report.BoardKey <> Solver.boardKey item.Puzzle ->
+                invalidArg (nameof generated) "Solver assessment belongs to different clues."
+            | _ -> ()
 
         { FormatVersion = 1
           Rules =
@@ -81,7 +107,7 @@ module Export =
               NoSelfTouching = true
               RequireFullCoverage = options.Mode = FullCoverage }
           Generation =
-            { Algorithm = if options.Mode = FullCoverage then "hamiltonian-path-partition-v1" else "random-path-growth-v1"
+            { Algorithm = algorithmName
               Mode = if options.Mode = FullCoverage then "full-coverage" else "connect-only"
               Seed = options.Seed
               Width = options.Width
@@ -89,10 +115,14 @@ module Export =
               PairCount = options.PairCount
               MinPathLength = options.MinPathLength
               MaxPathLength = options.MaxPathLength
-              MaxAttempts = options.MaxAttempts }
+              MaxAttempts = options.MaxAttempts
+              Selection = selection }
           Puzzles =
             generated
             |> Array.map (fun item ->
+                let reasoning = item.Quality |> Option.bind _.Reasoning
+                let geometry = Difficulty.assessWithCancellation cancellation item.Puzzle
+                let difficulty = reasoning |> Option.map (fun a -> Difficulty.withReasoning a geometry) |> Option.defaultValue geometry
                 { Id = puzzleId item.Puzzle
                   Width = item.Puzzle.Width
                   Height = item.Puzzle.Height
@@ -100,8 +130,13 @@ module Export =
                   Attempts = item.Attempts
                   Pairs = Array.ofList item.Puzzle.Pairs
                   Solution = item.Solution |> List.map (fun p -> { Label = p.Label; Cells = Array.ofList p.Cells }) |> Array.ofList
-                  Difficulty = Difficulty.assessWithCancellation cancellation item.Puzzle
-                  Verification = { SolutionValid = true; Uniqueness = "notChecked"; Difficulty = "heuristicEstimate" } }) }
+                  Difficulty = difficulty
+                  Selection = item.Quality |> Option.map _.Selection
+                  ShortestRoutes = item.Quality |> Option.bind _.ShortestRoutes
+                  Verification =
+                    { SolutionValid = true
+                      Uniqueness = reasoning |> Option.map _.Uniqueness |> Option.defaultValue "notChecked"
+                      Difficulty = if difficulty.Method = "cell-domain-reasoning-v1" then "reasoningEstimate" else "heuristicEstimate" } }) }
 
     let createPack options generated = createPackWithCancellation CancellationToken.None options generated
 
@@ -138,10 +173,18 @@ module Export =
 
     let printPuzzleWithCancellation cancellation showSolution (generated: GeneratedPuzzle) =
         let board = generated.Puzzle
-        let difficulty = Difficulty.assessWithCancellation cancellation board
+        let geometry = Difficulty.assessWithCancellation cancellation board
+        let reasoning = generated.Quality |> Option.bind _.Reasoning
+        let difficulty = reasoning |> Option.map (fun a -> Difficulty.withReasoning a geometry) |> Option.defaultValue geometry
         printfn "\n%dx%d, %d pairs, seed %d, %d attempt(s)" board.Width board.Height board.Pairs.Length generated.Seed generated.Attempts
         printfn "Mode: %s" (if board.RequireFullCoverage then "full-coverage (every square must be filled)" else "connect-only (unused squares allowed)")
-        printfn "Difficulty: %s (%d/100; provisional heuristic)" difficulty.Grade difficulty.Score
+        printfn "Difficulty: %s (%d/100; %s; provisional)" difficulty.Grade difficulty.Score difficulty.Method
+        match reasoning with
+        | Some a -> printfn "Solver: %s; %d trial eliminations; uniqueness %s; %s (%d work units)" a.Tier a.TrialSteps a.Uniqueness a.Status a.Work
+        | None -> ()
+        match generated.Quality |> Option.bind _.ShortestRoutes with
+        | Some s -> printfn "Shortest-route screen: %s after %d trial(s)" (if s.Solved then "solved" else "no solution found by this screen") s.Trials
+        | None -> ()
         let endpoints = board.Pairs |> Seq.collect (fun p -> [ p.Start, p.Label; p.Finish, p.Label ])
         printGrid "Puzzle (. = empty):" board.Width board.Height endpoints
 

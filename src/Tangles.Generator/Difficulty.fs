@@ -57,6 +57,10 @@ module Difficulty =
     type Component = { Name: string; Value: float; Weight: int; Points: float }
     type Thresholds = { EasyBelow: int; HardAtLeast: int }
 
+    type GeometricEstimate =
+        { Method: string; Profile: string; Grade: string; Score: int; RawScore: float
+          Thresholds: Thresholds; Components: Component array }
+
     type Assessment =
         { Method: string
           Profile: string
@@ -68,7 +72,9 @@ module Difficulty =
           Thresholds: Thresholds
           Measurements: Measurements
           PairMeasurements: PairMeasurements array
-          Components: Component array }
+          Components: Component array
+          Reasoning: Solver.Analysis option
+          GeometricEstimate: GeometricEstimate option }
 
     let private rounded (value: float) = Math.Round(value, 6, MidpointRounding.AwayFromZero)
     let private fraction (numerator: int) (denominator: int) = if denominator = 0 then 0.0 else float numerator / float denominator
@@ -234,6 +240,27 @@ module Difficulty =
         { Method = Method; Profile = mode + "-v1"; Mode = mode; Provisional = true
           Grade = if score < thresholds.EasyBelow then "easy" elif score < thresholds.HardAtLeast then "medium" else "hard"
           Score = score; RawScore = rawScore; Thresholds = thresholds
-          Measurements = measurements; PairMeasurements = stats; Components = components }
+          Measurements = measurements; PairMeasurements = stats; Components = components
+          Reasoning = None; GeometricEstimate = None }
 
     let assess board = assessWithCancellation CancellationToken.None board
+
+    /// Retain geometry as diagnostic data, but use completed full-coverage
+    /// reasoning to choose the primary grade. Limits/ambiguity are not hardness.
+    let withReasoning (reasoning: Solver.Analysis) (geometry: Assessment) =
+        if reasoning.Mode <> "full-coverage" || reasoning.Status <> "complete" || reasoning.Grade = "unrated" then
+            { geometry with Reasoning = Some reasoning }
+        else
+            let baseScore = match reasoning.Tier with "local" -> 10 | "routes" -> 30 | "trial" -> 55 | _ -> 80
+            let bonusName = match reasoning.Tier with "local" -> "localDeductionBonus" | "routes" -> "routeDeductionBonus" | "trial" -> "trialStepBonus" | _ -> "searchNodeBonus"
+            let components =
+                [| { Name = "reasoningTier"; Value = 1.0; Weight = baseScore; Points = float baseScore }
+                   { Name = bonusName; Value = float (reasoning.Score-baseScore); Weight = 1; Points = float (reasoning.Score-baseScore) } |]
+            { geometry with
+                Method = reasoning.Method; Profile = "full-coverage-reasoning-v1"
+                Grade = reasoning.Grade; Score = reasoning.Score; RawScore = float reasoning.Score
+                Thresholds = { EasyBelow = 30; HardAtLeast = 55 }; Components = components
+                Reasoning = Some reasoning
+                GeometricEstimate = Some { Method = geometry.Method; Profile = geometry.Profile; Grade = geometry.Grade
+                                           Score = geometry.Score; RawScore = geometry.RawScore; Thresholds = geometry.Thresholds
+                                           Components = geometry.Components } }

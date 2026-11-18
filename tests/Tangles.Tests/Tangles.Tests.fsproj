@@ -20,5 +20,7 @@
     <Compile Include="Tests.fs" />
     <Compile Include="PlayTests.fs" />
     <Compile Include="DifficultyTests.fs" />
+    <Compile Include="SolverTests.fs" />
+    <Compile Include="GuidedGenerationTests.fs" />
   </ItemGroup>
 </Project>

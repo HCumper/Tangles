@@ -1,0 +1,724 @@
+{
+  "formatVersion": 1,
+  "rules": {
+    "orthogonalOnly": true,
+    "noSharedCells": true,
+    "noSelfTouching": true,
+    "requireFullCoverage": true
+  },
+  "generation": {
+    "algorithm": "hamiltonian-path-partition-v2",
+    "mode": "full-coverage",
+    "seed": 42,
+    "width": 8,
+    "height": 8,
+    "pairCount": 12,
+    "minPathLength": 3,
+    "maxPathLength": 10,
+    "maxAttempts": 500
+  },
+  "puzzles": [
+    {
+      "id": "tangles-af5b1545815c5802b74a7311d930b72fbf28a97a3c386c54255d4ef14766a0ac",
+      "width": 8,
+      "height": 8,
+      "seed": 42,
+      "attempts": 73,
+      "pairs": [
+        {
+          "label": "A",
+          "start": {
+            "x": 3,
+            "y": 4
+          },
+          "finish": {
+            "x": 4,
+            "y": 5
+          }
+        },
+        {
+          "label": "B",
+          "start": {
+            "x": 2,
+            "y": 3
+          },
+          "finish": {
+            "x": 5,
+            "y": 2
+          }
+        },
+        {
+          "label": "C",
+          "start": {
+            "x": 1,
+            "y": 0
+          },
+          "finish": {
+            "x": 0,
+            "y": 2
+          }
+        },
+        {
+          "label": "D",
+          "start": {
+            "x": 0,
+            "y": 6
+          },
+          "finish": {
+            "x": 3,
+            "y": 7
+          }
+        },
+        {
+          "label": "E",
+          "start": {
+            "x": 6,
+            "y": 1
+          },
+          "finish": {
+            "x": 6,
+            "y": 5
+          }
+        },
+        {
+          "label": "F",
+          "start": {
+            "x": 1,
+            "y": 1
+          },
+          "finish": {
+            "x": 7,
+            "y": 1
+          }
+        },
+        {
+          "label": "G",
+          "start": {
+            "x": 1,
+            "y": 5
+          },
+          "finish": {
+            "x": 4,
+            "y": 4
+          }
+        },
+        {
+          "label": "H",
+          "start": {
+            "x": 0,
+            "y": 3
+          },
+          "finish": {
+            "x": 0,
+            "y": 5
+          }
+        },
+        {
+          "label": "I",
+          "start": {
+            "x": 4,
+            "y": 7
+          },
+          "finish": {
+            "x": 6,
+            "y": 7
+          }
+        },
+        {
+          "label": "J",
+          "start": {
+            "x": 6,
+            "y": 4
+          },
+          "finish": {
+            "x": 4,
+            "y": 2
+          }
+        },
+        {
+          "label": "K",
+          "start": {
+            "x": 6,
+            "y": 6
+          },
+          "finish": {
+            "x": 7,
+            "y": 7
+          }
+        },
+        {
+          "label": "L",
+          "start": {
+            "x": 2,
+            "y": 2
+          },
+          "finish": {
+            "x": 2,
+            "y": 5
+          }
+        }
+      ],
+      "solution": [
+        {
+          "label": "A",
+          "cells": [
+            {
+              "x": 3,
+              "y": 4
+            },
+            {
+              "x": 3,
+              "y": 5
+            },
+            {
+              "x": 4,
+              "y": 5
+            }
+          ]
+        },
+        {
+          "label": "B",
+          "cells": [
+            {
+              "x": 2,
+              "y": 3
+            },
+            {
+              "x": 3,
+              "y": 3
+            },
+            {
+              "x": 3,
+              "y": 2
+            },
+            {
+              "x": 3,
+              "y": 1
+            },
+            {
+              "x": 4,
+              "y": 1
+            },
+            {
+              "x": 5,
+              "y": 1
+            },
+            {
+              "x": 5,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "label": "C",
+          "cells": [
+            {
+              "x": 1,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": 1
+            },
+            {
+              "x": 0,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "label": "D",
+          "cells": [
+            {
+              "x": 0,
+              "y": 6
+            },
+            {
+              "x": 0,
+              "y": 7
+            },
+            {
+              "x": 1,
+              "y": 7
+            },
+            {
+              "x": 2,
+              "y": 7
+            },
+            {
+              "x": 3,
+              "y": 7
+            }
+          ]
+        },
+        {
+          "label": "E",
+          "cells": [
+            {
+              "x": 6,
+              "y": 1
+            },
+            {
+              "x": 6,
+              "y": 2
+            },
+            {
+              "x": 7,
+              "y": 2
+            },
+            {
+              "x": 7,
+              "y": 3
+            },
+            {
+              "x": 7,
+              "y": 4
+            },
+            {
+              "x": 7,
+              "y": 5
+            },
+            {
+              "x": 6,
+              "y": 5
+            }
+          ]
+        },
+        {
+          "label": "F",
+          "cells": [
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "x": 2,
+              "y": 1
+            },
+            {
+              "x": 2,
+              "y": 0
+            },
+            {
+              "x": 3,
+              "y": 0
+            },
+            {
+              "x": 4,
+              "y": 0
+            },
+            {
+              "x": 5,
+              "y": 0
+            },
+            {
+              "x": 6,
+              "y": 0
+            },
+            {
+              "x": 7,
+              "y": 0
+            },
+            {
+              "x": 7,
+              "y": 1
+            }
+          ]
+        },
+        {
+          "label": "G",
+          "cells": [
+            {
+              "x": 1,
+              "y": 5
+            },
+            {
+              "x": 1,
+              "y": 6
+            },
+            {
+              "x": 2,
+              "y": 6
+            },
+            {
+              "x": 3,
+              "y": 6
+            },
+            {
+              "x": 4,
+              "y": 6
+            },
+            {
+              "x": 5,
+              "y": 6
+            },
+            {
+              "x": 5,
+              "y": 5
+            },
+            {
+              "x": 5,
+              "y": 4
+            },
+            {
+              "x": 4,
+              "y": 4
+            }
+          ]
+        },
+        {
+          "label": "H",
+          "cells": [
+            {
+              "x": 0,
+              "y": 3
+            },
+            {
+              "x": 0,
+              "y": 4
+            },
+            {
+              "x": 0,
+              "y": 5
+            }
+          ]
+        },
+        {
+          "label": "I",
+          "cells": [
+            {
+              "x": 4,
+              "y": 7
+            },
+            {
+              "x": 5,
+              "y": 7
+            },
+            {
+              "x": 6,
+              "y": 7
+            }
+          ]
+        },
+        {
+          "label": "J",
+          "cells": [
+            {
+              "x": 6,
+              "y": 4
+            },
+            {
+              "x": 6,
+              "y": 3
+            },
+            {
+              "x": 5,
+              "y": 3
+            },
+            {
+              "x": 4,
+              "y": 3
+            },
+            {
+              "x": 4,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "label": "K",
+          "cells": [
+            {
+              "x": 6,
+              "y": 6
+            },
+            {
+              "x": 7,
+              "y": 6
+            },
+            {
+              "x": 7,
+              "y": 7
+            }
+          ]
+        },
+        {
+          "label": "L",
+          "cells": [
+            {
+              "x": 2,
+              "y": 2
+            },
+            {
+              "x": 1,
+              "y": 2
+            },
+            {
+              "x": 1,
+              "y": 3
+            },
+            {
+              "x": 1,
+              "y": 4
+            },
+            {
+              "x": 2,
+              "y": 4
+            },
+            {
+              "x": 2,
+              "y": 5
+            }
+          ]
+        }
+      ],
+      "difficulty": {
+        "method": "geometric-heuristic-v1",
+        "profile": "full-coverage-v1",
+        "mode": "full-coverage",
+        "provisional": true,
+        "grade": "easy",
+        "score": 26,
+        "rawScore": 25.956724,
+        "thresholds": {
+          "easyBelow": 35,
+          "hardAtLeast": 60
+        },
+        "measurements": {
+          "boardCellCount": 64,
+          "pairCount": 12,
+          "endpointCount": 24,
+          "cornerEndpointCount": 1,
+          "edgeEndpointCount": 9,
+          "meanCornerDistance": 3,
+          "meanEdgeDistance": 1,
+          "meanAvailableExits": 2.291667,
+          "singleExitEndpointCount": 3,
+          "adjacentPairCount": 0,
+          "alignedPairCount": 5,
+          "meanManhattanDistance": 3.333333,
+          "meanShortestDistance": 4.166667,
+          "minimumRequiredCells": 62,
+          "minimumCoverageRatio": 0.96875,
+          "coverageSlackCells": 2,
+          "requiredExtraCoverageCells": 2,
+          "forcedCornerTurnCount": 3,
+          "meanLog2ShortestRouteCount": 0.548747,
+          "shortestRouteCountLimit": 1024,
+          "cappedRoutePairCount": 0,
+          "routeInteriorOccurrences": 49,
+          "sharedRouteInteriorOccurrences": 18,
+          "routeOverlapRatio": 0.367347,
+          "maxRouteOverlap": 3,
+          "crossLabelEndpointAdjacencies": 15,
+          "clueCrowdingRatio": 0.3125
+        },
+        "pairMeasurements": [
+          {
+            "label": "A",
+            "manhattanDistance": 2,
+            "shortestDistance": 2,
+            "shortestRouteCount": 1,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 3,
+            "maxEndpointExits": 3,
+            "shortestRouteInteriorCells": 1,
+            "sharedRouteInteriorCells": 0
+          },
+          {
+            "label": "B",
+            "manhattanDistance": 4,
+            "shortestDistance": 4,
+            "shortestRouteCount": 1,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 3,
+            "maxEndpointExits": 3,
+            "shortestRouteInteriorCells": 3,
+            "sharedRouteInteriorCells": 2
+          },
+          {
+            "label": "C",
+            "manhattanDistance": 3,
+            "shortestDistance": 3,
+            "shortestRouteCount": 1,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 2,
+            "maxEndpointExits": 2,
+            "shortestRouteInteriorCells": 2,
+            "sharedRouteInteriorCells": 0
+          },
+          {
+            "label": "D",
+            "manhattanDistance": 4,
+            "shortestDistance": 4,
+            "shortestRouteCount": 4,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 2,
+            "maxEndpointExits": 2,
+            "shortestRouteInteriorCells": 6,
+            "sharedRouteInteriorCells": 3
+          },
+          {
+            "label": "E",
+            "manhattanDistance": 4,
+            "shortestDistance": 6,
+            "shortestRouteCount": 3,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 2,
+            "maxEndpointExits": 3,
+            "shortestRouteInteriorCells": 9,
+            "sharedRouteInteriorCells": 4
+          },
+          {
+            "label": "F",
+            "manhattanDistance": 6,
+            "shortestDistance": 8,
+            "shortestRouteCount": 4,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 2,
+            "maxEndpointExits": 3,
+            "shortestRouteInteriorCells": 10,
+            "sharedRouteInteriorCells": 0
+          },
+          {
+            "label": "G",
+            "manhattanDistance": 4,
+            "shortestDistance": 8,
+            "shortestRouteCount": 1,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 2,
+            "maxEndpointExits": 2,
+            "shortestRouteInteriorCells": 7,
+            "sharedRouteInteriorCells": 5
+          },
+          {
+            "label": "H",
+            "manhattanDistance": 2,
+            "shortestDistance": 2,
+            "shortestRouteCount": 1,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 1,
+            "maxEndpointExits": 2,
+            "shortestRouteInteriorCells": 1,
+            "sharedRouteInteriorCells": 0
+          },
+          {
+            "label": "I",
+            "manhattanDistance": 2,
+            "shortestDistance": 2,
+            "shortestRouteCount": 1,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 1,
+            "maxEndpointExits": 2,
+            "shortestRouteInteriorCells": 1,
+            "sharedRouteInteriorCells": 0
+          },
+          {
+            "label": "J",
+            "manhattanDistance": 4,
+            "shortestDistance": 4,
+            "shortestRouteCount": 2,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 3,
+            "maxEndpointExits": 3,
+            "shortestRouteInteriorCells": 4,
+            "sharedRouteInteriorCells": 4
+          },
+          {
+            "label": "K",
+            "manhattanDistance": 2,
+            "shortestDistance": 2,
+            "shortestRouteCount": 1,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 1,
+            "maxEndpointExits": 2,
+            "shortestRouteInteriorCells": 1,
+            "sharedRouteInteriorCells": 0
+          },
+          {
+            "label": "L",
+            "manhattanDistance": 3,
+            "shortestDistance": 5,
+            "shortestRouteCount": 1,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 3,
+            "maxEndpointExits": 3,
+            "shortestRouteInteriorCells": 4,
+            "sharedRouteInteriorCells": 0
+          }
+        ],
+        "components": [
+          {
+            "name": "boardScale",
+            "value": 0.5,
+            "weight": 10,
+            "points": 5
+          },
+          {
+            "name": "pairLoad",
+            "value": 0.75,
+            "weight": 8,
+            "points": 6
+          },
+          {
+            "name": "endpointFreedom",
+            "value": 0.430556,
+            "weight": 16,
+            "points": 6.888896
+          },
+          {
+            "name": "shortRouteAmbiguity",
+            "value": 0.054875,
+            "weight": 8,
+            "points": 0.439
+          },
+          {
+            "name": "routeOverlap",
+            "value": 0.367347,
+            "weight": 24,
+            "points": 8.816328
+          },
+          {
+            "name": "clueCrowding",
+            "value": 0.3125,
+            "weight": 6,
+            "points": 1.875
+          },
+          {
+            "name": "cornerDistance",
+            "value": 0.5,
+            "weight": 6,
+            "points": 3
+          },
+          {
+            "name": "requiredCoverageDetours",
+            "value": 0.03125,
+            "weight": 22,
+            "points": 0.6875
+          },
+          {
+            "name": "forcedEndpointCredit",
+            "value": 0.125,
+            "weight": -18,
+            "points": -2.25
+          },
+          {
+            "name": "forcedCornerCredit",
+            "value": 0.75,
+            "weight": -6,
+            "points": -4.5
+          }
+        ]
+      },
+      "verification": {
+        "solutionValid": true,
+        "uniqueness": "notChecked",
+        "difficulty": "heuristicEstimate"
+      }
+    }
+  ]
+}

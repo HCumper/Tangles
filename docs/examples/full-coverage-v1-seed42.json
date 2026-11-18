@@ -1,0 +1,562 @@
+{
+  "formatVersion": 1,
+  "rules": {
+    "orthogonalOnly": true,
+    "noSharedCells": true,
+    "noSelfTouching": true,
+    "requireFullCoverage": true
+  },
+  "generation": {
+    "algorithm": "hamiltonian-path-partition-v1",
+    "mode": "full-coverage",
+    "seed": 42,
+    "width": 8,
+    "height": 8,
+    "pairCount": 6,
+    "minPathLength": 4,
+    "maxPathLength": 16,
+    "maxAttempts": 500
+  },
+  "puzzles": [
+    {
+      "id": "tangles-ab5562da358325594a1b31f7d2aab369cb27077539c6daa748cc1fa6974ed8c9",
+      "width": 8,
+      "height": 8,
+      "seed": 42,
+      "attempts": 35,
+      "pairs": [
+        {
+          "label": "A",
+          "start": {
+            "x": 0,
+            "y": 5
+          },
+          "finish": {
+            "x": 7,
+            "y": 4
+          }
+        },
+        {
+          "label": "B",
+          "start": {
+            "x": 7,
+            "y": 3
+          },
+          "finish": {
+            "x": 0,
+            "y": 3
+          }
+        },
+        {
+          "label": "C",
+          "start": {
+            "x": 1,
+            "y": 5
+          },
+          "finish": {
+            "x": 1,
+            "y": 7
+          }
+        },
+        {
+          "label": "D",
+          "start": {
+            "x": 1,
+            "y": 0
+          },
+          "finish": {
+            "x": 0,
+            "y": 2
+          }
+        },
+        {
+          "label": "E",
+          "start": {
+            "x": 0,
+            "y": 0
+          },
+          "finish": {
+            "x": 6,
+            "y": 1
+          }
+        },
+        {
+          "label": "F",
+          "start": {
+            "x": 0,
+            "y": 7
+          },
+          "finish": {
+            "x": 6,
+            "y": 6
+          }
+        }
+      ],
+      "solution": [
+        {
+          "label": "A",
+          "cells": [
+            {
+              "x": 0,
+              "y": 5
+            },
+            {
+              "x": 0,
+              "y": 4
+            },
+            {
+              "x": 1,
+              "y": 4
+            },
+            {
+              "x": 2,
+              "y": 4
+            },
+            {
+              "x": 3,
+              "y": 4
+            },
+            {
+              "x": 4,
+              "y": 4
+            },
+            {
+              "x": 5,
+              "y": 4
+            },
+            {
+              "x": 6,
+              "y": 4
+            },
+            {
+              "x": 7,
+              "y": 4
+            }
+          ]
+        },
+        {
+          "label": "B",
+          "cells": [
+            {
+              "x": 7,
+              "y": 3
+            },
+            {
+              "x": 6,
+              "y": 3
+            },
+            {
+              "x": 5,
+              "y": 3
+            },
+            {
+              "x": 4,
+              "y": 3
+            },
+            {
+              "x": 3,
+              "y": 3
+            },
+            {
+              "x": 2,
+              "y": 3
+            },
+            {
+              "x": 1,
+              "y": 3
+            },
+            {
+              "x": 0,
+              "y": 3
+            }
+          ]
+        },
+        {
+          "label": "C",
+          "cells": [
+            {
+              "x": 1,
+              "y": 5
+            },
+            {
+              "x": 2,
+              "y": 5
+            },
+            {
+              "x": 3,
+              "y": 5
+            },
+            {
+              "x": 4,
+              "y": 5
+            },
+            {
+              "x": 5,
+              "y": 5
+            },
+            {
+              "x": 6,
+              "y": 5
+            },
+            {
+              "x": 7,
+              "y": 5
+            },
+            {
+              "x": 7,
+              "y": 6
+            },
+            {
+              "x": 7,
+              "y": 7
+            },
+            {
+              "x": 6,
+              "y": 7
+            },
+            {
+              "x": 5,
+              "y": 7
+            },
+            {
+              "x": 4,
+              "y": 7
+            },
+            {
+              "x": 3,
+              "y": 7
+            },
+            {
+              "x": 2,
+              "y": 7
+            },
+            {
+              "x": 1,
+              "y": 7
+            }
+          ]
+        },
+        {
+          "label": "D",
+          "cells": [
+            {
+              "x": 1,
+              "y": 0
+            },
+            {
+              "x": 2,
+              "y": 0
+            },
+            {
+              "x": 3,
+              "y": 0
+            },
+            {
+              "x": 4,
+              "y": 0
+            },
+            {
+              "x": 5,
+              "y": 0
+            },
+            {
+              "x": 6,
+              "y": 0
+            },
+            {
+              "x": 7,
+              "y": 0
+            },
+            {
+              "x": 7,
+              "y": 1
+            },
+            {
+              "x": 7,
+              "y": 2
+            },
+            {
+              "x": 6,
+              "y": 2
+            },
+            {
+              "x": 5,
+              "y": 2
+            },
+            {
+              "x": 4,
+              "y": 2
+            },
+            {
+              "x": 3,
+              "y": 2
+            },
+            {
+              "x": 2,
+              "y": 2
+            },
+            {
+              "x": 1,
+              "y": 2
+            },
+            {
+              "x": 0,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "label": "E",
+          "cells": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": 1
+            },
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "x": 2,
+              "y": 1
+            },
+            {
+              "x": 3,
+              "y": 1
+            },
+            {
+              "x": 4,
+              "y": 1
+            },
+            {
+              "x": 5,
+              "y": 1
+            },
+            {
+              "x": 6,
+              "y": 1
+            }
+          ]
+        },
+        {
+          "label": "F",
+          "cells": [
+            {
+              "x": 0,
+              "y": 7
+            },
+            {
+              "x": 0,
+              "y": 6
+            },
+            {
+              "x": 1,
+              "y": 6
+            },
+            {
+              "x": 2,
+              "y": 6
+            },
+            {
+              "x": 3,
+              "y": 6
+            },
+            {
+              "x": 4,
+              "y": 6
+            },
+            {
+              "x": 5,
+              "y": 6
+            },
+            {
+              "x": 6,
+              "y": 6
+            }
+          ]
+        }
+      ],
+      "difficulty": {
+        "method": "geometric-heuristic-v1",
+        "profile": "full-coverage-v1",
+        "mode": "full-coverage",
+        "provisional": true,
+        "grade": "easy",
+        "score": 25,
+        "rawScore": 25.098864,
+        "thresholds": {
+          "easyBelow": 35,
+          "hardAtLeast": 60
+        },
+        "measurements": {
+          "boardCellCount": 64,
+          "pairCount": 6,
+          "endpointCount": 12,
+          "cornerEndpointCount": 2,
+          "edgeEndpointCount": 7,
+          "meanCornerDistance": 1.833333,
+          "meanEdgeDistance": 0.25,
+          "meanAvailableExits": 2.25,
+          "singleExitEndpointCount": 2,
+          "adjacentPairCount": 0,
+          "alignedPairCount": 2,
+          "meanManhattanDistance": 5.666667,
+          "meanShortestDistance": 5.666667,
+          "minimumRequiredCells": 40,
+          "minimumCoverageRatio": 0.625,
+          "coverageSlackCells": 24,
+          "requiredExtraCoverageCells": 24,
+          "forcedCornerTurnCount": 2,
+          "meanLog2ShortestRouteCount": 0.166667,
+          "shortestRouteCountLimit": 1024,
+          "cappedRoutePairCount": 0,
+          "routeInteriorOccurrences": 29,
+          "sharedRouteInteriorOccurrences": 6,
+          "routeOverlapRatio": 0.206897,
+          "maxRouteOverlap": 2,
+          "crossLabelEndpointAdjacencies": 5,
+          "clueCrowdingRatio": 0.208333
+        },
+        "pairMeasurements": [
+          {
+            "label": "A",
+            "manhattanDistance": 8,
+            "shortestDistance": 8,
+            "shortestRouteCount": 1,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 2,
+            "maxEndpointExits": 2,
+            "shortestRouteInteriorCells": 7,
+            "sharedRouteInteriorCells": 0
+          },
+          {
+            "label": "B",
+            "manhattanDistance": 7,
+            "shortestDistance": 7,
+            "shortestRouteCount": 1,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 2,
+            "maxEndpointExits": 2,
+            "shortestRouteInteriorCells": 6,
+            "sharedRouteInteriorCells": 0
+          },
+          {
+            "label": "C",
+            "manhattanDistance": 2,
+            "shortestDistance": 2,
+            "shortestRouteCount": 1,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 2,
+            "maxEndpointExits": 3,
+            "shortestRouteInteriorCells": 1,
+            "sharedRouteInteriorCells": 1
+          },
+          {
+            "label": "D",
+            "manhattanDistance": 3,
+            "shortestDistance": 3,
+            "shortestRouteCount": 2,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 2,
+            "maxEndpointExits": 2,
+            "shortestRouteInteriorCells": 3,
+            "sharedRouteInteriorCells": 2
+          },
+          {
+            "label": "E",
+            "manhattanDistance": 7,
+            "shortestDistance": 7,
+            "shortestRouteCount": 1,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 1,
+            "maxEndpointExits": 4,
+            "shortestRouteInteriorCells": 6,
+            "sharedRouteInteriorCells": 2
+          },
+          {
+            "label": "F",
+            "manhattanDistance": 7,
+            "shortestDistance": 7,
+            "shortestRouteCount": 1,
+            "shortestRouteCountCapped": false,
+            "minEndpointExits": 1,
+            "maxEndpointExits": 4,
+            "shortestRouteInteriorCells": 6,
+            "sharedRouteInteriorCells": 1
+          }
+        ],
+        "components": [
+          {
+            "name": "boardScale",
+            "value": 0.5,
+            "weight": 10,
+            "points": 5
+          },
+          {
+            "name": "pairLoad",
+            "value": 0.375,
+            "weight": 8,
+            "points": 3
+          },
+          {
+            "name": "endpointFreedom",
+            "value": 0.416667,
+            "weight": 16,
+            "points": 6.666672
+          },
+          {
+            "name": "shortRouteAmbiguity",
+            "value": 0.016667,
+            "weight": 8,
+            "points": 0.133336
+          },
+          {
+            "name": "routeOverlap",
+            "value": 0.206897,
+            "weight": 24,
+            "points": 4.965528
+          },
+          {
+            "name": "clueCrowding",
+            "value": 0.208333,
+            "weight": 6,
+            "points": 1.249998
+          },
+          {
+            "name": "cornerDistance",
+            "value": 0.305556,
+            "weight": 6,
+            "points": 1.833336
+          },
+          {
+            "name": "requiredCoverageDetours",
+            "value": 0.375,
+            "weight": 22,
+            "points": 8.25
+          },
+          {
+            "name": "forcedEndpointCredit",
+            "value": 0.166667,
+            "weight": -18,
+            "points": -3.000006
+          },
+          {
+            "name": "forcedCornerCredit",
+            "value": 0.5,
+            "weight": -6,
+            "points": -3
+          }
+        ]
+      },
+      "verification": {
+        "solutionValid": true,
+        "uniqueness": "notChecked",
+        "difficulty": "heuristicEstimate"
+      }
+    }
+  ]
+}

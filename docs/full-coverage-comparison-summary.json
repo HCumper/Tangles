@@ -1,0 +1,999 @@
+{
+  "baselineCommit": "be340f55659d2e5d5237511f8c5750e409a49938",
+  "beforeAlgorithm": "hamiltonian-path-partition-v1",
+  "afterAlgorithm": "hamiltonian-path-partition-v2",
+  "seedRange": [
+    0,
+    499
+  ],
+  "runtime": ".NET 11.0.0",
+  "os": "Microsoft Windows 10.0.26200",
+  "architecture": "X64",
+  "beforeGeneratorSha256": "AE5A2D94477FF6B1570A9BE2790B2FFB88717F9B23041BCB21356AA5685F0E3B",
+  "afterGeneratorSha256": "15A99AAB447D0BCD3783A5A6280FF4335A1AAF86AA46EC8312824E8200D5FE52",
+  "sourceSha256": {
+    "src/Tangles.Generator/Generation.fs": "f48e529f5dbdae19d9405ce02738224ea2779c740762154dbbc945310a8c9791",
+    "src/Tangles.Generator/Export.fs": "5deb11bfa8ae1947dda98160aba6443efedd3a6398b30e075f43769aa3bf5dda",
+    "tools/benchmark-full-coverage.fsx": "ecde98e4bef600b44a8f3b0123c951a5e4e8d4bffe28ac3e22209b251e16c7c8"
+  },
+  "connectOnlyIdenticalAcross500Seeds": true,
+  "notes": [
+    "Timing covers Generation.generate, including its validation; grading/export and the independent checker are outside the timer.",
+    "Three warm-up calls per profile, one process per version, Release assemblies, sequential runs on one machine; timings are indicative.",
+    "Duplicates ignore labels, pair order and endpoint direction; rotations/reflections are distinct.",
+    "Turns and straight paths describe stored witnesses; they do not establish human difficulty or uniqueness.",
+    "Seeds 0..99 were used during development; seeds 100..499 were held out until the final algorithm was fixed."
+  ],
+  "profiles": [
+    {
+      "name": "8x8-six",
+      "settings": {
+        "mode": "full-coverage",
+        "width": 8,
+        "height": 8,
+        "pairCount": 6,
+        "minPathLength": 4,
+        "maxPathLength": 16,
+        "maxAttempts": 500
+      },
+      "before": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 3000,
+        "straightPaths": 639,
+        "straightPathPercent": 21.3,
+        "meanTurnsPerPath": 1.228333,
+        "allPathsAtMostTwoTurns": 444,
+        "distinctClueLayouts": 189,
+        "duplicateClueLayouts": 311,
+        "meanMilliseconds": 0.310326,
+        "medianMilliseconds": 0.28435,
+        "p95Milliseconds": 0.3518,
+        "meanAttempts": 36.322,
+        "grades": {
+          "easy": 497,
+          "medium": 3
+        },
+        "scoreRange": [
+          17,
+          37
+        ]
+      },
+      "after": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 3000,
+        "straightPaths": 411,
+        "straightPathPercent": 13.7,
+        "meanTurnsPerPath": 1.912333,
+        "allPathsAtMostTwoTurns": 233,
+        "distinctClueLayouts": 393,
+        "duplicateClueLayouts": 107,
+        "meanMilliseconds": 1.605547,
+        "medianMilliseconds": 1.08545,
+        "p95Milliseconds": 3.392,
+        "meanAttempts": 373.616,
+        "grades": {
+          "easy": 327,
+          "medium": 173
+        },
+        "scoreRange": [
+          17,
+          47
+        ]
+      },
+      "heldOutSeeds100To499": {
+        "before": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 2400,
+          "straightPaths": 522,
+          "straightPathPercent": 21.75,
+          "meanTurnsPerPath": 1.228333,
+          "allPathsAtMostTwoTurns": 350,
+          "distinctClueLayouts": 177,
+          "duplicateClueLayouts": 223,
+          "meanMilliseconds": 0.317555,
+          "medianMilliseconds": 0.2929,
+          "p95Milliseconds": 0.3513,
+          "meanAttempts": 36.282,
+          "grades": {
+            "easy": 397,
+            "medium": 3
+          },
+          "scoreRange": [
+            17,
+            37
+          ]
+        },
+        "after": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 2400,
+          "straightPaths": 329,
+          "straightPathPercent": 13.708,
+          "meanTurnsPerPath": 1.892083,
+          "allPathsAtMostTwoTurns": 194,
+          "distinctClueLayouts": 314,
+          "duplicateClueLayouts": 86,
+          "meanMilliseconds": 1.241574,
+          "medianMilliseconds": 1.0733,
+          "p95Milliseconds": 3.0162,
+          "meanAttempts": 374.373,
+          "grades": {
+            "easy": 266,
+            "medium": 134
+          },
+          "scoreRange": [
+            17,
+            47
+          ]
+        }
+      }
+    },
+    {
+      "name": "8x8-twelve",
+      "settings": {
+        "mode": "full-coverage",
+        "width": 8,
+        "height": 8,
+        "pairCount": 12,
+        "minPathLength": 3,
+        "maxPathLength": 10,
+        "maxAttempts": 500
+      },
+      "before": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 6000,
+        "straightPaths": 2658,
+        "straightPathPercent": 44.3,
+        "meanTurnsPerPath": 0.686167,
+        "allPathsAtMostTwoTurns": 430,
+        "distinctClueLayouts": 500,
+        "duplicateClueLayouts": 0,
+        "meanMilliseconds": 0.490672,
+        "medianMilliseconds": 0.49115,
+        "p95Milliseconds": 0.5412,
+        "meanAttempts": 33,
+        "grades": {
+          "easy": 500
+        },
+        "scoreRange": [
+          5,
+          30
+        ]
+      },
+      "after": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 6000,
+        "straightPaths": 874,
+        "straightPathPercent": 14.567,
+        "meanTurnsPerPath": 1.431667,
+        "allPathsAtMostTwoTurns": 63,
+        "distinctClueLayouts": 500,
+        "duplicateClueLayouts": 0,
+        "meanMilliseconds": 0.764275,
+        "medianMilliseconds": 0.7633,
+        "p95Milliseconds": 0.9747,
+        "meanAttempts": 66.402,
+        "grades": {
+          "easy": 500
+        },
+        "scoreRange": [
+          12,
+          34
+        ]
+      },
+      "heldOutSeeds100To499": {
+        "before": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 4800,
+          "straightPaths": 2126,
+          "straightPathPercent": 44.292,
+          "meanTurnsPerPath": 0.685,
+          "allPathsAtMostTwoTurns": 344,
+          "distinctClueLayouts": 400,
+          "duplicateClueLayouts": 0,
+          "meanMilliseconds": 0.48588,
+          "medianMilliseconds": 0.47315,
+          "p95Milliseconds": 0.5414,
+          "meanAttempts": 33,
+          "grades": {
+            "easy": 400
+          },
+          "scoreRange": [
+            6,
+            30
+          ]
+        },
+        "after": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 4800,
+          "straightPaths": 684,
+          "straightPathPercent": 14.25,
+          "meanTurnsPerPath": 1.436667,
+          "allPathsAtMostTwoTurns": 52,
+          "distinctClueLayouts": 400,
+          "duplicateClueLayouts": 0,
+          "meanMilliseconds": 0.760265,
+          "medianMilliseconds": 0.76475,
+          "p95Milliseconds": 1.0287,
+          "meanAttempts": 66.46,
+          "grades": {
+            "easy": 400
+          },
+          "scoreRange": [
+            12,
+            34
+          ]
+        }
+      }
+    },
+    {
+      "name": "8x8-five",
+      "settings": {
+        "mode": "full-coverage",
+        "width": 8,
+        "height": 8,
+        "pairCount": 5,
+        "minPathLength": 4,
+        "maxPathLength": 16,
+        "maxAttempts": 500
+      },
+      "before": {
+        "requested": 500,
+        "successes": 0,
+        "failures": 500,
+        "paths": 0,
+        "straightPaths": 0,
+        "straightPathPercent": null,
+        "meanTurnsPerPath": null,
+        "allPathsAtMostTwoTurns": 0,
+        "distinctClueLayouts": 0,
+        "duplicateClueLayouts": 0,
+        "meanMilliseconds": 0.799077,
+        "medianMilliseconds": 0.38835,
+        "p95Milliseconds": 2.4845,
+        "meanAttempts": null,
+        "grades": {},
+        "scoreRange": null
+      },
+      "after": {
+        "requested": 500,
+        "successes": 27,
+        "failures": 473,
+        "paths": 135,
+        "straightPaths": 2,
+        "straightPathPercent": 1.481,
+        "meanTurnsPerPath": 3.325926,
+        "allPathsAtMostTwoTurns": 0,
+        "distinctClueLayouts": 27,
+        "duplicateClueLayouts": 0,
+        "meanMilliseconds": 1.405101,
+        "medianMilliseconds": 1.3366,
+        "p95Milliseconds": 1.9815,
+        "meanAttempts": 286.704,
+        "grades": {
+          "medium": 25,
+          "easy": 2
+        },
+        "scoreRange": [
+          27,
+          48
+        ]
+      },
+      "heldOutSeeds100To499": {
+        "before": {
+          "requested": 400,
+          "successes": 0,
+          "failures": 400,
+          "paths": 0,
+          "straightPaths": 0,
+          "straightPathPercent": null,
+          "meanTurnsPerPath": null,
+          "allPathsAtMostTwoTurns": 0,
+          "distinctClueLayouts": 0,
+          "duplicateClueLayouts": 0,
+          "meanMilliseconds": 0.399564,
+          "medianMilliseconds": 0.38385,
+          "p95Milliseconds": 0.4132,
+          "meanAttempts": null,
+          "grades": {},
+          "scoreRange": null
+        },
+        "after": {
+          "requested": 400,
+          "successes": 21,
+          "failures": 379,
+          "paths": 105,
+          "straightPaths": 1,
+          "straightPathPercent": 0.952,
+          "meanTurnsPerPath": 3.380952,
+          "allPathsAtMostTwoTurns": 0,
+          "distinctClueLayouts": 21,
+          "duplicateClueLayouts": 0,
+          "meanMilliseconds": 1.46067,
+          "medianMilliseconds": 1.4984,
+          "p95Milliseconds": 2.0167,
+          "meanAttempts": 289.095,
+          "grades": {
+            "medium": 20,
+            "easy": 1
+          },
+          "scoreRange": [
+            34,
+            48
+          ]
+        }
+      }
+    },
+    {
+      "name": "7x5-four",
+      "settings": {
+        "mode": "full-coverage",
+        "width": 7,
+        "height": 5,
+        "pairCount": 4,
+        "minPathLength": 4,
+        "maxPathLength": 16,
+        "maxAttempts": 500
+      },
+      "before": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 2000,
+        "straightPaths": 516,
+        "straightPathPercent": 25.8,
+        "meanTurnsPerPath": 1.367,
+        "allPathsAtMostTwoTurns": 176,
+        "distinctClueLayouts": 355,
+        "duplicateClueLayouts": 145,
+        "meanMilliseconds": 0.075131,
+        "medianMilliseconds": 0.0738,
+        "p95Milliseconds": 0.0894,
+        "meanAttempts": 34,
+        "grades": {
+          "easy": 462,
+          "medium": 38
+        },
+        "scoreRange": [
+          6,
+          41
+        ]
+      },
+      "after": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 2000,
+        "straightPaths": 71,
+        "straightPathPercent": 3.55,
+        "meanTurnsPerPath": 2.4025,
+        "allPathsAtMostTwoTurns": 15,
+        "distinctClueLayouts": 484,
+        "duplicateClueLayouts": 16,
+        "meanMilliseconds": 0.338222,
+        "medianMilliseconds": 0.2698,
+        "p95Milliseconds": 0.7335,
+        "meanAttempts": 139.824,
+        "grades": {
+          "easy": 334,
+          "medium": 166
+        },
+        "scoreRange": [
+          9,
+          45
+        ]
+      },
+      "heldOutSeeds100To499": {
+        "before": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 1600,
+          "straightPaths": 416,
+          "straightPathPercent": 26.0,
+          "meanTurnsPerPath": 1.369375,
+          "allPathsAtMostTwoTurns": 138,
+          "distinctClueLayouts": 303,
+          "duplicateClueLayouts": 97,
+          "meanMilliseconds": 0.075115,
+          "medianMilliseconds": 0.07355,
+          "p95Milliseconds": 0.0886,
+          "meanAttempts": 34,
+          "grades": {
+            "easy": 367,
+            "medium": 33
+          },
+          "scoreRange": [
+            6,
+            40
+          ]
+        },
+        "after": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 1600,
+          "straightPaths": 59,
+          "straightPathPercent": 3.688,
+          "meanTurnsPerPath": 2.408125,
+          "allPathsAtMostTwoTurns": 12,
+          "distinctClueLayouts": 387,
+          "duplicateClueLayouts": 13,
+          "meanMilliseconds": 0.334626,
+          "medianMilliseconds": 0.26735,
+          "p95Milliseconds": 0.7303,
+          "meanAttempts": 139.98,
+          "grades": {
+            "medium": 130,
+            "easy": 270
+          },
+          "scoreRange": [
+            9,
+            45
+          ]
+        }
+      }
+    },
+    {
+      "name": "10x10-ten",
+      "settings": {
+        "mode": "full-coverage",
+        "width": 10,
+        "height": 10,
+        "pairCount": 10,
+        "minPathLength": 4,
+        "maxPathLength": 20,
+        "maxAttempts": 500
+      },
+      "before": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 5000,
+        "straightPaths": 1907,
+        "straightPathPercent": 38.14,
+        "meanTurnsPerPath": 0.8638,
+        "allPathsAtMostTwoTurns": 393,
+        "distinctClueLayouts": 500,
+        "duplicateClueLayouts": 0,
+        "meanMilliseconds": 0.247204,
+        "medianMilliseconds": 0.25195,
+        "p95Milliseconds": 0.2882,
+        "meanAttempts": 33,
+        "grades": {
+          "easy": 496,
+          "medium": 4
+        },
+        "scoreRange": [
+          3,
+          40
+        ]
+      },
+      "after": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 5000,
+        "straightPaths": 1139,
+        "straightPathPercent": 22.78,
+        "meanTurnsPerPath": 1.652,
+        "allPathsAtMostTwoTurns": 197,
+        "distinctClueLayouts": 500,
+        "duplicateClueLayouts": 0,
+        "meanMilliseconds": 2.700251,
+        "medianMilliseconds": 2.9276,
+        "p95Milliseconds": 3.4879,
+        "meanAttempts": 412.88,
+        "grades": {
+          "easy": 310,
+          "medium": 190
+        },
+        "scoreRange": [
+          6,
+          49
+        ]
+      },
+      "heldOutSeeds100To499": {
+        "before": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 4000,
+          "straightPaths": 1527,
+          "straightPathPercent": 38.175,
+          "meanTurnsPerPath": 0.86775,
+          "allPathsAtMostTwoTurns": 310,
+          "distinctClueLayouts": 400,
+          "duplicateClueLayouts": 0,
+          "meanMilliseconds": 0.236596,
+          "medianMilliseconds": 0.1933,
+          "p95Milliseconds": 0.2797,
+          "meanAttempts": 33,
+          "grades": {
+            "easy": 397,
+            "medium": 3
+          },
+          "scoreRange": [
+            3,
+            40
+          ]
+        },
+        "after": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 4000,
+          "straightPaths": 934,
+          "straightPathPercent": 23.35,
+          "meanTurnsPerPath": 1.62425,
+          "allPathsAtMostTwoTurns": 165,
+          "distinctClueLayouts": 400,
+          "duplicateClueLayouts": 0,
+          "meanMilliseconds": 2.746893,
+          "medianMilliseconds": 2.97075,
+          "p95Milliseconds": 3.5,
+          "meanAttempts": 414.56,
+          "grades": {
+            "medium": 141,
+            "easy": 259
+          },
+          "scoreRange": [
+            6,
+            49
+          ]
+        }
+      }
+    },
+    {
+      "name": "16x16-sixteen",
+      "settings": {
+        "mode": "full-coverage",
+        "width": 16,
+        "height": 16,
+        "pairCount": 16,
+        "minPathLength": 4,
+        "maxPathLength": 16,
+        "maxAttempts": 500
+      },
+      "before": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 8000,
+        "straightPaths": 6420,
+        "straightPathPercent": 80.25,
+        "meanTurnsPerPath": 0.1975,
+        "allPathsAtMostTwoTurns": 500,
+        "distinctClueLayouts": 14,
+        "duplicateClueLayouts": 486,
+        "meanMilliseconds": 0.338652,
+        "medianMilliseconds": 0.3231,
+        "p95Milliseconds": 0.3976,
+        "meanAttempts": 33,
+        "grades": {
+          "easy": 500
+        },
+        "scoreRange": [
+          1,
+          3
+        ]
+      },
+      "after": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 8000,
+        "straightPaths": 6312,
+        "straightPathPercent": 78.9,
+        "meanTurnsPerPath": 0.211,
+        "allPathsAtMostTwoTurns": 500,
+        "distinctClueLayouts": 14,
+        "duplicateClueLayouts": 486,
+        "meanMilliseconds": 9.699775,
+        "medianMilliseconds": 9.18625,
+        "p95Milliseconds": 13.6811,
+        "meanAttempts": 500,
+        "grades": {
+          "easy": 500
+        },
+        "scoreRange": [
+          1,
+          3
+        ]
+      },
+      "heldOutSeeds100To499": {
+        "before": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 6400,
+          "straightPaths": 5138,
+          "straightPathPercent": 80.281,
+          "meanTurnsPerPath": 0.197187,
+          "allPathsAtMostTwoTurns": 400,
+          "distinctClueLayouts": 14,
+          "duplicateClueLayouts": 386,
+          "meanMilliseconds": 0.335321,
+          "medianMilliseconds": 0.32395,
+          "p95Milliseconds": 0.3977,
+          "meanAttempts": 33,
+          "grades": {
+            "easy": 400
+          },
+          "scoreRange": [
+            1,
+            3
+          ]
+        },
+        "after": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 6400,
+          "straightPaths": 5042,
+          "straightPathPercent": 78.781,
+          "meanTurnsPerPath": 0.212188,
+          "allPathsAtMostTwoTurns": 400,
+          "distinctClueLayouts": 14,
+          "duplicateClueLayouts": 386,
+          "meanMilliseconds": 9.674584,
+          "medianMilliseconds": 9.2736,
+          "p95Milliseconds": 13.0998,
+          "meanAttempts": 500,
+          "grades": {
+            "easy": 400
+          },
+          "scoreRange": [
+            1,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "name": "16x16-looser-lengths",
+      "settings": {
+        "mode": "full-coverage",
+        "width": 16,
+        "height": 16,
+        "pairCount": 16,
+        "minPathLength": 4,
+        "maxPathLength": 32,
+        "maxAttempts": 500
+      },
+      "before": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 8000,
+        "straightPaths": 3229,
+        "straightPathPercent": 40.362,
+        "meanTurnsPerPath": 0.803875,
+        "allPathsAtMostTwoTurns": 385,
+        "distinctClueLayouts": 500,
+        "duplicateClueLayouts": 0,
+        "meanMilliseconds": 0.912216,
+        "medianMilliseconds": 0.8674,
+        "p95Milliseconds": 1.0535,
+        "meanAttempts": 33,
+        "grades": {
+          "easy": 495,
+          "medium": 5
+        },
+        "scoreRange": [
+          7,
+          41
+        ]
+      },
+      "after": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 8000,
+        "straightPaths": 2990,
+        "straightPathPercent": 37.375,
+        "meanTurnsPerPath": 0.915375,
+        "allPathsAtMostTwoTurns": 275,
+        "distinctClueLayouts": 500,
+        "duplicateClueLayouts": 0,
+        "meanMilliseconds": 10.366241,
+        "medianMilliseconds": 10.29105,
+        "p95Milliseconds": 12.3859,
+        "meanAttempts": 500,
+        "grades": {
+          "easy": 426,
+          "medium": 74
+        },
+        "scoreRange": [
+          7,
+          43
+        ]
+      },
+      "heldOutSeeds100To499": {
+        "before": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 6400,
+          "straightPaths": 2591,
+          "straightPathPercent": 40.484,
+          "meanTurnsPerPath": 0.804219,
+          "allPathsAtMostTwoTurns": 303,
+          "distinctClueLayouts": 400,
+          "duplicateClueLayouts": 0,
+          "meanMilliseconds": 0.936541,
+          "medianMilliseconds": 0.8656,
+          "p95Milliseconds": 1.1727,
+          "meanAttempts": 33,
+          "grades": {
+            "easy": 398,
+            "medium": 2
+          },
+          "scoreRange": [
+            9,
+            36
+          ]
+        },
+        "after": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 6400,
+          "straightPaths": 2400,
+          "straightPathPercent": 37.5,
+          "meanTurnsPerPath": 0.912031,
+          "allPathsAtMostTwoTurns": 222,
+          "distinctClueLayouts": 400,
+          "duplicateClueLayouts": 0,
+          "meanMilliseconds": 10.3799,
+          "medianMilliseconds": 10.2665,
+          "p95Milliseconds": 12.4558,
+          "meanAttempts": 500,
+          "grades": {
+            "easy": 346,
+            "medium": 54
+          },
+          "scoreRange": [
+            7,
+            43
+          ]
+        }
+      }
+    },
+    {
+      "name": "3x3-two",
+      "settings": {
+        "mode": "full-coverage",
+        "width": 3,
+        "height": 3,
+        "pairCount": 2,
+        "minPathLength": 2,
+        "maxPathLength": 7,
+        "maxAttempts": 500
+      },
+      "before": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 1000,
+        "straightPaths": 188,
+        "straightPathPercent": 18.8,
+        "meanTurnsPerPath": 1.312,
+        "allPathsAtMostTwoTurns": 500,
+        "distinctClueLayouts": 12,
+        "duplicateClueLayouts": 488,
+        "meanMilliseconds": 0.013786,
+        "medianMilliseconds": 0.0136,
+        "p95Milliseconds": 0.0157,
+        "meanAttempts": 11,
+        "grades": {
+          "easy": 500
+        },
+        "scoreRange": [
+          0,
+          0
+        ]
+      },
+      "after": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 1000,
+        "straightPaths": 189,
+        "straightPathPercent": 18.9,
+        "meanTurnsPerPath": 1.311,
+        "allPathsAtMostTwoTurns": 500,
+        "distinctClueLayouts": 12,
+        "duplicateClueLayouts": 488,
+        "meanMilliseconds": 0.081228,
+        "medianMilliseconds": 0.0689,
+        "p95Milliseconds": 0.1195,
+        "meanAttempts": 65.108,
+        "grades": {
+          "easy": 500
+        },
+        "scoreRange": [
+          0,
+          0
+        ]
+      },
+      "heldOutSeeds100To499": {
+        "before": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 800,
+          "straightPaths": 145,
+          "straightPathPercent": 18.125,
+          "meanTurnsPerPath": 1.31875,
+          "allPathsAtMostTwoTurns": 400,
+          "distinctClueLayouts": 12,
+          "duplicateClueLayouts": 388,
+          "meanMilliseconds": 0.013562,
+          "medianMilliseconds": 0.0135,
+          "p95Milliseconds": 0.0153,
+          "meanAttempts": 11,
+          "grades": {
+            "easy": 400
+          },
+          "scoreRange": [
+            0,
+            0
+          ]
+        },
+        "after": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 800,
+          "straightPaths": 153,
+          "straightPathPercent": 19.125,
+          "meanTurnsPerPath": 1.30875,
+          "allPathsAtMostTwoTurns": 400,
+          "distinctClueLayouts": 12,
+          "duplicateClueLayouts": 388,
+          "meanMilliseconds": 0.075574,
+          "medianMilliseconds": 0.0683,
+          "p95Milliseconds": 0.0839,
+          "meanAttempts": 65.115,
+          "grades": {
+            "easy": 400
+          },
+          "scoreRange": [
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "name": "connect-only-control",
+      "settings": {
+        "mode": "connect-only",
+        "width": 8,
+        "height": 8,
+        "pairCount": 6,
+        "minPathLength": 4,
+        "maxPathLength": 16,
+        "maxAttempts": 500
+      },
+      "before": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 3000,
+        "straightPaths": 184,
+        "straightPathPercent": 6.133,
+        "meanTurnsPerPath": 3.082,
+        "allPathsAtMostTwoTurns": 0,
+        "distinctClueLayouts": 500,
+        "duplicateClueLayouts": 0,
+        "meanMilliseconds": 0.224414,
+        "medianMilliseconds": 0.1514,
+        "p95Milliseconds": 0.5161,
+        "meanAttempts": 1.158,
+        "grades": {
+          "medium": 489,
+          "easy": 5,
+          "hard": 6
+        },
+        "scoreRange": [
+          26,
+          56
+        ]
+      },
+      "after": {
+        "requested": 500,
+        "successes": 500,
+        "failures": 0,
+        "paths": 3000,
+        "straightPaths": 184,
+        "straightPathPercent": 6.133,
+        "meanTurnsPerPath": 3.082,
+        "allPathsAtMostTwoTurns": 0,
+        "distinctClueLayouts": 500,
+        "duplicateClueLayouts": 0,
+        "meanMilliseconds": 0.197887,
+        "medianMilliseconds": 0.14125,
+        "p95Milliseconds": 0.4701,
+        "meanAttempts": 1.158,
+        "grades": {
+          "medium": 489,
+          "easy": 5,
+          "hard": 6
+        },
+        "scoreRange": [
+          26,
+          56
+        ]
+      },
+      "heldOutSeeds100To499": {
+        "before": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 2400,
+          "straightPaths": 149,
+          "straightPathPercent": 6.208,
+          "meanTurnsPerPath": 3.065,
+          "allPathsAtMostTwoTurns": 0,
+          "distinctClueLayouts": 400,
+          "duplicateClueLayouts": 0,
+          "meanMilliseconds": 0.222986,
+          "medianMilliseconds": 0.14705,
+          "p95Milliseconds": 0.4845,
+          "meanAttempts": 1.15,
+          "grades": {
+            "medium": 391,
+            "easy": 4,
+            "hard": 5
+          },
+          "scoreRange": [
+            28,
+            56
+          ]
+        },
+        "after": {
+          "requested": 400,
+          "successes": 400,
+          "failures": 0,
+          "paths": 2400,
+          "straightPaths": 149,
+          "straightPathPercent": 6.208,
+          "meanTurnsPerPath": 3.065,
+          "allPathsAtMostTwoTurns": 0,
+          "distinctClueLayouts": 400,
+          "duplicateClueLayouts": 0,
+          "meanMilliseconds": 0.189984,
+          "medianMilliseconds": 0.1361,
+          "p95Milliseconds": 0.4614,
+          "meanAttempts": 1.15,
+          "grades": {
+            "medium": 391,
+            "easy": 4,
+            "hard": 5
+          },
+          "scoreRange": [
+            28,
+            56
+          ]
+        }
+      }
+    }
+  ]
+}

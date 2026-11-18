@@ -227,10 +227,15 @@ let ``command line rejects malformed and contradictory requests`` () =
 
 [<Theory>]
 [<InlineData(1, 12, 2, 3, 9)>]
+[<InlineData(12, 1, 2, 3, 9)>]
+[<InlineData(2, 8, 4, 2, 6)>]
+[<InlineData(8, 2, 4, 2, 6)>]
 [<InlineData(2, 2, 2, 2, 2)>]
 [<InlineData(3, 3, 2, 2, 7)>]
 [<InlineData(7, 5, 4, 4, 16)>]
 [<InlineData(8, 8, 6, 4, 16)>]
+[<InlineData(8, 8, 12, 3, 10)>]
+[<InlineData(10, 10, 10, 4, 20)>]
 [<InlineData(16, 16, 16, 4, 16)>]
 let ``full coverage witnesses fill every cell without self contact across seeds`` width height pairs minimum maximum =
     for seed in 0 .. 39 do
@@ -263,7 +268,7 @@ let ``full coverage rejects insufficient capacity and impossible single paths`` 
 let ``full coverage bounded search failure is not reported as impossibility`` () =
     let options = { Generation.defaults 0 with Mode = FullCoverage; MaxAttempts = 1 }
     match Generation.generate CancellationToken.None options with
-    | Ok _ -> failwith "The initial striped traversal cannot be split into six induced paths."
+    | Ok _ -> failwith "This one-candidate fixture unexpectedly found a witness."
     | Error message -> Assert.Contains("does not prove impossibility", message)
 
 [<Fact>]
@@ -300,3 +305,49 @@ let ``coverage modes are explicit on the command line with connect only as defau
     Assert.Equal(FullCoverage, parse [| "--mode"; "full-coverage" |])
     for args in [ [| "--mode" |]; [| "--mode"; "invalid" |]; [| "--mode"; "connect-only"; "--mode"; "full-coverage" |] ] do
         Assert.True(CommandLine.parse 42 args |> Result.isError)
+
+[<Theory>]
+[<InlineData(6, 4, 16, 1.5)>]
+[<InlineData(12, 3, 10, 1.0)>]
+let ``full coverage mixing avoids a predominantly striped sample`` pairs minimum maximum minimumTurns =
+    // Broad fixed-seed regression bounds for layout variety, not human difficulty.
+    let turns =
+        [ for seed in 0 .. 31 do
+              let options =
+                  { Generation.defaults seed with Mode = FullCoverage; PairCount = pairs
+                                                  MinPathLength = minimum; MaxPathLength = maximum }
+              let puzzle = generate options
+              independentlyCheck options puzzle
+              for path in puzzle.Solution do
+                  yield path.Cells |> List.windowed 3 |> List.sumBy (function
+                      | [a; b; c] when (b.X - a.X, b.Y - a.Y) <> (c.X - b.X, c.Y - b.Y) -> 1
+                      | _ -> 0) ]
+    let mean = turns |> List.averageBy float
+    Assert.True(mean >= minimumTurns, $"Too few turns per path: {mean}.")
+    Assert.True(float (turns |> List.filter ((=) 0) |> List.length) / float turns.Length < 0.35)
+
+[<Fact>]
+let ``exports distinguish the new full coverage algorithm and preserve connect only identity`` () =
+    let options = Generation.defaults 42
+    let connect = Export.createPack options [|generate options|]
+    Assert.Equal("random-path-growth-v1", connect.Generation.Algorithm)
+    Assert.Equal("tangles-5860d9285de33d0007e8e7b55bfbe3614b052cdcd4336ce589fd368fee142328", connect.Puzzles[0].Id)
+    let fullOptions = { options with Mode = FullCoverage }
+    let full = Export.createPack fullOptions [|generate fullOptions|]
+    Assert.Equal("hamiltonian-path-partition-v2", full.Generation.Algorithm)
+
+[<Theory>]
+[<InlineData(1)>]
+[<InlineData(63)>]
+[<InlineData(64)>]
+[<InlineData(127)>]
+[<InlineData(128)>]
+[<InlineData(129)>]
+[<InlineData(256)>]
+let ``full coverage respects candidate limits around restart and fallback boundaries`` limit =
+    let options = { Generation.defaults 42 with Mode = FullCoverage; MaxAttempts = limit }
+    match Generation.generate CancellationToken.None options with
+    | Ok generated ->
+        independentlyCheck options generated
+        Assert.InRange(generated.Attempts, 1, limit)
+    | Error message -> Assert.Contains($"after {limit} attempts", message)

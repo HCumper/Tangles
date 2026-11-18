@@ -6,6 +6,7 @@ open System.Collections.Generic
 
 type CommandOptions =
     { Generation: GenerationOptions
+      Selection: GenerationPolicy.Options
       Count: int
       OutputPath: string option
       ShowSolution: bool
@@ -27,6 +28,13 @@ Usage: Tangles.Generator [options]
   --seed N           Reproducible integer seed (random when omitted)
   --count N          Puzzles in this batch, 1..10000 (default 1)
   --max-attempts N   Candidate attempts per puzzle, 1..10000 (default 500)
+  --difficulty D    Full-coverage target: any (default), easy, medium, hard, expert
+  --candidates N    Bounded selection proposals, 1..10000 (default 100)
+  --improve-steps N Further proposals after reaching the target, 0..10000 (default 100)
+  --solver-work N   Deterministic work budget per assessment (default 2000000)
+  --assess          Record clue-only solver reasoning and solution-count evidence
+  --require-unique  Accept only puzzles proved to have one solution
+  --avoid-shortest  Connect-only: reject puzzles solved by 32 shortest-route trials
   --output PATH      Save a versioned JSON pack with endpoints and solutions
   --show-solution    Also display the known solution in the console
   --force            Allow replacing an existing output file
@@ -34,9 +42,13 @@ Usage: Tangles.Generator [options]
 
 Rules: orthogonal paths, no sharing or self-touching in both modes.
 Connect-only allows unused cells; full-coverage requires every square to be used.
-Solutions are validated. Difficulty grades are provisional heuristic estimates.
-JSON includes the grade, score, measurements and scoring components.
-Uniqueness is not checked; grades have not been calibrated against human play.
+Hard uses contradiction trials; expert allows branching. Targets are exact.
+Targeted full-coverage search mixes fresh traversals and hill-climbs solver grade.
+--max-attempts bounds each fresh layout search; --candidates also bounds retries.
+Selected batches allow at most 2 * count * candidates proposals in total.
+JSON includes reasoning, selection statistics and provisional difficulty grades.
+Uniqueness remains optional; a solver limit never certifies uniqueness or hardness.
+Grades have not been calibrated against human play. Any valid route still counts.
 An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
 """
 
@@ -46,6 +58,7 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
         else
             let mutable options =
                 { Generation = Generation.defaults defaultSeed
+                  Selection = GenerationPolicy.defaults
                   Count = 1
                   OutputPath = None
                   ShowSolution = false
@@ -54,7 +67,7 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
             let seen = HashSet<string>()
             let mutable index = 0
             let mutable error = None
-            let numeric = set [ "--width"; "--height"; "--pairs"; "--min-length"; "--max-length"; "--seed"; "--count"; "--max-attempts" ]
+            let numeric = set [ "--width"; "--height"; "--pairs"; "--min-length"; "--max-length"; "--seed"; "--count"; "--max-attempts"; "--candidates"; "--improve-steps"; "--solver-work" ]
 
             while index < args.Length && error.IsNone do
                 let arg = args[index]
@@ -65,7 +78,10 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
                     options <- { options with ShowSolution = true }
                 elif arg = "--force" then
                     options <- { options with Force = true }
-                elif arg = "--output" || arg = "--mode" || numeric.Contains arg then
+                elif arg = "--assess" then options <- { options with Selection = { options.Selection with Assess = true } }
+                elif arg = "--require-unique" then options <- { options with Selection = { options.Selection with RequireUnique = true } }
+                elif arg = "--avoid-shortest" then options <- { options with Selection = { options.Selection with AvoidShortest = true } }
+                elif arg = "--output" || arg = "--mode" || arg = "--difficulty" || numeric.Contains arg then
                     if index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal) then
                         error <- Some $"Missing value for {arg}."
                     else
@@ -77,6 +93,11 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
                             | "connect-only" -> options <- { options with Generation = { options.Generation with Mode = ConnectOnly } }
                             | "full-coverage" -> options <- { options with Generation = { options.Generation with Mode = FullCoverage } }
                             | _ -> error <- Some "Mode must be connect-only or full-coverage."
+                        elif arg = "--difficulty" then
+                            let target = match value with "any" -> Some AnyDifficulty | "easy" -> Some Easy | "medium" -> Some Medium | "hard" -> Some Hard | "expert" -> Some Expert | _ -> None
+                            match target with
+                            | Some target -> options <- { options with Selection = { options.Selection with Target = target } }
+                            | None -> error <- Some "Difficulty must be any, easy, medium, hard or expert."
                         elif arg = "--output" then
                             if String.IsNullOrWhiteSpace value then error <- Some "Output path must not be empty."
                             else options <- { options with OutputPath = Some value }
@@ -95,6 +116,9 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
                                 | "--max-attempts" -> options <- { options with Generation = { generation with MaxAttempts = number } }
                                 | "--seed" -> options <- { options with Generation = { generation with Seed = number } }
                                 | "--count" -> options <- { options with Count = number }
+                                | "--candidates" -> options <- { options with Selection = { options.Selection with MaxCandidates = number } }
+                                | "--improve-steps" -> options <- { options with Selection = { options.Selection with ImproveSteps = number } }
+                                | "--solver-work" -> options <- { options with Selection = { options.Selection with SolverWork = number } }
                                 | _ -> ()
                 else
                     error <- Some $"Unknown option: {arg}. Use --help for usage."
@@ -105,7 +129,7 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
             | Some message -> Error message
             | None ->
                 let errors =
-                    [ yield! Generation.validateOptions options.Generation
+                    [ yield! GuidedGeneration.validateOptions options.Generation options.Selection
                       if options.Count < 1 || options.Count > 10000 then "Count must be between 1 and 10000."
                       if options.Force && options.OutputPath.IsNone then "--force requires --output." ]
 

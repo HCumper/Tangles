@@ -18,6 +18,8 @@ dotnet run --project src/Tangles.Generator -- --width 7 --height 5 --pairs 4 --s
 dotnet run --project src/Tangles.Generator -- --count 20 --seed 42 --output puzzles/batch.json
 dotnet run --project src/Tangles.Generator -- --mode full-coverage --seed 42 --show-solution
 dotnet run --project src/Tangles.Generator -- --mode full-coverage --count 20 --seed 42 --output puzzles/full.json
+
+dotnet run --project src/Tangles.Generator -- --mode full-coverage --difficulty hard --count 20 --seed 42 --output puzzles/hard.json
 dotnet test Tangles.slnx
 ```
 
@@ -38,6 +40,16 @@ For full coverage, the board size must lie between `pairs * min-length` and
 Existing output files are preserved unless `--force` is supplied. The parent
 directory is created if necessary. A batch is written only after every puzzle
 has been generated and validated. Ctrl+C cancels generation.
+
+`--difficulty easy|medium|hard|expert` enables solver-guided full-coverage
+selection. Hard puzzles require contradiction trials in the grader and are
+solved without branching; expert puzzles require branching in this strategy.
+The default `--difficulty any` retains the fast generation mode. `--assess`
+adds solver evidence without requiring a particular tier. Use `--require-unique`
+to enforce a proved unique answer, or `--avoid-shortest` to screen connect-only
+puzzles against 32 greedy shortest-route trials. See
+[solver-guided generation](docs/solver-guided-generation.md) for commands,
+budgets, measurements and limitations.
 
 Exit codes: 0 success/help, 1 generation or file failure, 2 invalid arguments
 or an existing output file, 130 cancellation.
@@ -67,7 +79,7 @@ a 2,048-node budget; `--max-attempts` (default 500) limits board attempts.
 Exhaustion is reported as failure to find a candidate, never as proof that
 the configuration is impossible. Dense or unusually long requests can fail.
 
-Full-coverage mode uses `hamiltonian-path-partition-v1`. It starts with a traversal
+Full-coverage mode uses `hamiltonian-path-partition-v2`. It starts with a traversal
 visiting every square once, then changes it with endpoint backbite moves (joining
 an endpoint to another neighbouring square and reversing the affected section).
 Dynamic programming splits that traversal into exactly the requested number of
@@ -75,27 +87,43 @@ paths within the length limits. A segment is allowed only if its nonconsecutive
 cells never touch orthogonally, preserving the no-self-touching rule. The segments
 therefore cover the board without sharing cells.
 
-The search favours traversals needing fewer segments, periodically restarts when
-unsuccessful, and retains a valid witness while exploring up to 32 further
-candidates for variety. `--max-attempts` bounds all candidate evaluations. Valid
-settings can still exhaust that search; another seed, a larger attempt limit or
-different pair/length settings may help. One path cannot fill a two-dimensional
+Before testing a split, an unguided backbite walk mixes the traversal: 48 moves
+per board cell, with a minimum of 256 and a maximum of 16,384 (3,072 on 8x8).
+The search favours traversals needing fewer segments. After 128 unsuccessful
+candidates it creates a fresh randomly oriented, reflected and mixed traversal.
+Every eighth search proposal uses several backbites to help leave local plateaux.
+Once a witness is found, it is retained while up to `max(64, board area)` further
+candidates are explored. With attempt limits of at least 128, up to the final
+128 candidates are reserved for a fresh structured start if mixing has not
+found any witness; this preserves support for tightly constrained lengths.
+
+`--max-attempts` bounds all candidate split evaluations, including refinement
+and fallback. The bounded mixing moves are additional work and check cancellation
+throughout; one-dimensional boards skip mixing because backbites cannot change
+their traversal. Valid settings can still exhaust that search; another seed,
+a larger attempt limit or different pair/length settings may help. One path cannot fill a two-dimensional
 rectangle under the no-self-touching rule, and is rejected in this mode.
+See [the measured v1/v2 comparison](docs/full-coverage-comparison.md) for the
+improvements in variety, generation costs and remaining limitations.
 
 The shared validator separately checks the returned witness before it is
-displayed or saved. Every console run and JSON export also receives an initial
+displayed or saved. Fast generation also receives an initial
 **provisional heuristic difficulty grade** (`easy`, `medium` or `hard`) and a
 0..100 score. The two coverage modes use separate profiles. Grades depend on
 the clues, not on the shape of the stored solution, and are not calibrated
-against human play. The generator does not establish uniqueness, deduplicate
-puzzles, or guarantee enjoyable play. Solver-assisted selection and playtesting
-remain future work. See [the difficulty model](docs/difficulty-grading.md) for
-measurements, formulas, weights and limitations.
+against human play. Solver-assessed full-coverage puzzles use a reasoning grade
+and retain the geometry estimate as diagnostic data. Selected packs exclude
+duplicate clue layouts; full-coverage selections are ordered by solver difficulty.
+Their bounded candidate pool skips failed searches. Plain fast generation retains its original
+batch behaviour. Unique solutions are recorded when established and can be
+required explicitly; uniqueness is never assumed during solving. Playtesting is
+still needed. See [the geometry model](docs/difficulty-grading.md) and
+[the reasoning model](docs/solver-guided-generation.md).
 
 An explicit seed reproduces generation with the same options, algorithm and
-.NET runtime implementation. A batch uses the supplied seed for the first
-puzzle and deterministically derived seeds thereafter. Each puzzle stores its
-own seed so it can also be regenerated individually with the same settings.
+.NET runtime implementation. A batch starts generation with the supplied seed
+and uses deterministically derived seeds for further requests. Each puzzle stores
+its own seed so it can also be regenerated individually with the same settings.
 
 ## JSON pack format (version 1)
 
@@ -110,8 +138,13 @@ and a `puzzles` array. Every puzzle includes:
 - `solution`: labels with ordered `cells` arrays, including endpoints.
 - `difficulty`: provisional grade, score, versioned mode-specific profile,
   thresholds, aggregate and per-pair measurements, and weighted score components.
-- `verification`: `solutionValid: true`, `uniqueness: "notChecked"`,
-  `difficulty: "heuristicEstimate"` (an estimate, not a verified human rating).
+  Assessed puzzles also include `reasoning`; a completed reasoning grade retains
+  the original score/components in `geometricEstimate`.
+- `selection`: optional per-puzzle candidate/search statistics; `shortestRoutes`
+  records an optional connect-only screen.
+- `verification`: `solutionValid: true`, `uniqueness` (`notChecked`, `unique`,
+  `multiple` or `notEstablished`), and `difficulty` (`heuristicEstimate` or
+  `reasoningEstimate`). Grades remain provisional estimates of human difficulty.
 
 Coordinates are zero-based `{ "x": 0, "y": 0 }`, with the origin at the top
 left. Puzzle clues are the dimensions and endpoint pairs; solution cells are
@@ -122,6 +155,9 @@ the same batch settings produce identical JSON on the same runtime.
 `generation.mode` is `connect-only` or `full-coverage`, and `generation.algorithm`
 records the corresponding algorithm. Both modes use format version 1: the
 coverage flag was already part of that format. Each pack uses one rule set.
+`generation.selection` records requested policies, work limits and observed
+batch retries. Solver-guided full coverage records
+`solver-guided-hamiltonian-partition-v1` as its generation algorithm.
 The difficulty object is also an additive format-v1 field; old packs without
 it remain valid. Existing players ignore this extra metadata. Difficulty does
 not change puzzle IDs or the generated clues/solutions. Previously generated
@@ -131,8 +167,8 @@ packs are not modified automatically; new runs include assessments.
 
 - `Tangles.slnx`: solution.
 - `src/Tangles.Core`: shared puzzle types, complete/partial rules validation, pack reading and player state.
-- `src/Tangles.Generator`: generation, heuristic difficulty grading, command line,
-  console display and JSON export.
+- `src/Tangles.Generator`: generation, clue-only reasoning/solution counting,
+  solver-guided selection, geometric grading, command line and JSON export.
 - `src/Tangles.Player`: standalone Bolero WebAssembly player and static assets.
 - `tests/Tangles.Tests`: rule regressions, independent multi-seed witness checks,
   reproducibility, input validation, cancellation and export checks.

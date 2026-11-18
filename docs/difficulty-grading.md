@@ -1,5 +1,10 @@
 # Initial heuristic difficulty model
 
+This document describes the geometry estimate used by fast, unfiltered
+generation. Solver-assessed full-coverage puzzles can instead use the
+[reasoning grade](solver-guided-generation.md) as their primary assessment;
+their original geometry score/components remain in `difficulty.geometricEstimate`.
+
 The generator automatically grades each puzzle, using `Difficulty.assess` in
 `src/Tangles.Generator/Difficulty.fs`. No additional command-line option is needed.
 The console prints the label and score; each JSON puzzle includes the full report
@@ -133,4 +138,5 @@ puzzle harder because it is not an input to the grade.
 
 The current generator may produce batches concentrated in one category. Do not
 force a grade distribution or present these labels as calibrated ratings.
-Playtests and a reasoning solver should inform a later version of the model.
+The separate reasoning model now supports solver-guided selection. Human
+playtests are still needed to calibrate either model.

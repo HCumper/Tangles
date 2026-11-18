@@ -176,3 +176,52 @@ let ``guided selection honours cancellation`` () =
     Assert.Throws<OperationCanceledException>(fun () ->
         GuidedGeneration.generate cancellation.Token { Generation.defaults 42 with Mode = FullCoverage }
             { GenerationPolicy.defaults with Target = Hard } |> ignore) |> ignore
+
+[<Fact>]
+let ``trial floors are enforced and exported without changing the game rules`` () =
+    let options = { Generation.defaults 42 with Mode = FullCoverage }
+    let policy = { GenerationPolicy.defaults with Target = Hard; MinTrials = 25 }
+    let puzzle = GuidedGeneration.generate CancellationToken.None options policy |> require
+    Assert.True(puzzle.Quality.Value.Reasoning.Value.TrialSteps >= 25)
+    let pack = Export.createPack options [|puzzle|]
+    Assert.Equal("solver-guided-hamiltonian-partition-v2",pack.Generation.Algorithm)
+    Assert.Equal(25,pack.Generation.Selection.Value.MinTrials)
+    Assert.Equal(25,pack.Puzzles[0].Selection.Value.MinTrials)
+    Assert.Equal(puzzle.Puzzle,(Export.toJson pack |> PuzzlePacks.read |> require).Puzzles[0].Puzzle)
+    let impossible = { policy with MinTrials = 1_000_000; MaxCandidates = 2; ImproveSteps = 0 }
+    Assert.True(GuidedGeneration.generate CancellationToken.None options impossible |> Result.isError)
+
+[<Fact>]
+let ``expert floors select and export first-answer depth and effort`` () =
+    let options = { Generation.defaults 42 with Mode = FullCoverage; PairCount = 4; MaxPathLength = 32 }
+    let policy = { GenerationPolicy.defaults with Target = Expert; MinBranchDepth = 1; MinFirstSolutionNodes = 1 }
+    let first = GuidedGeneration.generate CancellationToken.None options policy |> require
+    let second = GuidedGeneration.generate CancellationToken.None options policy |> require
+    Assert.Equal(first,second)
+    let report = first.Quality.Value.Reasoning.Value
+    Assert.Equal("expert",report.Grade)
+    Assert.True(report.FirstSolutionBranchDepth >= 1)
+    Assert.True(report.FirstSolutionSearchNodes >= 1)
+    Assert.Equal("unique",report.Uniqueness)
+    let pack = Export.createPack options [|first|]
+    Assert.Equal(1,pack.Generation.Selection.Value.MinBranchDepth)
+    Assert.Equal(1,pack.Generation.Selection.Value.MinFirstSolutionNodes)
+    Assert.Equal("solver-guided-hamiltonian-partition-v2",pack.Generation.Algorithm)
+
+[<Fact>]
+let ``CLI validates reasoning floors and restricts depth floors to expert`` () =
+    match CommandLine.parse 42 [|"--mode";"full-coverage";"--difficulty";"expert";"--min-depth";"6";"--min-search-nodes";"128";"--min-trials";"25"|] |> require with
+    | Generate options ->
+        Assert.Equal(6,options.Selection.MinBranchDepth)
+        Assert.Equal(128,options.Selection.MinFirstSolutionNodes)
+        Assert.Equal(25,options.Selection.MinTrials)
+    | _ -> failwith "Expected generation."
+    for args in
+        [ [|"--min-trials";"1"|]
+          [|"--mode";"full-coverage";"--difficulty";"medium";"--min-trials";"1"|]
+          [|"--mode";"full-coverage";"--difficulty";"hard";"--min-depth";"1"|]
+          [|"--mode";"full-coverage";"--difficulty";"hard";"--min-search-nodes";"1"|]
+          [|"--min-trials";"-1"|]
+          [|"--min-depth";"257"|]
+          [|"--min-search-nodes";"20001"|] ] do
+        Assert.True(CommandLine.parse 42 args |> Result.isError)

@@ -37,6 +37,7 @@ module Export =
 
     type SelectionSettings =
         { Target: string; CandidateLimit: int; ImprovementLimit: int; SolverWorkLimit: int
+          MinTrials: int; MinBranchDepth: int; MinFirstSolutionNodes: int
           Assess: bool; RequireUnique: bool; AvoidShortest: bool
           BatchRequests: int option; RejectedSearches: int option; RejectedDuplicates: int option
           BatchCandidateBudget: int option; BatchCandidatesConsidered: int option }
@@ -79,6 +80,7 @@ module Export =
             quality |> Option.map (fun q ->
                 { Target = q.Selection.Target; CandidateLimit = q.Selection.CandidateLimit; ImprovementLimit = q.Selection.ImprovementLimit
                   SolverWorkLimit = q.Selection.SolverWorkLimit; Assess = q.Selection.Assess; RequireUnique = q.Selection.RequireUnique; AvoidShortest = q.Selection.AvoidShortest
+                  MinTrials = q.Selection.MinTrials; MinBranchDepth = q.Selection.MinBranchDepth; MinFirstSolutionNodes = q.Selection.MinFirstSolutionNodes
                   BatchRequests = None; RejectedSearches = None; RejectedDuplicates = None
                   BatchCandidateBudget = None; BatchCandidatesConsidered = None })
         let selection = generated |> Array.tryHead |> Option.bind (fun p -> settings p.Quality)
@@ -180,7 +182,10 @@ module Export =
         printfn "Mode: %s" (if board.RequireFullCoverage then "full-coverage (every square must be filled)" else "connect-only (unused squares allowed)")
         printfn "Difficulty: %s (%d/100; %s; provisional)" difficulty.Grade difficulty.Score difficulty.Method
         match reasoning with
-        | Some a -> printfn "Solver: %s; %d trial eliminations; uniqueness %s; %s (%d work units)" a.Tier a.TrialSteps a.Uniqueness a.Status a.Work
+        | Some a ->
+            printfn "Solver: %s; %d trial eliminations; uniqueness %s; %s (%d work units)" a.Tier a.TrialSteps a.Uniqueness a.Status a.Work
+            if a.SearchNodes > 0 then
+                printfn "First answer: depth %d, %d search nodes; total proof search: %d nodes." a.FirstSolutionBranchDepth a.FirstSolutionSearchNodes a.SearchNodes
         | None -> ()
         match generated.Quality |> Option.bind _.ShortestRoutes with
         | Some s -> printfn "Shortest-route screen: %s after %d trial(s)" (if s.Solved then "solved" else "no solution found by this screen") s.Trials

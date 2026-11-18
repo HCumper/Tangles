@@ -44,6 +44,18 @@ more search; these are starting points, not guarantees that every seed succeeds.
 Increase `--solver-work` when candidates hit the assessment limit. Increasing
 `--candidates` or `--max-attempts` instead gives the layout search more chances.
 
+For a stronger 12x12 playtest, use fewer pairs and explicit expert floors:
+
+```powershell
+dotnet run --project src/Tangles.Generator -c Release -- --mode full-coverage --width 12 --height 12 --pairs 6 --min-length 3 --max-length 48 --max-attempts 10000 --difficulty expert --min-depth 10 --min-search-nodes 5000 --solver-work 100000000 --candidates 80 --improve-steps 20 --seed 42 --output puzzles/expert-12x12-6pairs-challenge.json
+```
+
+This example reaches its first answer after 10 nested cell-colour branch
+decisions and 10,712 search nodes. An eight-pair variant with `--min-depth 8`,
+`--min-search-nodes 700` and `--candidates 40` reaches its first answer at depth
+8 after 723 nodes. Both complete the uniqueness proof within the limits. These
+are strategy-specific measurements, not guarantees of human difficulty.
+
 Pair count is a useful coarse dial: the supplied experiment suggests roughly
 area/6 for easy, sqrt(area) around medium/hard, and sqrt(area)/2 for expert.
 Actual selection uses the solver; it does not assume a pair count establishes
@@ -117,6 +129,12 @@ selection as well.
   100), within the overall candidate limit. Zero returns the first match.
 - `--solver-work` limits each assessment deterministically (default 2,000,000
   counted operations). Search also has a 20,000-node limit.
+- `--min-trials` sets a minimum successful contradiction count for hard/expert
+  targets. Zero, the default, adds no floor.
+- `--min-depth` and `--min-search-nodes` apply to expert targets. They set minimum
+  branch depth and visited nodes at the **first valid answer**, respectively.
+  Both default to zero. Work spent subsequently proving uniqueness cannot
+  satisfy these floors. Incomplete solver runs are still rejected.
 - A selected batch has at most `2 * count * candidates` proposals in total. A
   new request starts only when enough budget remains for its full candidate
   allowance. Rejected duplicates and failed requests consume this budget.
@@ -166,6 +184,21 @@ assumptions tested, search nodes, capped solution count, search completeness,
 uniqueness, consumed work and the work limit. Local/route deduction counts
 exclude deductions inside speculative branches; speculative work is still
 charged to the work budget.
+
+`firstSolutionSearchNodes` and `firstSolutionBranchDepth` describe the first
+answer found by the search after the initial deduction/trial pass.
+`maxSearchDepth` covers the whole search. Logical solutions have zero search
+nodes and depth. Depth counts cell-colour decisions along the successful DFS
+branch; it is not a minimum over all search orders, or a count of guesses a
+human must make. The total `searchNodes` includes subsequent uniqueness work.
+
+When any minimum is enabled, generation records
+`solver-guided-hamiltonian-partition-v2`. Expert depth/effort floors also make
+hill-climbing and pack ordering prefer first-answer depth, then first-answer
+nodes, then trial count. Otherwise v1 generation order is preserved. The
+`cell-domain-reasoning-v1` tiers and displayed score formulas are unchanged;
+the new measurements are additive. Generation policy and per-puzzle selection
+metadata retain all three floors so the selection can be replayed.
 
 `verification.uniqueness` is `unique`, `multiple`, `none`, `notEstablished` or
 `notChecked`; valid generated witnesses prevent a legitimate `none` result.

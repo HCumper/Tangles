@@ -8,16 +8,27 @@ module GenerationPolicy =
           MaxCandidates: int
           ImproveSteps: int
           SolverWork: int
+          MinTrials: int
+          MinBranchDepth: int
+          MinFirstSolutionNodes: int
           Assess: bool
           RequireUnique: bool
           AvoidShortest: bool }
 
     let defaults =
         { Target = AnyDifficulty; MaxCandidates = 100; ImproveSteps = 100
-          SolverWork = Solver.defaults.MaxWork; Assess = false; RequireUnique = false; AvoidShortest = false }
+          SolverWork = Solver.defaults.MaxWork; MinTrials = 0; MinBranchDepth = 0; MinFirstSolutionNodes = 0
+          Assess = false; RequireUnique = false; AvoidShortest = false }
 
     let targetName = function AnyDifficulty -> "any" | Easy -> "easy" | Medium -> "medium" | Hard -> "hard" | Expert -> "expert"
     let active options = options.Assess || options.Target <> AnyDifficulty || options.RequireUnique || options.AvoidShortest
+    let strengthened options = options.MinTrials > 0 || options.MinBranchDepth > 0 || options.MinFirstSolutionNodes > 0
+    let depthSelection options = options.MinBranchDepth > 0 || options.MinFirstSolutionNodes > 0
+    let meetsMinimums options (analysis: Solver.Analysis) =
+        analysis.Status = "complete"
+        && analysis.TrialSteps >= options.MinTrials
+        && analysis.FirstSolutionBranchDepth >= options.MinBranchDepth
+        && analysis.FirstSolutionSearchNodes >= options.MinFirstSolutionNodes
 
     type Statistics =
         { Algorithm: string
@@ -28,6 +39,9 @@ module GenerationPolicy =
           TraversalEvaluations: int
           ImprovementLimit: int
           SolverWorkLimit: int
+          MinTrials: int
+          MinBranchDepth: int
+          MinFirstSolutionNodes: int
           Assess: bool
           RequireUnique: bool
           AvoidShortest: bool

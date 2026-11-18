@@ -55,8 +55,10 @@ let private run (cancellation: CancellationToken) options =
             if GenerationPolicy.active options.Selection && options.Generation.Mode = FullCoverage then
                 Array.sortInPlaceBy (fun (p: GeneratedPuzzle) ->
                     match p.Quality |> Option.bind _.Reasoning with
-                    | Some a -> a.Score, a.TrialSteps, a.RouteDeductions, p.Seed
-                    | None -> 0,0,0,p.Seed) puzzles
+                    | Some a when GenerationPolicy.depthSelection options.Selection ->
+                        0, a.FirstSolutionBranchDepth, a.FirstSolutionSearchNodes, a.TrialSteps, a.RouteDeductions, p.Seed
+                    | Some a -> a.Score, 0, 0, a.TrialSteps, a.RouteDeductions, p.Seed
+                    | None -> 0,0,0,0,0,p.Seed) puzzles
 
             match options.OutputPath with
             | Some path ->

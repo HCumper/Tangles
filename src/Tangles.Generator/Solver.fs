@@ -31,6 +31,9 @@ module Solver =
           TrialSteps: int
           TrialAssumptions: int
           SearchNodes: int
+          FirstSolutionSearchNodes: int
+          FirstSolutionBranchDepth: int
+          MaxSearchDepth: int
           SolutionCount: int
           SolutionCountLimit: int
           SolutionCountComplete: bool
@@ -79,6 +82,7 @@ module Solver =
             && board.Pairs.Length <= (if board.RequireFullCoverage then 64 else 63)
         let mutable work, localDeductions, routeDeductions, routePasses = 0, 0, 0, 0
         let mutable trialSteps, trialAssumptions, searchNodes = 0, 0, 0
+        let mutable firstSolutionNodes, firstSolutionDepth, maxSearchDepth = 0, 0, 0
         let mutable tier, status, limitReason = "local", "complete", ""
         let mutable logical, exhaustive = false, false
         let solutions = ResizeArray<SolutionPath list>()
@@ -254,12 +258,13 @@ module Solver =
                             grading <- false
 
                 if not logical then
-                    let rec search (dom: uint64 array) =
+                    let rec search (dom: uint64 array) depth =
                         if solutions.Count >= 2 then false
                         else
                             spend ()
                             if searchNodes >= limits.MaxSearchNodes then raise (LimitReached "searchNodes")
                             searchNodes <- searchNodes + 1
+                            maxSearchDepth <- max maxSearchDepth depth
                             try
                                 propagate dom
                                 let mutable best, size = -1, 65
@@ -267,7 +272,11 @@ module Solver =
                                     let choices = BitOperations.PopCount dom[cell]
                                     if choices > 1 && choices < size then best <- cell; size <- choices
                                 if best < 0 then
-                                    solutions.Add (materialise dom)
+                                    let answer = materialise dom
+                                    if solutions.Count = 0 then
+                                        firstSolutionNodes <- searchNodes
+                                        firstSolutionDepth <- depth
+                                    solutions.Add answer
                                     true
                                 else
                                     let mutable bits = dom[best]
@@ -277,10 +286,10 @@ module Solver =
                                         bits <- bits &&& (bits - 1UL)
                                         let next = Array.copy dom
                                         next[best] <- bit
-                                        complete <- search next && complete
+                                        complete <- search next (depth + 1) && complete
                                     complete && bits = 0UL
                             with Contradiction -> true
-                    exhaustive <- search domains
+                    exhaustive <- search domains 0
                     if exhaustive && solutions.Count = 0 then tier <- "unsatisfiable"
             with
             | Contradiction -> tier <- "unsatisfiable"; exhaustive <- true
@@ -307,6 +316,7 @@ module Solver =
               Status = status; LimitReason = limitReason; Tier = tier; Grade = grade; Score = score; Provisional = true
               SolvedByReasoning = logical; LocalDeductions = localDeductions; RouteDeductions = routeDeductions
               RoutePasses = routePasses; TrialSteps = trialSteps; TrialAssumptions = trialAssumptions; SearchNodes = searchNodes
+              FirstSolutionSearchNodes = firstSolutionNodes; FirstSolutionBranchDepth = firstSolutionDepth; MaxSearchDepth = maxSearchDepth
               SolutionCount = solutions.Count; SolutionCountLimit = 2; SolutionCountComplete = exhaustive
               Uniqueness = uniqueness; Work = work; WorkLimit = limits.MaxWork }
           Solutions = solutions.ToArray() }

@@ -32,6 +32,9 @@ Usage: Tangles.Generator [options]
   --candidates N    Bounded selection proposals, 1..10000 (default 100)
   --improve-steps N Further proposals after reaching the target, 0..10000 (default 100)
   --solver-work N   Deterministic work budget per assessment (default 2000000)
+  --min-trials N    Minimum contradiction eliminations for hard/expert (default 0)
+  --min-depth N     Expert: minimum branch depth to the first answer (default 0)
+  --min-search-nodes N  Expert: minimum nodes before the first answer (default 0)
   --assess          Record clue-only solver reasoning and solution-count evidence
   --require-unique  Accept only puzzles proved to have one solution
   --avoid-shortest  Connect-only: reject puzzles solved by 32 shortest-route trials
@@ -67,7 +70,7 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
             let seen = HashSet<string>()
             let mutable index = 0
             let mutable error = None
-            let numeric = set [ "--width"; "--height"; "--pairs"; "--min-length"; "--max-length"; "--seed"; "--count"; "--max-attempts"; "--candidates"; "--improve-steps"; "--solver-work" ]
+            let numeric = set [ "--width"; "--height"; "--pairs"; "--min-length"; "--max-length"; "--seed"; "--count"; "--max-attempts"; "--candidates"; "--improve-steps"; "--solver-work"; "--min-trials"; "--min-depth"; "--min-search-nodes" ]
 
             while index < args.Length && error.IsNone do
                 let arg = args[index]
@@ -119,6 +122,9 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
                                 | "--candidates" -> options <- { options with Selection = { options.Selection with MaxCandidates = number } }
                                 | "--improve-steps" -> options <- { options with Selection = { options.Selection with ImproveSteps = number } }
                                 | "--solver-work" -> options <- { options with Selection = { options.Selection with SolverWork = number } }
+                                | "--min-trials" -> options <- { options with Selection = { options.Selection with MinTrials = number } }
+                                | "--min-depth" -> options <- { options with Selection = { options.Selection with MinBranchDepth = number } }
+                                | "--min-search-nodes" -> options <- { options with Selection = { options.Selection with MinFirstSolutionNodes = number } }
                                 | _ -> ()
                 else
                     error <- Some $"Unknown option: {arg}. Use --help for usage."

@@ -11,6 +11,14 @@ module GuidedGeneration =
           if policy.MaxCandidates < 1 || policy.MaxCandidates > 10000 then "Candidate limit must be between 1 and 10000."
           if policy.ImproveSteps < 0 || policy.ImproveSteps > 10000 then "Improvement steps must be between 0 and 10000."
           if policy.SolverWork < 1 || policy.SolverWork > 100_000_000 then "Solver work limit must be between 1 and 100000000."
+          if policy.MinTrials < 0 || policy.MinTrials > 1_000_000 then "Minimum trials must be between 0 and 1000000."
+          if policy.MinBranchDepth < 0 || policy.MinBranchDepth > 256 then "Minimum branch depth must be between 0 and 256."
+          if policy.MinFirstSolutionNodes < 0 || policy.MinFirstSolutionNodes > Solver.defaults.MaxSearchNodes then
+              "Minimum first-solution nodes must be between 0 and 20000."
+          if policy.MinTrials > 0 && policy.Target <> Hard && policy.Target <> Expert then
+              "--min-trials requires --difficulty hard or expert."
+          if GenerationPolicy.depthSelection policy && policy.Target <> Expert then
+              "--min-depth and --min-search-nodes require --difficulty expert."
           if policy.Target <> AnyDifficulty && generation.Mode <> FullCoverage then
               "Reasoning difficulty targets require --mode full-coverage. For connect-only use --avoid-shortest."
           if policy.AvoidShortest && generation.Mode <> ConnectOnly then "--avoid-shortest applies only to connect-only puzzles."
@@ -37,7 +45,7 @@ module GuidedGeneration =
             let mutable failure: string option = None
             let mutable firstAccepted: int option = None
             let mutable accepted: (GeneratedPuzzle * Solver.Analysis option * Solver.ShortestRouteScreen option) option = None
-            let mutable acceptedScore = Int32.MinValue, 0, 0
+            let mutable acceptedScore = Int32.MinValue, 0, 0, 0
 
             let score (analysis: Solver.Analysis option) =
                 match analysis with
@@ -45,8 +53,10 @@ module GuidedGeneration =
                     let rank = gradeRank a.Grade
                     let desired = if policy.Target = AnyDifficulty then 2 else gradeRank target
                     let priority = if rank <= desired then rank else -10 - rank
-                    priority, a.TrialSteps, a.RouteDeductions
-                | _ -> -100, 0, 0
+                    if GenerationPolicy.depthSelection policy then
+                        priority, a.FirstSolutionBranchDepth, a.FirstSolutionSearchNodes, a.TrialSteps
+                    else priority, a.TrialSteps, a.RouteDeductions, 0
+                | _ -> -100, 0, 0, 0
 
             let consider (candidate: GeneratedPuzzle) =
                 let key = Solver.boardKey candidate.Puzzle
@@ -78,6 +88,8 @@ module GuidedGeneration =
                         let matches =
                             (policy.Target = AnyDifficulty || (reasoning |> Option.exists (fun a -> a.Status = "complete" && a.Grade = target)))
                             && (not policy.RequireUnique || (reasoning |> Option.exists (fun a -> a.Uniqueness = "unique")))
+                            && (not (GenerationPolicy.strengthened policy)
+                                || (reasoning |> Option.exists (GenerationPolicy.meetsMinimums policy)))
                         let qualityScore = score reasoning
                         if matches && failure.IsNone && (accepted.IsNone || qualityScore >= acceptedScore) then
                             accepted <- Some (candidate, reasoning, shortest)
@@ -130,7 +142,7 @@ module GuidedGeneration =
                             order <- candidate; positions <- nextPositions; currentScore <- nextScore
                     found
 
-                let mutable current: (int array * int array * (int * int * int)) option = None
+                let mutable current: (int array * int array * (int * int * int * int)) option = None
                 let mutable stagnant = 0
                 while considered < policy.MaxCandidates && failure.IsNone
                       && (firstAccepted.IsNone || considered - firstAccepted.Value < policy.ImproveSteps) do
@@ -177,9 +189,10 @@ module GuidedGeneration =
                 Error $"No {goal} found in {considered} candidates ({evaluated} assessed, {budgetRejections} solver limits). Try more --candidates{budgetAdvice}, fewer pairs or different path-length bounds. No easier puzzle was substituted."
             | None, Some (candidate, reasoning, shortest) ->
                 let statistics: GenerationPolicy.Statistics =
-                    { Algorithm = if guided then "solver-guided-hamiltonian-partition-v1" elif generation.Mode = FullCoverage then Generation.fullCoverageAlgorithm else "random-path-growth-v1"
+                    { Algorithm = if guided then (if GenerationPolicy.strengthened policy then "solver-guided-hamiltonian-partition-v2" else "solver-guided-hamiltonian-partition-v1") elif generation.Mode = FullCoverage then Generation.fullCoverageAlgorithm else "random-path-growth-v1"
                       Target = target; CandidateLimit = policy.MaxCandidates; CandidatesConsidered = considered; CandidatesEvaluated = evaluated
                       TraversalEvaluations = traversalEvaluations; ImprovementLimit = policy.ImproveSteps; SolverWorkLimit = policy.SolverWork
+                      MinTrials = policy.MinTrials; MinBranchDepth = policy.MinBranchDepth; MinFirstSolutionNodes = policy.MinFirstSolutionNodes
                       Assess = policy.Assess; RequireUnique = policy.RequireUnique; AvoidShortest = policy.AvoidShortest; DuplicatesRejected = duplicates
                       BudgetRejections = budgetRejections; StartingTier = startingTier; StartingTrialSteps = startingTrials }
                 Ok { candidate with Attempts = traversalEvaluations; Quality = Some { Reasoning = reasoning; ShortestRoutes = shortest; Selection = statistics } }

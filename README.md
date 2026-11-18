@@ -50,6 +50,9 @@ to enforce a proved unique answer, or `--avoid-shortest` to screen connect-only
 puzzles against 32 greedy shortest-route trials. See
 [solver-guided generation](docs/solver-guided-generation.md) for commands,
 budgets, measurements and limitations.
+Use `--min-trials` to remove weak hard/expert candidates, or expert-only
+`--min-depth` and `--min-search-nodes` to require deeper search to a first answer.
+The latter measurements exclude subsequent work proving uniqueness.
 
 Exit codes: 0 success/help, 1 generation or file failure, 2 invalid arguments
 or an existing output file, 130 cancellation.
@@ -157,7 +160,8 @@ records the corresponding algorithm. Both modes use format version 1: the
 coverage flag was already part of that format. Each pack uses one rule set.
 `generation.selection` records requested policies, work limits and observed
 batch retries. Solver-guided full coverage records
-`solver-guided-hamiltonian-partition-v1` as its generation algorithm.
+`solver-guided-hamiltonian-partition-v1` as its generation algorithm, or `v2`
+when explicit reasoning minimums are enabled.
 The difficulty object is also an additive format-v1 field; old packs without
 it remain valid. Existing players ignore this extra metadata. Difficulty does
 not change puzzle IDs or the generated clues/solutions. Previously generated

@@ -85,6 +85,8 @@ let ``hard reference puzzle needs contradiction trials and has a checked unique 
     Assert.Equal("hard", result.Analysis.Grade)
     Assert.True(result.Analysis.TrialSteps > 0)
     Assert.True(result.Analysis.SolvedByReasoning)
+    Assert.Equal(0,result.Analysis.FirstSolutionSearchNodes)
+    Assert.Equal(0,result.Analysis.FirstSolutionBranchDepth)
     Assert.Equal("unique", result.Analysis.Uniqueness)
     Assert.Single(result.Solutions) |> ignore
     Assert.Empty(Validation.solution hardFixture result.Solutions[0])
@@ -158,3 +160,31 @@ let ``multiple full-coverage answers are ambiguity rather than an expert grade``
     Assert.Equal("unrated",result.Analysis.Grade)
     Assert.Equal(2,result.Solutions.Length)
     for solution in result.Solutions do Assert.Empty(Validation.solution puzzle solution)
+
+[<Fact>]
+let ``first answer effort is separate from completing the uniqueness proof`` () =
+    let puzzle =
+        board true 12 12
+            [pair "A" (cell 2 2) (cell 9 1); pair "B" (cell 0 10) (cell 8 3)
+             pair "C" (cell 1 10) (cell 6 1); pair "D" (cell 7 7) (cell 6 0)
+             pair "E" (cell 2 7) (cell 3 2); pair "F" (cell 8 4) (cell 9 2)]
+    let limits = { Solver.defaults with MaxWork = 100_000_000 }
+    let result = Solver.solve CancellationToken.None limits puzzle
+    let report = result.Analysis
+    Assert.Equal("expert", report.Grade)
+    Assert.Equal("unique", report.Uniqueness)
+    Assert.InRange(report.FirstSolutionSearchNodes,1,report.SearchNodes-1)
+    Assert.InRange(report.FirstSolutionBranchDepth,1,report.MaxSearchDepth)
+    Assert.Empty(Validation.solution puzzle result.Solutions[0])
+    let floor = (report.FirstSolutionSearchNodes + report.SearchNodes) / 2
+    let policy = { GenerationPolicy.defaults with Target = Expert; MinFirstSolutionNodes = floor }
+    Assert.True(report.SearchNodes >= floor)
+    Assert.False(GenerationPolicy.meetsMinimums policy report)
+    let limited = Solver.solve CancellationToken.None { limits with MaxSearchNodes = report.FirstSolutionSearchNodes } puzzle
+    Assert.Single(limited.Solutions) |> ignore
+    Assert.Equal(report.FirstSolutionSearchNodes, limited.Analysis.FirstSolutionSearchNodes)
+    Assert.Equal(report.FirstSolutionBranchDepth, limited.Analysis.FirstSolutionBranchDepth)
+    Assert.Equal("budgetExceeded", limited.Analysis.Status)
+    Assert.Equal("notEstablished", limited.Analysis.Uniqueness)
+    Assert.Equal("unrated", limited.Analysis.Grade)
+    Assert.False(GenerationPolicy.meetsMinimums { policy with MinFirstSolutionNodes = 1 } limited.Analysis)

@@ -9,6 +9,7 @@ module GenerationPolicy =
           ImproveSteps: int
           SolverWork: int
           MinTrials: int
+          MaxTrials: int option
           MinBranchDepth: int
           MinFirstSolutionNodes: int
           Assess: bool
@@ -17,29 +18,34 @@ module GenerationPolicy =
 
     let defaults =
         { Target = AnyDifficulty; MaxCandidates = 100; ImproveSteps = 100
-          SolverWork = Solver.defaults.MaxWork; MinTrials = 0; MinBranchDepth = 0; MinFirstSolutionNodes = 0
+          SolverWork = Solver.defaults.MaxWork; MinTrials = 0; MaxTrials = None; MinBranchDepth = 0; MinFirstSolutionNodes = 0
           Assess = false; RequireUnique = false; AvoidShortest = false }
 
     let targetName = function AnyDifficulty -> "any" | Easy -> "easy" | Medium -> "medium" | Hard -> "hard" | Expert -> "expert"
     let active options = options.Assess || options.Target <> AnyDifficulty || options.RequireUnique || options.AvoidShortest
-    let strengthened options = options.MinTrials > 0 || options.MinBranchDepth > 0 || options.MinFirstSolutionNodes > 0
+    let version = "symmetry-effort-v1"
+    let strengthened options = options.MinTrials > 0 || options.MaxTrials.IsSome || options.MinBranchDepth > 0 || options.MinFirstSolutionNodes > 0
     let depthSelection options = options.MinBranchDepth > 0 || options.MinFirstSolutionNodes > 0
     let meetsMinimums options (analysis: Solver.Analysis) =
         analysis.Status = "complete"
         && analysis.TrialSteps >= options.MinTrials
+        && (options.MaxTrials |> Option.forall (fun upper -> analysis.TrialSteps <= upper))
         && analysis.FirstSolutionBranchDepth >= options.MinBranchDepth
         && analysis.FirstSolutionSearchNodes >= options.MinFirstSolutionNodes
 
     type Statistics =
         { Algorithm: string
+          PolicyVersion: string
           Target: string
           CandidateLimit: int
           CandidatesConsidered: int
           CandidatesEvaluated: int
           TraversalEvaluations: int
+          SolverAssessments: int
           ImprovementLimit: int
           SolverWorkLimit: int
           MinTrials: int
+          MaxTrials: int option
           MinBranchDepth: int
           MinFirstSolutionNodes: int
           Assess: bool

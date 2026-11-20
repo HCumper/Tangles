@@ -1,117 +1,33 @@
 {
-  "validatedAt": "2026-11-17T16:02:36.278978+00:00",
-  "target": "SSB 2.8.0 records -> S*BASIC; SMSQ/E on SMSQmulator 68000 CPU; Turbo 5.09, Brief optimisation, 64 KiB compiler buffer",
-  "loaderSha256": "9eca81d523de278ebd0d73a1b4e688de6ccbe6e0a6020b59a7345b650402aaf5",
-  "parserSha256": "09a39f52e76a51abda8ec8936ef4fa761e4dcb1dbd29107f7dab3ac3caacdeda",
-  "exampleSha256": "a39122082b6ae216be94d602f6b3b339e6c3cf8fd9d640a843de1cd287463b59",
-  "model": "TanglesPack, TanglesPuzzle record array, TanglesPair record array with nested TanglesCell endpoints; one-based contiguous pair ranges",
-  "ownership": "Loader frees source/tree/frames on success and failure. Records survive independent subsequent JSON parsing. Failed loads clear partial model counts; pack_free leaves independently loaded JSON alone.",
-  "coverage": "113 cases: independent record comparison for both bundled packs; both coverage flags; required/type/range checks; integer token checks; Unicode and text limits; distinct labels and endpoints; repeated/conflicting IDs; last duplicate JSON member; ignored solutions; file/node/depth limits; memory-string entry point; missing files; reloads; model/tree lifetime.",
+  "validatedAt": "2026-11-18T03:12:57.260066+00:00",
+  "loaderSha256": "7f44359e6350611f67d66eb45f0ca39ee977c46735c03e07c4d01c364f7fc0d5",
+  "parserSha256": "0260d582e671c59f95ea0e3948a6212ded38719fffcc5a1b8009bb40682b56c1",
+  "target": "SSB 2.8.0 / Turbo 5.09 / SMSQmulator SMSQ/E",
   "runs": [
     {
       "passed": true,
-      "compiled": false,
-      "runtimeOnly": false,
-      "ramMiB": 8,
-      "caseCount": 113,
-      "loaderSha256": "9eca81d523de278ebd0d73a1b4e688de6ccbe6e0a6020b59a7345b650402aaf5",
-      "parserSha256": "09a39f52e76a51abda8ec8936ef4fa761e4dcb1dbd29107f7dab3ac3caacdeda",
-      "suiteSha256": "c4f578572522268eb7609c2dd2923b5f2ea375393ef4ed60f0852034937cd2b4",
-      "driverSha256": "0dd8222d27efe40b60fd204d26d1c5e41ab047bca55d13d2d3c62a197accd2ba",
-      "errors": [],
-      "folder": "build/pack-loader/interpreted-final",
-      "testedAt": "2026-11-17T15:55:35.296350+00:00"
-    },
-    {
-      "passed": true,
       "compiled": true,
       "runtimeOnly": false,
       "ramMiB": 8,
-      "caseCount": 113,
-      "loaderSha256": "9eca81d523de278ebd0d73a1b4e688de6ccbe6e0a6020b59a7345b650402aaf5",
-      "parserSha256": "09a39f52e76a51abda8ec8936ef4fa761e4dcb1dbd29107f7dab3ac3caacdeda",
-      "suiteSha256": "c4f578572522268eb7609c2dd2923b5f2ea375393ef4ed60f0852034937cd2b4",
-      "driverSha256": "0dd8222d27efe40b60fd204d26d1c5e41ab047bca55d13d2d3c62a197accd2ba",
+      "caseCount": 114,
+      "loaderSha256": "7f44359e6350611f67d66eb45f0ca39ee977c46735c03e07c4d01c364f7fc0d5",
+      "parserSha256": "0260d582e671c59f95ea0e3948a6212ded38719fffcc5a1b8009bb40682b56c1",
+      "suiteSha256": "07e3d6aef1f29d523a9eafa8fa90c0c84f2c2ac105f570f3cb324a8f02f98167",
+      "driverSha256": "6c063f718eb755b7962d9f1aaa2a4b461cc3d5baa131e7c213809a24a4c1388c",
       "errors": [],
-      "folder": "build/pack-loader/compiled-final",
-      "testedAt": "2026-11-17T15:55:43.582841+00:00"
-    },
-    {
-      "passed": true,
-      "compiled": true,
-      "runtimeOnly": true,
-      "ramMiB": 4,
-      "caseCount": 113,
-      "loaderSha256": "9eca81d523de278ebd0d73a1b4e688de6ccbe6e0a6020b59a7345b650402aaf5",
-      "parserSha256": "09a39f52e76a51abda8ec8936ef4fa761e4dcb1dbd29107f7dab3ac3caacdeda",
-      "suiteSha256": "c4f578572522268eb7609c2dd2923b5f2ea375393ef4ed60f0852034937cd2b4",
-      "driverSha256": "0dd8222d27efe40b60fd204d26d1c5e41ab047bca55d13d2d3c62a197accd2ba",
-      "errors": [],
-      "folder": "build/pack-loader/runtime-4m",
-      "testedAt": "2026-11-17T16:00:53.083909+00:00"
-    },
-    {
-      "passed": true,
-      "compiled": true,
-      "example": true,
-      "ramMiB": 8,
-      "caseCount": 0,
-      "packCount": 1,
-      "packNodes": {
-        "quickstart_json": 66,
-        "starter_json": 1784
-      },
-      "packSha256": {
-        "quickstart_json": "5011abbeb6fe94bb280c64fd374b9cf98df54c1741c7c697b0074136fe683cc8",
-        "starter_json": "5363ab7b933aff7cde018c0ce267e7351533bd425c8adf0addea156ae06e58b5"
-      },
-      "librarySha256": "09a39f52e76a51abda8ec8936ef4fa761e4dcb1dbd29107f7dab3ac3caacdeda",
-      "manifestCount": 119,
-      "manifestsPreserved": true,
-      "errors": [],
-      "folder": "build/pack-loader/example-final",
-      "testedAt": "2026-11-17T15:57:35.046498+00:00"
-    },
-    {
-      "passed": true,
-      "compiled": true,
-      "example": true,
-      "runtimeOnly": true,
-      "ramMiB": 2,
-      "puzzleCount": 8,
-      "pairCount": 48,
-      "exeSha256": "d70b618e0c50156b81008a989678be0b51ba63c5004271ec3092454bced0ad3f",
-      "loaderSha256": "9eca81d523de278ebd0d73a1b4e688de6ccbe6e0a6020b59a7345b650402aaf5",
-      "errors": [],
-      "folder": "build/pack-loader/example-runtime-2m",
-      "testedAt": "2026-11-17T16:00:18.393233+00:00"
+      "folder": "1794970785853158100",
+      "testedAt": "2026-11-18T03:00:56.836171+00:00"
     }
   ],
-  "compiledTargets": {
-    "compiled-final": {
-      "bytes": 48640,
-      "sha256": "594dfa1a1cbb3f51ce5cfff9a5329abfa2222ab661f7e58fe1f26e9f2ae54574",
-      "dataspaceKiB": 1024
-    },
-    "example-final": {
-      "bytes": 42658,
-      "sha256": "d70b618e0c50156b81008a989678be0b51ba63c5004271ec3092454bced0ad3f",
-      "dataspaceKiB": 256
-    }
+  "playerProjection": {
+    "passed": true,
+    "compiled": true,
+    "reference": "Tangles.Core.Play",
+    "transitions": 2333,
+    "cases": 8,
+    "largePackBytes": 2460329,
+    "errors": [],
+    "folder": "player-tests-1794970787096448300"
   },
-  "compilerNotes": "0 errors; 28 local-only string-name warnings for the example, 30 including the test driver.",
-  "limits": {
-    "inputBytes": 1048576,
-    "depth": 32,
-    "maxNodes": 32766,
-    "maxPuzzles": 10000,
-    "maxBoardSide": 64,
-    "textUtf8Bytes": 128,
-    "maxPairs": 32766
-  },
-  "observedMemoryLimit": {
-    "fullSuiteAt2MiB": "SMSQ/E insufficient memory at EXECUTE_W: the test executable reserves 1 MiB dataspace for the 12000-node fixture. It passes unchanged in 4 MiB.",
-    "practicalExampleAt2MiB": "The same verified example executable, with 256 KiB dataspace, reads all 8 starter puzzles / 48 pairs in a fresh 2 MiB emulator; output is byte-for-byte identical to the 8 MiB run.",
-    "classicQdosAnd128KiB": "Not tested."
-  }
+  "scope": "Current-source compiled regression and original 100-puzzle pack import. Earlier interpreted/example runs remain in git history."
 }

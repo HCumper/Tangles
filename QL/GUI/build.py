@@ -41,8 +41,11 @@ def main():
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
             name = next(n for n in archive.namelist() if n.lower().endswith("tptr.ext"))
             (run / "tptr_ext").write_bytes(archive.read(name))
-    for source, target in (("build.ssb", "input_ssb"), ("tangles.ssb", "tangles_ssb")):
+    for source, target in (("build.ssb", "input_ssb"), ("tangles.ssb", "tangles_ssb"),
+                           ("play.ssb", "play_ssb"), ("progress.ssb", "progress_ssb")):
         shutil.copy2(ROOT / source, run / target)
+    for name in ("pack", "json"):
+        shutil.copy2(ROOT.parent / "Parser" / (name + ".ssb"), run / (name + "_ssb"))
     wrapper = (run / "input_ssb").read_text("ascii")
     (run / "input_ssb").write_text(wrapper.replace('"ram1_tangles_err"', '"nfa1_report"'), encoding="ascii", newline="\n")
     boot = '''100 LRESPR "nfa1_env_bin"
@@ -77,7 +80,7 @@ def main():
                     text = report_path.read_text("latin1")
                 except OSError:  # The QL compiler may hold an exclusive host file handle.
                     text = ""
-                if re.search(r"Parsing done, [1-9][0-9]* errors", text):
+                if "**** ERROR" in text or re.search(r"Parsing done, [1-9][0-9]* errors", text):
                     process.terminate()
                     process.wait(timeout=10)
                     raise RuntimeError("Turbo rejected the source:\n" + text)
@@ -95,13 +98,33 @@ def main():
     artifact.mkdir(exist_ok=True)
     for name in ("tangles_exe", "tptr_ext", "ttk", "output_bas", "report", "build.log"):
         shutil.copy2(run / name, artifact / name)
-    manifest = {"compiled": True, "sourceSha256": hashlib.sha256((ROOT / "tangles.ssb").read_bytes()).hexdigest(), "executableSha256": hashlib.sha256((artifact / "tangles_exe").read_bytes()).hexdigest(), "toolchain": "SSB 2.8.0 / Turbo 5.09 / SMSQmulator SMSQ/E", "run": str(run)}
+    sources = [ROOT / n for n in ("tangles.ssb", "play.ssb", "progress.ssb", "build.ssb")]
+    sources += [ROOT.parent / "Parser" / n for n in ("pack.ssb", "json.ssb")]
+    manifest = {"compiled": True, "sourceSha256": {str(p.relative_to(ROOT.parent)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}, "executableSha256": hashlib.sha256((artifact / "tangles_exe").read_bytes()).hexdigest(), "toolchain": "SSB 2.8.0 / Turbo 5.09 / SMSQmulator SMSQ/E", "run": str(run)}
     (artifact / "build.json").write_text(json.dumps(manifest, indent=2))
+    packs = ROOT.parents[1] / "src/Tangles.Player/wwwroot/packs"
+    files = [packs / "starter.json", packs / "quick-start.json", packs / "full-coverage.json"]
+    files += sorted((ROOT.parents[1] / "puzzles").glob("*.json"))
+    catalogue = []
+    for i, path in enumerate(files):
+        if not path.exists():
+            continue
+        pack = json.loads(path.read_text(encoding="utf-8"))
+        dimensions = sorted({(p["width"], p["height"]) for p in pack["puzzles"]})
+        size = ",".join(f"{w}x{h}" for w, h in dimensions)
+        mode = "full coverage" if pack["rules"]["requireFullCoverage"] else "connections only"
+        name = f"{path.stem} / {size} / {mode} / {len(pack['puzzles'])} puzzles"
+        target = f"pack{i:02d}_json"
+        shutil.copy2(path, artifact / target)
+        catalogue.extend([name[:128], target])
+    (artifact / "tangles_catalog").write_text(str(len(catalogue)//2) + "\n" + "\n".join(catalogue) + "\n", encoding="ascii")
+    (artifact / "boot").write_text('100 DATA_USE "nfa1_"\n110 LRESPR "nfa1_ttk"\n120 LRESPR "nfa1_tptr_ext"\n130 EXEC_W "sfa1_tangles_exe"\n', encoding="ascii")
     print(report, flush=True)
     print("Executable: " + str(artifact / "tangles_exe"), flush=True)
     if args.check:
+        (artifact / "smoke.json").unlink(missing_ok=True)
         subprocess.run(["javac", "-cp", cp, "-d", str(artifact), str(ROOT / "GuiCheck.java")], check=True)
-        subprocess.run(["java", "-cp", str(artifact) + ";" + cp, "GuiCheck", str(tool / "build/SMSQE"), str(artifact)], check=True, timeout=120)
+        subprocess.run(["java", "-cp", str(artifact) + ";" + cp, "GuiCheck", str(tool / "build/SMSQE"), str(artifact)], check=True, timeout=180)
     return 0
 
 

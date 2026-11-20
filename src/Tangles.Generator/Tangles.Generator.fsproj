@@ -7,12 +7,18 @@
     <ProjectReference Include="../Tangles.Core/Tangles.Core.fsproj" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Tangles.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="GenerationSupport.fs" />
     <Compile Include="Solver.fs" />
+    <Compile Include="Symmetry.fs" />
     <Compile Include="Difficulty.fs" />
     <Compile Include="GenerationPolicy.fs" />
     <Compile Include="CoverageSearch.fs" />
     <Compile Include="Generation.fs" />
     <Compile Include="GuidedGeneration.fs" />
+    <Compile Include="Ramp.fs" />
     <Compile Include="Export.fs" />
     <Compile Include="CommandLine.fs" />
     <Compile Include="Program.fs" />

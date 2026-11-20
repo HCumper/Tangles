@@ -1,128 +1,32 @@
 {
-  "validatedAt": "2026-11-17T09:52:54.540322+00:00",
-  "librarySha256": "09a39f52e76a51abda8ec8936ef4fa761e4dcb1dbd29107f7dab3ac3caacdeda",
-  "target": "SSB 2.8.0 records -> S*BASIC; SMSQ/E on SMSQmulator 68000 CPU; Turbo 5.09 with Brief optimisation and 64 KB compiler buffer",
+  "validatedAt": "2026-11-18T03:12:57.260066+00:00",
+  "librarySha256": "0260d582e671c59f95ea0e3948a6212ded38719fffcc5a1b8009bb40682b56c1",
+  "target": "SSB 2.8.0 / Turbo 5.09 / SMSQmulator SMSQ/E",
   "runs": [
     {
       "passed": true,
-      "compiled": false,
-      "example": false,
-      "ramMiB": 8,
-      "caseCount": 60,
-      "packCount": 2,
-      "packNodes": {
-        "quickstart_json": 66,
-        "starter_json": 1784
-      },
-      "packSha256": {
-        "quickstart_json": "5011abbeb6fe94bb280c64fd374b9cf98df54c1741c7c697b0074136fe683cc8",
-        "starter_json": "5363ab7b933aff7cde018c0ce267e7351533bd425c8adf0addea156ae06e58b5"
-      },
-      "librarySha256": "09a39f52e76a51abda8ec8936ef4fa761e4dcb1dbd29107f7dab3ac3caacdeda",
-      "manifestCount": 95,
-      "manifestsPreserved": true,
-      "errors": [],
-      "folder": "interpreted-fixed",
-      "testedAt": "2026-11-17T09:49:42.399503+00:00"
-    },
-    {
-      "passed": true,
       "compiled": true,
       "example": false,
       "ramMiB": 8,
       "caseCount": 60,
-      "packCount": 2,
+      "packCount": 3,
       "packNodes": {
+        "fullcoverage_json": 2178,
         "quickstart_json": 66,
         "starter_json": 1784
       },
       "packSha256": {
+        "fullcoverage_json": "ee0bd963ab545d634f6cf8e40ec50bca9bcd8dc109dfae32fd2fad9a5d8c4636",
         "quickstart_json": "5011abbeb6fe94bb280c64fd374b9cf98df54c1741c7c697b0074136fe683cc8",
         "starter_json": "5363ab7b933aff7cde018c0ce267e7351533bd425c8adf0addea156ae06e58b5"
       },
-      "librarySha256": "09a39f52e76a51abda8ec8936ef4fa761e4dcb1dbd29107f7dab3ac3caacdeda",
-      "manifestCount": 95,
+      "librarySha256": "0260d582e671c59f95ea0e3948a6212ded38719fffcc5a1b8009bb40682b56c1",
+      "manifestCount": 105,
       "manifestsPreserved": true,
       "errors": [],
-      "folder": "compiled-fixed",
-      "testedAt": "2026-11-17T09:50:01.634667+00:00"
-    },
-    {
-      "passed": true,
-      "compiled": true,
-      "example": true,
-      "ramMiB": 8,
-      "caseCount": 0,
-      "packCount": 1,
-      "packNodes": {
-        "quickstart_json": 66,
-        "starter_json": 1784
-      },
-      "packSha256": {
-        "quickstart_json": "5011abbeb6fe94bb280c64fd374b9cf98df54c1741c7c697b0074136fe683cc8",
-        "starter_json": "5363ab7b933aff7cde018c0ce267e7351533bd425c8adf0addea156ae06e58b5"
-      },
-      "librarySha256": "09a39f52e76a51abda8ec8936ef4fa761e4dcb1dbd29107f7dab3ac3caacdeda",
-      "manifestCount": 95,
-      "manifestsPreserved": true,
-      "errors": [],
-      "folder": "example-fixed",
-      "testedAt": "2026-11-17T09:49:56.299432+00:00"
-    },
-    {
-      "passed": true,
-      "compiled": true,
-      "example": false,
-      "ramMiB": 2,
-      "caseCount": 60,
-      "packCount": 2,
-      "packNodes": {
-        "quickstart_json": 66,
-        "starter_json": 1784
-      },
-      "packSha256": {
-        "quickstart_json": "5011abbeb6fe94bb280c64fd374b9cf98df54c1741c7c697b0074136fe683cc8",
-        "starter_json": "5363ab7b933aff7cde018c0ce267e7351533bd425c8adf0addea156ae06e58b5"
-      },
-      "librarySha256": "09a39f52e76a51abda8ec8936ef4fa761e4dcb1dbd29107f7dab3ac3caacdeda",
-      "manifestCount": 95,
-      "manifestsPreserved": true,
-      "errors": [],
-      "folder": "runtime-2m",
-      "testedAt": "2026-11-17T09:51:13.106136+00:00",
-      "runtimeOnly": true
+      "folder": "1794970787281942600",
+      "testedAt": "2026-11-18T03:00:47.569833+00:00"
     }
   ],
-  "compilerNotes": "0 errors; 15 local-only string-name warnings. Fast optimisation and 2 KB compiler buffer remain unsupported by this local Turbo build for this target.",
-  "limits": "Classic QDOS ROMs and 128 KB machines not tested; 2 MiB runtime tested after 8 MiB build.",
-  "manifestRefactor": {
-    "count": 95,
-    "previousLibrarySha256": "be335cb80467501db8389530f0d5214351120dfe98bc3e6b73dffea177943e7d",
-    "numericExpansionAudit": "Expanding every named constant restores the original executable tokens, apart from the equivalent four-digit loop bound (4-1) and post-BOM position (3+1). Numeric kind/error API and all limits are unchanged.",
-    "sourceEncoding": "ASCII, LF line endings",
-    "ssbFix": "Preserve MANIFEST and all following assignments on the same physical BASIC line during record expansion.",
-    "ssbSource": "Structured Super Basic/Source/ssbpass2.ssb",
-    "ssbSourceSha256": "c737baebe9b7bfc83411893187c6cbea58e28474b7b42ef29bd0a0438f51ce86",
-    "ssbExecutableSha256": "684b685f2fe56c05a75a15220f825fcf1a145c063d1ff65ca94d681ca93e06f6",
-    "ssbRegressionChecks": [
-      {
-        "name": "standalone-colon",
-        "passed": true
-      },
-      {
-        "name": "manifest-records",
-        "passed": true
-      },
-      {
-        "name": "arrays-pools",
-        "passed": true
-      }
-    ],
-    "ssbSelfHost": {
-      "passed": true,
-      "old_bytes": 93948,
-      "new_bytes": 93948,
-      "sha256": "c088104a9f484ee2b8bed5b86166004abf5ad92e9d17dad66ec9f10da98b5034"
-    }
-  }
+  "scope": "Current-source compiled regression. Earlier interpreted/example runs remain in git history; not rerun for this change."
 }

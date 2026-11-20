@@ -98,10 +98,125 @@ let ``player loads the generator format without depending on its solution`` () =
     Assert.Single(parsed.Puzzles) |> ignore
     Assert.Equal(8, parsed.Puzzles[0].Puzzle.Width)
     Assert.Equal(6, parsed.Puzzles[0].Puzzle.Pairs.Length)
+    Assert.True(parsed.Puzzles[0].Solution.IsSome)
     let document = JsonNode.Parse json
     (document["puzzles"][0]).AsObject().Remove("solution") |> ignore
     (document["puzzles"][0]).AsObject().Remove("verification") |> ignore
-    Assert.True(PuzzlePacks.read (document.ToJsonString()) |> Result.isOk)
+    let cluesOnly = PuzzlePacks.read (document.ToJsonString()) |> require
+    Assert.True(cluesOnly.Puzzles[0].Solution.IsNone)
+
+[<Theory>]
+[<InlineData("null")>]
+[<InlineData("false")>]
+[<InlineData("{}")>]
+[<InlineData("[]")>]
+[<InlineData("[{\"label\":\"A\",\"cells\":[] }]")>]
+let ``invalid optional solutions disable hints without preventing play`` invalidSolution =
+    let document = JsonNode.Parse(generatedPack ())
+    document.["puzzles"].[0].["solution"] <- JsonNode.Parse(invalidSolution: string)
+    let pack = PuzzlePacks.read (document.ToJsonString()) |> require
+    Assert.True(pack.Puzzles[0].Solution.IsNone)
+    Assert.Empty(Validation.puzzle pack.Puzzles[0].Puzzle)
+
+[<Fact>]
+let ``hint witnesses are validated rather than trusting verification metadata`` () =
+    let document = JsonNode.Parse(generatedPack ())
+    document.["puzzles"].[0].["solution"].[0].["cells"].[0].["x"] <- JsonValue.Create(-1)
+    let pack = PuzzlePacks.read (document.ToJsonString()) |> require
+    Assert.True(pack.Puzzles[0].Solution.IsNone)
+
+[<Fact>]
+let ``a hint replaces a partial path preserves other colours saves and undoes`` () =
+    let before = Play.create board |> draw [ c 0 0; c 1 0 ] |> draw [ c 2 2; c 1 2; c 0 2 ]
+    let route = { Label = "A"; Cells = [ c 0 0; c 1 0; c 2 0 ] }
+    let hinted = Play.reveal route before |> require
+    Assert.True(hinted.Paths["A"] = route.Cells)
+    Assert.True(hinted.Paths["B"] = before.Paths["B"])
+    Assert.True(Play.isComplete hinted)
+    Assert.True(hinted.Active.IsNone)
+    let saved = PuzzlePacks.writeProgress (Play.paths hinted) |> PuzzlePacks.readProgress board |> require
+    let restored = Play.restore saved (Play.create board) |> require
+    Assert.True(Play.isComplete restored)
+    Assert.True((Play.undo hinted).Paths = before.Paths)
+
+[<Fact>]
+let ``a hint clears intersecting colours and one undo restores the entire change`` () =
+    let before = Play.create board |> draw [ c 0 2; c 0 1; c 1 1; c 1 0 ] |> Play.start (c 0 0) |> require
+    let route = { Label = "A"; Cells = [ c 0 0; c 1 0; c 2 0 ] }
+    let hinted = Play.reveal route before |> require
+    Assert.False(hinted.Paths.ContainsKey "B")
+    Assert.True(hinted.Paths["A"] = route.Cells)
+    Assert.Empty(Validation.partialSolution board (Play.paths hinted))
+    Assert.True((Play.undo hinted).Paths = before.Paths)
+
+[<Fact>]
+let ``hints prefer unfinished colours and stop after any valid completion`` () =
+    let solution = [ { Label = "A"; Cells = [ c 0 0; c 1 0; c 2 0 ] }
+                     { Label = "B"; Cells = [ c 0 2; c 1 2; c 2 2 ] } ]
+    let empty = Play.create board
+    Assert.Equal(2, (Play.hintCandidates solution empty).Length)
+    let withA = empty |> draw [ c 2 0; c 1 0; c 0 0 ]
+    Assert.Equal("B", (Play.hintCandidates solution withA |> List.exactlyOne).Label)
+    // B takes a valid alternative route instead of the stored one.
+    let solved = withA |> draw [ c 0 2; c 0 1; c 1 1; c 2 1; c 2 2 ]
+    Assert.True(Play.isComplete solved)
+    Assert.Empty(Play.hintCandidates solution solved)
+
+[<Fact>]
+let ``invalid hint paths cannot bypass the shared rules`` () =
+    let state = Play.create board
+    for route in [ { Label = "A"; Cells = [] }
+                   { Label = "A"; Cells = [ c 0 0; c 1 0 ] }
+                   { Label = "A"; Cells = [ c 0 0; c 2 0 ] }
+                   { Label = "missing"; Cells = [ c 0 0; c 1 0; c 2 0 ] } ] do
+        Assert.True(Play.reveal route state |> Result.isError)
+    Assert.True(state.Paths.IsEmpty)
+
+[<Fact>]
+let ``full coverage hints can repair connected routes with gaps and eventually solve`` () =
+    let solution =
+        [ { Label = "A"; Cells = [ c 1 3; c 2 3; c 2 2; c 2 1; c 1 1; c 0 1 ] }
+          { Label = "B"; Cells = [ c 4 1; c 4 2; c 3 2; c 3 3 ] }
+          { Label = "C"; Cells = [ c 2 0; c 1 0; c 0 0 ] }
+          { Label = "D"; Cells = [ c 4 3; c 4 4; c 3 4; c 2 4; c 1 4; c 0 4; c 0 3; c 0 2; c 1 2 ] }
+          { Label = "E"; Cells = [ c 4 0; c 3 0; c 3 1 ] } ]
+    let puzzle =
+        { Width = 5; Height = 5; RequireFullCoverage = true
+          Pairs = solution |> List.map (fun path -> { Label = path.Label; Start = path.Cells.Head; Finish = List.last path.Cells }) }
+    Assert.Empty(Validation.solution puzzle solution)
+    let before =
+        Play.create puzzle
+        |> draw [ c 0 1; c 0 2; c 0 3; c 1 3 ]
+        |> draw solution[1].Cells
+        |> draw (List.rev solution[2].Cells)
+        |> draw [ c 1 2; c 2 2; c 2 3; c 2 4; c 3 4; c 4 4; c 4 3 ]
+        |> draw solution[4].Cells
+    Assert.Equal(5, Play.completedCount before)
+    Assert.False(Play.isComplete before)
+    let candidates = Play.hintCandidates solution before
+    Assert.True((candidates |> List.map _.Label) = [ "A"; "D" ])
+    let hinted = Play.reveal candidates.Head before |> require
+    Assert.True((Play.undo hinted).Paths = before.Paths)
+    let completed = Play.reveal (Play.hintCandidates solution hinted |> List.exactlyOne) hinted |> require
+    Assert.True(Play.isComplete completed)
+    Assert.Empty(Play.hintCandidates solution completed)
+
+[<Theory>]
+[<InlineData(false)>]
+[<InlineData(true)>]
+let ``repeated hints solve generated packs in either mode`` fullCoverage =
+    for seed in 0 .. 9 do
+        let options = { Generation.defaults seed with Mode = if fullCoverage then FullCoverage else ConnectOnly }
+        let generated = Generation.generate CancellationToken.None options |> require
+        let loaded = Export.createPack options [| generated |] |> Export.toJson |> PuzzlePacks.read |> require
+        let entry = loaded.Puzzles[0]
+        let solution = entry.Solution.Value
+        let mutable state = Play.create entry.Puzzle
+        for index in 0 .. entry.Puzzle.Pairs.Length - 1 do
+            let candidates = Play.hintCandidates solution state
+            Assert.Equal(entry.Puzzle.Pairs.Length - index, candidates.Length)
+            state <- Play.reveal candidates[index % candidates.Length] state |> require
+        Assert.True(Play.isComplete state)
 
 [<Fact>]
 let ``all generated witnesses are playable using the shared player operations`` () =

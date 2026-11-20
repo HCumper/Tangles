@@ -119,7 +119,7 @@ let ``different valid witnesses for identical clues receive identical grades`` (
     let long = [ c 0 0; c 0 1; c 0 2; c 1 2; c 2 2; c 2 1 ]
     let options = { Generation.defaults 0 with Width = 4; Height = 4; PairCount = 1 }
     let export cells =
-        let generated = { Puzzle = puzzle; Solution = [ { Label = "A"; Cells = cells } ]; Seed = 0; Attempts = 1; Quality = None }
+        let generated = { Puzzle = puzzle; Solution = [ { Label = "A"; Cells = cells } ]; Seed = 0; Attempts = 1; Quality = None; Work = GenerationWork.zero }
         Export.createPack options [| generated |]
     let first, second = export short, export long
     Assert.Equal(first.Puzzles[0].Id, second.Puzzles[0].Id)

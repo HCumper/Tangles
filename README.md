@@ -24,6 +24,11 @@ dotnet test Tangles.slnx
 ```
 
 With no options, generate an 8x8 puzzle with six pairs and a random seed.
+
+Pack-quality options include `--max-trials N` (optional), experimental
+`--cut-style varied`, and `--ramp easy..hard`. Batches reject rotated and
+reflected duplicates. See [pack quality and measured results](docs/pack-quality.md)
+for recipes, comparison data and the sample ramp packs.
 `--mode connect-only` is the default and keeps the original generation method.
 Use `--mode full-coverage` to require every square in a final solution.
 Use `--width` and `--height` independently for rectangular boards (1..64 each).
@@ -82,7 +87,7 @@ a 2,048-node budget; `--max-attempts` (default 500) limits board attempts.
 Exhaustion is reported as failure to find a candidate, never as proof that
 the configuration is impossible. Dense or unusually long requests can fail.
 
-Full-coverage mode uses `hamiltonian-path-partition-v2`. It starts with a traversal
+Full-coverage mode uses `hamiltonian-path-partition-v3`. It starts with a traversal
 visiting every square once, then changes it with endpoint backbite moves (joining
 an endpoint to another neighbouring square and reversing the affected section).
 Dynamic programming splits that traversal into exactly the requested number of
@@ -96,7 +101,8 @@ The search favours traversals needing fewer segments. After 128 unsuccessful
 candidates it creates a fresh randomly oriented, reflected and mixed traversal.
 Every eighth search proposal uses several backbites to help leave local plateaux.
 Once a witness is found, it is retained while up to `max(64, board area)` further
-candidates are explored. With attempt limits of at least 128, up to the final
+candidates are explored. One-dimensional boards skip this ineffective refinement.
+With attempt limits of at least 128, up to the final
 128 candidates are reserved for a fresh structured start if mixing has not
 found any witness; this preserves support for tightly constrained lengths.
 
@@ -123,7 +129,7 @@ required explicitly; uniqueness is never assumed during solving. Playtesting is
 still needed. See [the geometry model](docs/difficulty-grading.md) and
 [the reasoning model](docs/solver-guided-generation.md).
 
-An explicit seed reproduces generation with the same options, algorithm and
+Seeds must be in `0..2147483647`. An explicit seed reproduces generation with the same options, algorithm and
 .NET runtime implementation. A batch starts generation with the supplied seed
 and uses deterministically derived seeds for further requests. Each puzzle stores
 its own seed so it can also be regenerated individually with the same settings.
@@ -160,8 +166,12 @@ records the corresponding algorithm. Both modes use format version 1: the
 coverage flag was already part of that format. Each pack uses one rule set.
 `generation.selection` records requested policies, work limits and observed
 batch retries. Solver-guided full coverage records
-`solver-guided-hamiltonian-partition-v1` as its generation algorithm, or `v2`
+`solver-guided-hamiltonian-partition-v5` as its generation algorithm, or `v6`
 when explicit reasoning minimums are enabled.
+`generation.batchSeedAlgorithm` records the independent batch seed derivation;
+per-puzzle `work` separates board attempts, traversal evaluations and refinement.
+See [generator reliability and replay](docs/generator-reliability.md) for the
+seed policy, structured proposals, diagnostics and compatibility details.
 The difficulty object is also an additive format-v1 field; old packs without
 it remain valid. Existing players ignore this extra metadata. Difficulty does
 not change puzzle IDs or the generated clues/solutions. Previously generated
@@ -205,6 +215,11 @@ packs with several board sizes list each distinct size.
 - Other routes and endpoints cannot be crossed or overwritten. Self-touching
   and diagonal steps are rejected by the shared F# validator.
 - Undo restores one drawing stroke. Reset clears the board and is undoable.
+- Hint fills a random unfinished colour using the pack's stored solution. It
+  clears any drawn paths that cross that route; one Undo restores the whole
+  change. Hints are unavailable when the puzzle is complete or its pack has no
+  valid stored solution. If all pairs connect but full coverage has gaps, Hint
+  replaces a route that differs from the stored solution.
 - Keyboard: Tab to the board; arrows move the cursor; Space/Enter starts or
   stops drawing. Escape stops drawing; Ctrl+Z/Cmd+Z undoes.
 - Any valid connection of every pair completes a connect-only puzzle.
@@ -214,7 +229,7 @@ packs with several board sizes list each distinct size.
 - The pack description says **Full coverage required** or **Connections only**, using the JSON
   `rules.requireFullCoverage` flag. The introduction, instructions and footer
   explain the selected rule, including when another pack is imported.
-- The player never compares the answer with a stored solution.
+- Completion accepts any valid solution, independently of the stored hint paths.
 
 Valid partial progress is saved in this browser's local storage per puzzle.
 Undo history is not persisted. Storage can be unavailable or cleared by the
@@ -222,6 +237,13 @@ browser; progress does not synchronise between devices. Custom packs must be
 loaded again after a reload unless supplied as a static pack URL.
 
 ### Loading generator packs
+
+The hosted pack chooser includes the six 12×12 collections generated on
+20 November 2026 (100 puzzles per grade and coverage mode), plus the 8×8,
+12×12 and 16×16 easy-to-hard full-coverage ramps. Connect-only grades are
+provisional geometric estimates; full-coverage grades use solver reasoning.
+The player project links these JSON files from `puzzles/` into the published
+`packs/` directory, so the website and repository use the same pack contents.
 
 Use **Load puzzle pack** to select the generator's v1 JSON output (up to 5 MB).
 Imported packs join the drop-down list for the current visit, so you can switch
@@ -274,12 +296,13 @@ python -m http.server 5094 --bind 127.0.0.1 --directory artifacts/player/wwwroot
 
 The WebAssembly runtime is included in the initial download. This initial
 version does not install an offline service worker or provide logical hints,
-difficulty ratings, generation in the browser, or solution reveals. A
+difficulty ratings, or generation in the browser. Hints reveal one complete
+stored path rather than explaining a deduction. A
 `wasm-tools` workload is not required for this interpreted WebAssembly build;
 AOT/native optimisation is disabled. The .NET publish command may suggest
 installing that optional workload.
 
-## QL puzzle-pack loading layer
+## QL player and puzzle-pack loading layer
 
 `QL/Parser/pack.ssb` loads the generator's v1 JSON packs into named SSB records,
 with clue and rule validation similar to the F# loader. Applications use
@@ -287,5 +310,13 @@ with clue and rule validation similar to the F# loader. Applications use
 coverage flag; JSON traversal stays inside the loader and its temporary tree is
 freed after loading. `pack_example.ssb` demonstrates this interface. See
 [the QL parser and loader guide](QL/Parser/README.md) for APIs, QL limits and
-interpreted/Turbo emulator checks. The separate `QL/GUI` drag-and-colour proof
-remains the foundation for the future puzzle player.
+interpreted/Turbo emulator checks.
+
+[`QL/GUI`](QL/GUI/README.md) is the native SMSQ/E player: pack selection/import,
+variable boards including 16x16, mouse and keyboard drawing with the same game
+rules as the F# player, undo/reset, puzzle navigation, completion and validated
+local progress. The compiled engine is checked against reference traces from
+`Tangles.Core.Play`. The player import validates up to 5 MiB of original JSON
+while retaining only clue/rule nodes; the 100-puzzle 12x12 pack is tested unchanged.
+Use SMSQ/E GD2 at 800x600 with 16 MiB RAM; see the GUI guide for the real Turbo
+build, launcher, controls and QL-specific limits.

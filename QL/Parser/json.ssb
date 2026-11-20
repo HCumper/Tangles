@@ -60,9 +60,21 @@ MANIFEST : JSON_PHASE_FIRST% = 0
 MANIFEST : JSON_PHASE_REQUIRED% = 1
 MANIFEST : JSON_PHASE_AFTER% = 2
 
+## Internal clue-projection roles. Zero is also the scratch/discard handle.
+MANIFEST : JSON_ROLE_DROP% = 0
+MANIFEST : JSON_ROLE_ROOT% = 1
+MANIFEST : JSON_ROLE_RULES% = 2
+MANIFEST : JSON_ROLE_PUZZLES% = 3
+MANIFEST : JSON_ROLE_PUZZLE% = 4
+MANIFEST : JSON_ROLE_PAIRS% = 5
+MANIFEST : JSON_ROLE_PAIR% = 6
+MANIFEST : JSON_ROLE_POINT% = 7
+MANIFEST : JSON_ROLE_VALUE% = 8
+
 ## Storage and conversion limits. Values above 32767 must not have a % suffix.
 MANIFEST : JSON_CHUNK_SIZE% = 512
 MANIFEST : JSON_MAX_BYTES = 1048576
+MANIFEST : JSON_PLAYER_MAX_BYTES = 5242880
 MANIFEST : JSON_MAX_NODES% = 32766
 MANIFEST : JSON_MAX_DEPTH% = 256
 MANIFEST : JSON_MAX_TEXT% = 4096
@@ -189,6 +201,9 @@ END TYPE
 ## the document's temporary token span.
 TYPE JsonFrame
   node%
+  kind%
+  role%
+  start
   phase%
   last%
   keyStart
@@ -204,6 +219,8 @@ DIM jsonNodes(0) AS JsonNode
 DIM jsonFrames(0) AS JsonFrame
 DIM jsonChunks$(0,JSON_CHUNK_SIZE%)
 jsonArena% = 0 : jsonStack% = 0 : jsonSlots% = 0
+## Opt-in projection used only by pack_load_player. The generic API is unchanged.
+jsonCluesOnly%=0 : jsonKeepValue%=1
 
 ## INTERNAL: invalidate the old document, check limits, and size the arena.
 ## Record declarations reset fields; clearing the document first prevents a bad
@@ -218,8 +235,12 @@ DEFine PROCedure json_begin(VAL jbBytes, VAL jbCapacity%, VAL jbDepth%)
   LOCal jbChunk%,jbSlots%
   DIM jsonDoc AS JsonDocument
   jsonDoc.position = 1
-  IF jbBytes < 0 OR jbBytes > JSON_MAX_BYTES THEN
-    json_fail JSON_ERR_CONFIG%,"Input limit is 1048576 bytes"
+  IF jbBytes < 0 OR (jbBytes > JSON_MAX_BYTES AND NOT jsonCluesOnly%) OR jbBytes > JSON_PLAYER_MAX_BYTES THEN
+    IF jsonCluesOnly% THEN
+      json_fail JSON_ERR_CONFIG%,"Player input limit is 5242880 bytes"
+    ELSE
+      json_fail JSON_ERR_CONFIG%,"Input limit is 1048576 bytes"
+    END IF
     RETurn
   END IF
   IF jbCapacity% < 1 OR jbCapacity% > JSON_MAX_NODES% THEN
@@ -279,8 +300,12 @@ DEFine PROCedure json_load(VAL jlFile$, VAL jlCapacity%, VAL jlMaxBytes, VAL jlD
   LOCal jlChannel%,jlSize,jlPosition,jlChunk%,jlOffset%,jlFill,jlByte$(1)
   json_begin 0,jlCapacity%,jlDepth%
   IF jsonDoc.error% THEN RETurn
-  IF jlMaxBytes < 0 OR jlMaxBytes > JSON_MAX_BYTES THEN
-    json_fail JSON_ERR_CONFIG%,"File byte limit must be 0..1048576"
+  IF jlMaxBytes < 0 OR (jlMaxBytes > JSON_MAX_BYTES AND NOT jsonCluesOnly%) OR jlMaxBytes > JSON_PLAYER_MAX_BYTES THEN
+    IF jsonCluesOnly% THEN
+      json_fail JSON_ERR_CONFIG%,"Player file byte limit must be 0..5242880"
+    ELSE
+      json_fail JSON_ERR_CONFIG%,"File byte limit must be 0..1048576"
+    END IF
     RETurn
   END IF
   jlChannel% = FOP_IN(jlFile$)
@@ -580,8 +605,11 @@ END DEFine
 DEFine FuNction json_value%
   LOCal jvNode%,jvByte%
   json_space
-  IF jsonDoc.used% >= jsonDoc.capacity% THEN json_fail JSON_ERR_NODES%,"JSON node capacity exhausted" : RETurn 0
-  jsonDoc.used% = jsonDoc.used%+1 : jvNode% = jsonDoc.used%
+  jvNode%=0
+  IF jsonKeepValue% THEN
+    IF jsonDoc.used% >= jsonDoc.capacity% THEN json_fail JSON_ERR_NODES%,"JSON node capacity exhausted" : RETurn 0
+    jsonDoc.used% = jsonDoc.used%+1 : jvNode% = jsonDoc.used%
+  END IF
   jsonNodes(jvNode%).kind% = 0 : jsonNodes(jvNode%).first% = 0
   jsonNodes(jvNode%).next% = 0 : jsonNodes(jvNode%).count% = 0
   jsonNodes(jvNode%).length = 0 : jsonNodes(jvNode%).keyStart = 0
@@ -622,6 +650,9 @@ DEFine PROCedure json_push(VAL jkNode%)
   IF jsonDoc.depth% >= jsonDoc.maxDepth% THEN json_fail JSON_ERR_DEPTH%,"JSON nesting limit exceeded" : RETurn
   jsonDoc.depth% = jsonDoc.depth%+1 : jkDepth% = jsonDoc.depth%
   jsonFrames(jkDepth%).node% = jkNode%
+  jsonFrames(jkDepth%).kind%=jsonNodes(jkNode%).kind%
+  jsonFrames(jkDepth%).start=jsonNodes(jkNode%).start
+  jsonFrames(jkDepth%).role%=JSON_ROLE_DROP%
   jsonFrames(jkDepth%).phase% = JSON_PHASE_FIRST% : jsonFrames(jkDepth%).last% = 0
 END DEFine
 
@@ -636,24 +667,26 @@ END DEFine
 ## Each successful iteration advances input or pops a frame. Nesting uses the
 ## explicit stack rather than proportional BASIC procedure recursion.
 DEFine PROCedure json_read
-  LOCal jrFrame%,jrParent%,jrKind%,jrByte%,jrChild%,jrLast%,jrClose%,jrPhase%
+  LOCal jrFrame%,jrParent%,jrKind%,jrByte%,jrChild%,jrLast%,jrClose%,jrPhase%,jrRole%
   ## Permit a UTF-8 BOM only at the start of a document.
   IF json_byte%(1) = JSON_BOM_FIRST% AND json_byte%(2) = JSON_BOM_SECOND% AND json_byte%(3) = JSON_BOM_THIRD% THEN jsonDoc.position = JSON_BOM_BYTES%+1
-  jsonDoc.root% = json_value%
+  jsonKeepValue%=1 : jsonDoc.root% = json_value%
   IF jsonDoc.error% THEN jsonDoc.root% = 0 : RETurn
   jrParent% = jsonDoc.root%
-  IF jsonNodes(jrParent%).kind% <= JSON_KIND_ARRAY% THEN json_push jrParent%
+  IF jsonNodes(jrParent%).kind% <= JSON_KIND_ARRAY% THEN
+    json_push jrParent% : jsonFrames(jsonDoc.depth%).role%=JSON_ROLE_ROOT%
+  END IF
   REPeat jrParse
     IF jsonDoc.error% OR jsonDoc.depth% = 0 THEN EXIT jrParse
     jrFrame% = jsonDoc.depth% : jrParent% = jsonFrames(jrFrame%).node%
-    jrKind% = jsonNodes(jrParent%).kind% : jrPhase% = jsonFrames(jrFrame%).phase%
+    jrKind% = jsonFrames(jrFrame%).kind% : jrPhase% = jsonFrames(jrFrame%).phase%
     jrClose% = JSON_CH_CLOSE_ARRAY% : IF jrKind% = JSON_KIND_OBJECT% THEN jrClose% = JSON_CH_CLOSE_OBJECT%
     json_space : jrByte% = json_byte%(jsonDoc.position)
 ## A close is legal for an empty container (phase 0) or after an item
 ## (phase 2), but never immediately after a comma (phase 1).
     IF jrByte% = jrClose% AND jrPhase% <> JSON_PHASE_REQUIRED% THEN
       jsonDoc.position = jsonDoc.position+1
-      jsonNodes(jrParent%).length = jsonDoc.position-jsonNodes(jrParent%).start
+      IF jrParent% THEN jsonNodes(jrParent%).length = jsonDoc.position-jsonFrames(jrFrame%).start
       jsonDoc.depth% = jsonDoc.depth%-1
     ELSE
       IF jrPhase% = JSON_PHASE_AFTER% THEN
@@ -670,6 +703,9 @@ DEFine PROCedure json_read
           IF json_byte%(jsonDoc.position) <> JSON_CH_COLON% THEN json_fail JSON_ERR_SYNTAX%,"Expected colon after member name" : EXIT jrParse
           jsonDoc.position = jsonDoc.position+1
         END IF
+        jrRole%=JSON_ROLE_VALUE%
+        IF jsonCluesOnly% THEN jrRole%=json_player_role%(jrFrame%)
+        jsonKeepValue%=(jrRole%<>JSON_ROLE_DROP%)
         jrChild% = json_value%
         IF jsonDoc.error% THEN EXIT jrParse
         IF jrKind% = JSON_KIND_OBJECT% THEN
@@ -679,14 +715,19 @@ DEFine PROCedure json_read
         jrLast% = jsonFrames(jrFrame%).last%
 ## Only the previous LAST direct child's next% is changed. That child's own
 ## children form a separate chain and are not part of the sibling traversal.
-        IF jrLast% = 0 THEN
-          jsonNodes(jrParent%).first% = jrChild%
-        ELSE
-          jsonNodes(jrLast%).next% = jrChild%
+        IF jrChild% THEN
+          IF jrLast% = 0 THEN
+            jsonNodes(jrParent%).first% = jrChild%
+          ELSE
+            jsonNodes(jrLast%).next% = jrChild%
+          END IF
+          jsonFrames(jrFrame%).last% = jrChild%
+          jsonNodes(jrParent%).count% = jsonNodes(jrParent%).count%+1
         END IF
-        jsonFrames(jrFrame%).last% = jrChild% : jsonFrames(jrFrame%).phase% = JSON_PHASE_AFTER%
-        jsonNodes(jrParent%).count% = jsonNodes(jrParent%).count%+1
-        IF jsonNodes(jrChild%).kind% <= JSON_KIND_ARRAY% THEN json_push jrChild%
+        jsonFrames(jrFrame%).phase% = JSON_PHASE_AFTER%
+        IF jsonNodes(jrChild%).kind% <= JSON_KIND_ARRAY% THEN
+          json_push jrChild% : jsonFrames(jsonDoc.depth%).role%=jrRole%
+        END IF
       END IF
     END IF
   END REPeat jrParse
@@ -695,6 +736,43 @@ DEFine PROCedure json_read
     IF jsonDoc.position <= jsonDoc.bytes THEN json_fail JSON_ERR_SYNTAX%,"Unexpected text after JSON value"
   END IF
   IF jsonDoc.error% THEN jsonDoc.root% = 0
+  jsonKeepValue%=1
+END DEFine
+
+## Projection roles: root, rules, puzzles, puzzle, pairs, pair, point, scalar.
+## Ignored values use scratch node zero and stack frames, still passing the
+## complete JSON grammar/Unicode/number/depth checks. No witness enters the tree.
+DEFine FuNction json_player_role%(VAL jzFrame%)
+  LOCal jzRole%,jzStart,jzLength
+  jzRole%=jsonFrames(jzFrame%).role%
+  IF jzRole%=JSON_ROLE_DROP% THEN RETurn JSON_ROLE_DROP%
+  IF jsonFrames(jzFrame%).kind%=JSON_KIND_ARRAY% THEN
+    IF jzRole%=JSON_ROLE_PUZZLES% THEN RETurn JSON_ROLE_PUZZLE%
+    IF jzRole%=JSON_ROLE_PAIRS% THEN RETurn JSON_ROLE_PAIR%
+    RETurn JSON_ROLE_DROP%
+  END IF
+  jzStart=jsonFrames(jzFrame%).keyStart : jzLength=jsonFrames(jzFrame%).keyLength
+  SELect ON jzRole%
+    =JSON_ROLE_ROOT%
+      IF json_keyis%(jzStart,jzLength,"formatVersion") THEN RETurn JSON_ROLE_VALUE%
+      IF json_keyis%(jzStart,jzLength,"rules") THEN RETurn JSON_ROLE_RULES%
+      IF json_keyis%(jzStart,jzLength,"puzzles") THEN RETurn JSON_ROLE_PUZZLES%
+    =JSON_ROLE_RULES%
+      IF json_keyis%(jzStart,jzLength,"orthogonalOnly") THEN RETurn JSON_ROLE_VALUE%
+      IF json_keyis%(jzStart,jzLength,"noSharedCells") THEN RETurn JSON_ROLE_VALUE%
+      IF json_keyis%(jzStart,jzLength,"noSelfTouching") THEN RETurn JSON_ROLE_VALUE%
+      IF json_keyis%(jzStart,jzLength,"requireFullCoverage") THEN RETurn JSON_ROLE_VALUE%
+    =JSON_ROLE_PUZZLE%
+      IF json_keyis%(jzStart,jzLength,"id") THEN RETurn JSON_ROLE_VALUE%
+      IF json_keyis%(jzStart,jzLength,"width") OR json_keyis%(jzStart,jzLength,"height") THEN RETurn JSON_ROLE_VALUE%
+      IF json_keyis%(jzStart,jzLength,"pairs") THEN RETurn JSON_ROLE_PAIRS%
+    =JSON_ROLE_PAIR%
+      IF json_keyis%(jzStart,jzLength,"label") THEN RETurn JSON_ROLE_VALUE%
+      IF json_keyis%(jzStart,jzLength,"start") OR json_keyis%(jzStart,jzLength,"finish") THEN RETurn JSON_ROLE_POINT%
+    =JSON_ROLE_POINT%
+      IF json_keyis%(jzStart,jzLength,"x") OR json_keyis%(jzStart,jzLength,"y") THEN RETurn JSON_ROLE_VALUE%
+  END SELect
+  RETurn JSON_ROLE_DROP%
 END DEFine
 
 ## INTERNAL common accessor guard. A latched parse/accessor error blocks

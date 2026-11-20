@@ -12,13 +12,20 @@ let private board full width height pairs = { Width = width; Height = height; Re
 
 // An independent oracle enumerates entire induced paths and combines disjoint
 // paths. It shares neither the cell-domain model nor any solver rule.
-let private oracle (puzzle: Puzzle) =
+exception OracleBudgetExceeded
+
+let private oracleWithin budget (puzzle: Puzzle) =
+    let mutable visited = 0
+    let spend () =
+        visited <- visited + 1
+        if visited > budget then raise OracleBudgetExceeded
     let adjacent a b = abs (a.X-b.X) + abs (a.Y-b.Y) = 1
     let allCells = [for y in 0 .. puzzle.Height-1 do for x in 0 .. puzzle.Width-1 -> cell x y]
     let endpoints = puzzle.Pairs |> List.collect (fun p -> [p.Start;p.Finish]) |> Set.ofList
     let routes (p: EndpointPair) =
         let result = ResizeArray<Set<Cell>>()
         let rec extend path =
+            spend ()
             let current = List.head path
             if current = p.Finish then result.Add (Set.ofList path)
             else
@@ -31,6 +38,7 @@ let private oracle (puzzle: Puzzle) =
         List.ofSeq result
     let mutable found = 0
     let rec combine occupied remaining =
+        spend ()
         if found < 2 then
             match remaining with
             | [] when not puzzle.RequireFullCoverage || Set.count occupied = allCells.Length -> found <- found + 1
@@ -38,8 +46,13 @@ let private oracle (puzzle: Puzzle) =
             | choices::rest ->
                 for path in choices do
                     if Set.isEmpty (Set.intersect occupied path) then combine (Set.union occupied path) rest
-    combine Set.empty (List.map routes puzzle.Pairs)
-    found
+    try
+        combine Set.empty (List.map routes puzzle.Pairs)
+        Some found
+    with OracleBudgetExceeded -> None
+
+let private oracle puzzle =
+    oracleWithin Int32.MaxValue puzzle |> Option.defaultWith (fun () -> failwith "Small oracle unexpectedly exceeded its budget.")
 
 [<Theory>]
 [<InlineData(false)>]
@@ -188,3 +201,33 @@ let ``first answer effort is separate from completing the uniqueness proof`` () 
     Assert.Equal("notEstablished", limited.Analysis.Uniqueness)
     Assert.Equal("unrated", limited.Analysis.Grade)
     Assert.False(GenerationPolicy.meetsMinimums { policy with MinFirstSolutionNodes = 1 } limited.Analysis)
+
+[<Theory>]
+[<InlineData(4,24)>]
+[<InlineData(5,12)>]
+let ``three pair randomized larger boards agree with bounded independent enumeration`` size samples =
+    let random = Random (19471 + size)
+    for full in [false;true] do
+        let mutable completed = 0
+        for _ in 1..samples do
+            let cells = [|0..size*size-1|]
+            for i in cells.Length-1 .. -1 .. 1 do
+                let j = random.Next(i+1)
+                let temporary = cells[i]
+                cells[i] <- cells[j]
+                cells[j] <- temporary
+            let clues =
+                [for i in 0..2 ->
+                    let a,b = cells[2*i],cells[2*i+1]
+                    pair (string (char (int 'A'+i))) (cell (a%size) (a/size)) (cell (b%size) (b/size))]
+            let puzzle = board full size size clues
+            match oracleWithin 250_000 puzzle with
+            | None -> () // Incomplete oracle searches make no claim about the answer.
+            | Some expected ->
+                completed <- completed + 1
+                let result = Solver.solve CancellationToken.None { Solver.defaults with MaxWork = 10_000_000 } puzzle
+                Assert.Equal("complete",result.Analysis.Status)
+                Assert.Equal(expected,result.Analysis.SolutionCount)
+                Assert.Equal((if expected=0 then "none" elif expected=1 then "unique" else "multiple"),result.Analysis.Uniqueness)
+                for paths in result.Solutions do Assert.Empty(Validation.solution puzzle paths)
+        Assert.True(completed >= 8, $"Only {completed} {size}x{size} oracle comparisons completed (full={full}).")

@@ -1,0 +1,139 @@
+## Local progress, two alternating files. An interrupted save leaves the other
+## slot intact. Every load compares the complete clues and validates every step.
+#INCLUDE play_ssb
+DIM progressRoot$(255),progressFile$(255),progressText$(1024)
+progressRoot$="nfa1_" : progressSerial=0 : progressError%=0
+
+DEFine FuNction progress_line$(VAL ilChannel%)
+  LOCal ilText$(1024),ilChar$(1)
+  ilText$=""
+  REPeat ilRead
+    ilChar$=INKEY$(#ilChannel%,-1)
+    IF LEN(ilChar$)=0 THEN progressError%=1 : EXIT ilRead
+    IF CODE(ilChar$)=10 THEN EXIT ilRead
+    IF CODE(ilChar$)<>13 THEN
+      IF LEN(ilText$)>=1024 THEN progressError%=1 : EXIT ilRead
+      ilText$=ilText$ & ilChar$
+    END IF
+  END REPeat ilRead
+  RETurn ilText$
+END DEFine
+
+DEFine FuNction progress_number(VAL inChannel%)
+  LOCal inText$(1024),inI%,inCode%,inValue
+  inText$=progress_line$(inChannel%) : inValue=0
+  IF LEN(inText$)=0 OR LEN(inText$)>10 THEN progressError%=1 : RETurn 0
+  FOR inI%=1 TO LEN(inText$)
+    inCode%=CODE(inText$(inI%))-48
+    IF inCode%<0 OR inCode%>9 THEN progressError%=1 : RETurn 0
+    inValue=inValue*10+inCode%
+    IF inValue>1000000000 THEN progressError%=1 : RETurn 0
+  END FOR inI%
+  RETurn inValue
+END DEFine
+
+DEFine FuNction progress_hex$(VAL ihText$)
+  LOCal ihResult$(256),ihI%
+  ihResult$=""
+  FOR ihI%=1 TO LEN(ihText$)
+    ihResult$=ihResult$ & HEX$(CODE(ihText$(ihI%)),8)
+  END FOR ihI%
+  RETurn ihResult$
+END DEFine
+
+DEFine PROCedure progress_key
+  LOCal ikI%,ikJ%,ikHash,ikOther,ikText$(512)
+  ## Turbo MOD coerces to signed 16-bit integers. Use real remainders here.
+  ikHash=0 : ikOther=0 : ikText$=playId$ & ":" & playWidth% & ":" & playHeight% & ":" & playFull%
+  FOR ikJ%=0 TO playPairCount%
+    IF ikJ% THEN ikText$=playLabels$(ikJ%) & ":" & playStart%(ikJ%) & ":" & playEnd%(ikJ%)
+    FOR ikI%=1 TO LEN(ikText$)
+      ikHash=ikHash*31+CODE(ikText$(ikI%)) : ikHash=ikHash-65521*INT(ikHash/65521)
+      ikOther=ikOther*131+CODE(ikText$(ikI%)) : ikOther=ikOther-64007*INT(ikOther/64007)
+    END FOR ikI%
+  END FOR ikJ%
+  progressFile$=progressRoot$ & "tangles_" & ikHash & "_" & ikOther & "_"
+END DEFine
+
+DEFine PROCedure progress_save
+  LOCal isChannel%,isI%,isSlot%
+  IF NOT playReady% THEN RETurn
+  play_finish : progress_key
+  progressSerial=progressSerial+1 : isSlot%=1+progressSerial-2*INT(progressSerial/2)
+  isChannel%=FOP_OVER(progressFile$ & isSlot%)
+  IF isChannel%<0 THEN playMessage$="Progress could not be saved. Check the save device." : RETurn
+  PRINT #isChannel%,"TANGLES-PROGRESS-1"
+  PRINT #isChannel%,progressSerial
+  PRINT #isChannel%,progress_hex$(playId$)
+  PRINT #isChannel%,playWidth%
+  PRINT #isChannel%,playHeight%
+  PRINT #isChannel%,playFull%
+  PRINT #isChannel%,playPairCount%
+  FOR isI%=1 TO playPairCount%
+    PRINT #isChannel%,progress_hex$(playLabels$(isI%))
+    PRINT #isChannel%,playStart%(isI%)
+    PRINT #isChannel%,playEnd%(isI%)
+  END FOR isI%
+  FOR isI%=0 TO playSize%-1
+    PRINT #isChannel%,playOwner%(isI%)
+    PRINT #isChannel%,playOrder%(isI%)
+  END FOR isI%
+  PRINT #isChannel%,"END"
+  CLOSE #isChannel%
+END DEFine
+
+DEFine PROCedure progress_load
+  LOCal irChannel%,irSlot%,irI%,irValid%,irAny%,irFound%,irSerial,irValue
+  LOCal irText$(1024)
+  progress_key : progressSerial=0 : irFound%=0 : irAny%=0
+  FOR irSlot%=1 TO 2
+    irChannel%=FOP_IN(progressFile$ & irSlot%)
+    IF irChannel%>=0 THEN
+      irAny%=1 : progressError%=0 : irValid%=1
+      irText$=progress_line$(irChannel%)
+      IF NOT pack_equal%(irText$,"TANGLES-PROGRESS-1") THEN irValid%=0
+      irSerial=progress_number(irChannel%)
+      irText$=progress_line$(irChannel%)
+      IF NOT pack_equal%(irText$,progress_hex$(playId$)) THEN irValid%=0
+      irValue=progress_number(irChannel%) : IF irValue<>playWidth% THEN irValid%=0
+      irValue=progress_number(irChannel%) : IF irValue<>playHeight% THEN irValid%=0
+      irValue=progress_number(irChannel%) : IF irValue<>playFull% THEN irValid%=0
+      irValue=progress_number(irChannel%) : IF irValue<>playPairCount% THEN irValid%=0
+      IF irValid% AND NOT progressError% THEN
+        FOR irI%=1 TO playPairCount%
+          irText$=progress_line$(irChannel%)
+          IF NOT pack_equal%(irText$,progress_hex$(playLabels$(irI%))) THEN irValid%=0
+          irValue=progress_number(irChannel%) : IF irValue<>playStart%(irI%) THEN irValid%=0
+          irValue=progress_number(irChannel%) : IF irValue<>playEnd%(irI%) THEN irValid%=0
+        END FOR irI%
+        FOR irI%=0 TO playSize%-1
+          irValue=progress_number(irChannel%)
+          IF irValue>playPairCount% THEN irValid%=0 : irValue=0
+          playOwner%(irI%)=irValue
+          irValue=progress_number(irChannel%)
+          IF irValue>playSize% THEN irValid%=0 : irValue=0
+          playOrder%(irI%)=irValue
+        END FOR irI%
+        irText$=progress_line$(irChannel%)
+        IF NOT pack_equal%(irText$,"END") THEN irValid%=0
+        IF INKEY$(#irChannel%,-1)<>"" THEN irValid%=0
+        IF irValid% AND NOT progressError% THEN irValid%=play_valid%
+        IF irValid% AND NOT progressError% AND irSerial>progressSerial THEN
+          progressSerial=irSerial : irFound%=1
+          FOR irI%=0 TO playSize%-1
+            playBeforeOwner%(irI%)=playOwner%(irI%) : playBeforeOrder%(irI%)=playOrder%(irI%)
+          END FOR irI%
+        END IF
+      END IF
+      CLOSE #irChannel%
+    END IF
+  END FOR irSlot%
+  FOR irI%=0 TO playSize%-1
+    playOwner%(irI%)=0 : playOrder%(irI%)=0
+    IF irFound% THEN
+      playOwner%(irI%)=playBeforeOwner%(irI%) : playOrder%(irI%)=playBeforeOrder%(irI%)
+    END IF
+  END FOR irI%
+  play_rebuild
+  IF irAny% AND NOT irFound% THEN playMessage$="Saved progress was invalid. This puzzle has restarted."
+END DEFine

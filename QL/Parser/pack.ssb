@@ -80,6 +80,17 @@ DEFine PROCedure pack_load(VAL plFile$, VAL plCapacity%)
   pack_finish
 END DEFine
 
+## Player import: unchanged generator JSON, up to 5 MiB. Validate all bytes but
+## retain clue/rule nodes only, avoiding a node for every stored solution cell.
+## The generic parser and the original 1 MiB loading API retain their contracts.
+DEFine PROCedure pack_load_player(VAL ppFile$,VAL ppCapacity%)
+  pack_free
+  jsonCluesOnly%=1
+  json_load ppFile$,ppCapacity%,JSON_PLAYER_MAX_BYTES,PACK_DEPTH%
+  pack_finish
+  jsonCluesOnly%=0 : jsonKeepValue%=1
+END DEFine
+
 ## PUBLIC: small documents already held in a QL string.
 DEFine PROCedure pack_parse(VAL ppText$, VAL ppCapacity%)
   pack_free

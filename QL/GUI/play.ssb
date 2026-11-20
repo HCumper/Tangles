@@ -1,0 +1,222 @@
+## Rule engine: the QL counterpart of Tangles.Core.Play. No witness is read.
+#INCLUDE pack_ssb
+MANIFEST : PLAY_HISTORY% = 100
+MANIFEST : PLAY_MAX_CELLS% = 4096
+DIM playId$(128),playMessage$(160)
+DIM playLabels$(0,128),playStart%(0),playEnd%(0),playHead%(0),playTail%(0),playLength%(0)
+DIM playOwner%(0),playOrder%(0),playEndpoint%(0),playBeforeOwner%(0),playBeforeOrder%(0)
+DIM playHistoryOwner%(0,0),playHistoryOrder%(0,0),playSeen%(0)
+playReady%=0 : playActive%=0 : playPending%=0
+playWidth%=0 : playHeight%=0 : playSize%=0 : playPairCount%=0
+playFull%=0 : playUsed%=0 : playConnected%=0 : playSolved%=0
+playHistoryCount%=0 : playHistoryNext%=1
+
+DEFine PROCedure play_open(VAL poPuzzle%)
+  LOCal poI%,poSlot%
+  playWidth%=packPuzzles(poPuzzle%).width% : playHeight%=packPuzzles(poPuzzle%).height%
+  playSize%=playWidth%*playHeight% : playPairCount%=packPuzzles(poPuzzle%).pairCount%
+  playFull%=packPuzzles(poPuzzle%).requireFullCoverage% : playId$=packPuzzles(poPuzzle%).id$
+  DIM playLabels$(playPairCount%,128),playStart%(playPairCount%),playEnd%(playPairCount%)
+  DIM playHead%(playPairCount%),playTail%(playPairCount%),playLength%(playPairCount%)
+  DIM playOwner%(playSize%-1),playOrder%(playSize%-1),playEndpoint%(playSize%-1)
+  DIM playBeforeOwner%(playSize%-1),playBeforeOrder%(playSize%-1),playSeen%(playSize%)
+  DIM playHistoryOwner%(PLAY_HISTORY%,playSize%-1),playHistoryOrder%(PLAY_HISTORY%,playSize%-1)
+  FOR poI%=0 TO playSize%-1
+    playOwner%(poI%)=0 : playOrder%(poI%)=0 : playEndpoint%(poI%)=0
+  END FOR poI%
+  FOR poI%=1 TO playPairCount%
+    poSlot%=packPuzzles(poPuzzle%).firstPair%+poI%-1
+    playLabels$(poI%)=packPairs(poSlot%).label$
+    playStart%(poI%)=packPairs(poSlot%).start.y%*playWidth%+packPairs(poSlot%).start.x%
+    playEnd%(poI%)=packPairs(poSlot%).finish.y%*playWidth%+packPairs(poSlot%).finish.x%
+    playEndpoint%(playStart%(poI%))=poI% : playEndpoint%(playEnd%(poI%))=poI%
+  END FOR poI%
+  playActive%=0 : playPending%=0 : playHistoryCount%=0 : playHistoryNext%=1
+  playReady%=1 : playMessage$="" : play_rebuild
+END DEFine
+
+DEFine FuNction play_adjacent%(VAL paA%,VAL paB%)
+  RETurn ABS((paA% MOD playWidth%)-(paB% MOD playWidth%))+ABS(INT(paA%/playWidth%)-INT(paB%/playWidth%))=1
+END DEFine
+
+DEFine PROCedure play_rebuild
+  LOCal pbI%,pbP%
+  playUsed%=0 : playConnected%=0
+  FOR pbP%=1 TO playPairCount%
+    playLength%(pbP%)=0 : playHead%(pbP%)=-1 : playTail%(pbP%)=-1
+  END FOR pbP%
+  FOR pbI%=0 TO playSize%-1
+    pbP%=playOwner%(pbI%)
+    IF pbP% THEN
+      playUsed%=playUsed%+1
+      IF playOrder%(pbI%)=1 THEN playHead%(pbP%)=pbI%
+      IF playOrder%(pbI%)>playLength%(pbP%) THEN
+        playLength%(pbP%)=playOrder%(pbI%) : playTail%(pbP%)=pbI%
+      END IF
+    END IF
+  END FOR pbI%
+  FOR pbP%=1 TO playPairCount%
+    IF playLength%(pbP%)>1 THEN
+      IF playTail%(pbP%)=playStart%(pbP%) OR playTail%(pbP%)=playEnd%(pbP%) THEN playConnected%=playConnected%+1
+    END IF
+  END FOR pbP%
+  playSolved%=(playConnected%=playPairCount%) AND (NOT playFull% OR playUsed%=playSize%)
+END DEFine
+
+DEFine PROCedure play_snapshot
+  LOCal psI%
+  FOR psI%=0 TO playSize%-1
+    playBeforeOwner%(psI%)=playOwner%(psI%) : playBeforeOrder%(psI%)=playOrder%(psI%)
+  END FOR psI%
+  playPending%=1
+END DEFine
+
+DEFine PROCedure play_finish
+  LOCal pfI%,pfChanged%
+  IF playPending% THEN
+    pfChanged%=0
+    FOR pfI%=0 TO playSize%-1
+      IF playOwner%(pfI%)<>playBeforeOwner%(pfI%) OR playOrder%(pfI%)<>playBeforeOrder%(pfI%) THEN pfChanged%=1
+    END FOR pfI%
+    IF pfChanged% THEN
+      FOR pfI%=0 TO playSize%-1
+        playHistoryOwner%(playHistoryNext%,pfI%)=playBeforeOwner%(pfI%)
+        playHistoryOrder%(playHistoryNext%,pfI%)=playBeforeOrder%(pfI%)
+      END FOR pfI%
+      playHistoryNext%=playHistoryNext% MOD PLAY_HISTORY%+1
+      IF playHistoryCount%<PLAY_HISTORY% THEN playHistoryCount%=playHistoryCount%+1
+    END IF
+  END IF
+  playActive%=0 : playPending%=0
+END DEFine
+
+DEFine PROCedure play_trim(VAL ptPair%,VAL ptOrder%)
+  LOCal ptI%
+  FOR ptI%=0 TO playSize%-1
+    IF playOwner%(ptI%)=ptPair% AND playOrder%(ptI%)>ptOrder% THEN
+      playOwner%(ptI%)=0 : playOrder%(ptI%)=0
+    END IF
+  END FOR ptI%
+  play_rebuild
+END DEFine
+
+DEFine FuNction play_begin%(VAL pnCell%)
+  LOCal pnPair%,pnOrder%
+  playMessage$=""
+  IF pnCell%<0 OR pnCell%>=playSize% THEN RETurn 0
+  pnPair%=playEndpoint%(pnCell%)
+  IF NOT pnPair% THEN pnPair%=playOwner%(pnCell%)
+  IF NOT pnPair% THEN playMessage$="Start at an endpoint or an existing path." : RETurn 0
+  play_finish
+  play_snapshot
+  IF playEndpoint%(pnCell%) THEN
+    play_trim pnPair%,0
+    playOwner%(pnCell%)=pnPair% : playOrder%(pnCell%)=1
+  ELSE
+    pnOrder%=playOrder%(pnCell%) : play_trim pnPair%,pnOrder%
+  END IF
+  playActive%=pnPair% : play_rebuild
+  RETurn 1
+END DEFine
+
+DEFine FuNction play_step%(VAL pmCell%)
+  LOCal pmLast%,pmI%,pmDirection%
+  playMessage$=""
+  IF NOT playActive% THEN RETurn 1
+  IF pmCell%<0 OR pmCell%>=playSize% THEN playMessage$="Stay inside the board." : RETurn 0
+  pmLast%=playTail%(playActive%)
+  IF pmCell%=pmLast% THEN RETurn 1
+  IF NOT play_adjacent%(pmLast%,pmCell%) THEN playMessage$="Move one square horizontally or vertically." : RETurn 0
+  IF playOwner%(pmCell%)=playActive% THEN play_trim playActive%,playOrder%(pmCell%) : RETurn 1
+  IF playLength%(playActive%)>1 AND playEndpoint%(pmLast%) THEN
+    playMessage$="This pair is connected. Retrace or start another path." : RETurn 0
+  END IF
+  IF playOwner%(pmCell%) THEN playMessage$="Paths cannot share cells." : RETurn 0
+  IF playEndpoint%(pmCell%) AND playEndpoint%(pmCell%)<>playActive% THEN
+    playMessage$="A path cannot pass through another endpoint." : RETurn 0
+  END IF
+  ## Only the four neighbours of the new square can cause a self-touch.
+  FOR pmDirection%=1 TO 4
+    pmI%=pmCell%-1 : IF pmDirection%=2 THEN pmI%=pmCell%+1
+    IF pmDirection%=3 THEN pmI%=pmCell%-playWidth%
+    IF pmDirection%=4 THEN pmI%=pmCell%+playWidth%
+    IF pmI%>=0 AND pmI%<playSize% AND pmI%<>pmLast% THEN
+      IF playOwner%(pmI%)=playActive% THEN
+        IF play_adjacent%(pmI%,pmCell%) THEN playMessage$="A path cannot touch its own sides." : RETurn 0
+      END IF
+    END IF
+  END FOR pmDirection%
+  playOwner%(pmCell%)=playActive% : playOrder%(pmCell%)=playLength%(playActive%)+1
+  ## Appending cannot remove or change another route. Keep these totals current
+  ## directly; trimming, undo and restoration still use the complete rebuild.
+  playLength%(playActive%)=playLength%(playActive%)+1 : playTail%(playActive%)=pmCell%
+  playUsed%=playUsed%+1
+  IF playEndpoint%(pmCell%) THEN playConnected%=playConnected%+1
+  playSolved%=(playConnected%=playPairCount%) AND (NOT playFull% OR playUsed%=playSize%)
+  RETurn 1
+END DEFine
+
+DEFine PROCedure play_undo
+  LOCal puI%
+  play_finish
+  IF playHistoryCount%=0 THEN playMessage$="Nothing to undo." : RETurn
+  playHistoryNext%=playHistoryNext%-1 : IF playHistoryNext%=0 THEN playHistoryNext%=PLAY_HISTORY%
+  FOR puI%=0 TO playSize%-1
+    playOwner%(puI%)=playHistoryOwner%(playHistoryNext%,puI%)
+    playOrder%(puI%)=playHistoryOrder%(playHistoryNext%,puI%)
+  END FOR puI%
+  playHistoryCount%=playHistoryCount%-1 : playMessage$="" : play_rebuild
+END DEFine
+
+DEFine PROCedure play_reset
+  LOCal pcI%
+  play_finish : play_snapshot
+  FOR pcI%=0 TO playSize%-1
+    playOwner%(pcI%)=0 : playOrder%(pcI%)=0
+  END FOR pcI%
+  play_finish : play_rebuild : playMessage$=""
+END DEFine
+
+## Validate restored cell/order data independently, including disconnected runs,
+## duplicate steps, endpoints in interiors, geometry, and non-consecutive touches.
+DEFine FuNction play_valid%
+  LOCal pvI%,pvP%,pvJ%,pvN%,pvPrev%,pvNext%,pvCount%
+  FOR pvI%=0 TO playSize%-1
+    IF playOwner%(pvI%)<0 OR playOwner%(pvI%)>playPairCount% THEN RETurn 0
+    IF playOrder%(pvI%)<0 OR playOrder%(pvI%)>playSize% THEN RETurn 0
+    IF (playOwner%(pvI%)=0)<>(playOrder%(pvI%)=0) THEN RETurn 0
+  END FOR pvI%
+  play_rebuild
+  FOR pvP%=1 TO playPairCount%
+    IF playLength%(pvP%) THEN
+      IF playHead%(pvP%)<>playStart%(pvP%) AND playHead%(pvP%)<>playEnd%(pvP%) THEN RETurn 0
+      FOR pvJ%=1 TO playLength%(pvP%)
+        playSeen%(pvJ%)=0
+      END FOR pvJ%
+      pvCount%=0
+      FOR pvI%=0 TO playSize%-1
+        IF playOwner%(pvI%)=pvP% THEN
+          pvN%=playOrder%(pvI%) : pvCount%=pvCount%+1
+          IF playSeen%(pvN%) THEN RETurn 0
+          playSeen%(pvN%)=1
+          IF playEndpoint%(pvI%) THEN
+            IF playEndpoint%(pvI%)<>pvP% THEN RETurn 0
+            IF pvN%<>1 AND pvN%<>playLength%(pvP%) THEN RETurn 0
+          END IF
+          pvPrev%=0 : pvNext%=0
+          FOR pvJ%=0 TO playSize%-1
+            IF playOwner%(pvJ%)=pvP% AND play_adjacent%(pvI%,pvJ%) THEN
+              IF ABS(playOrder%(pvJ%)-pvN%)<>1 THEN RETurn 0
+              IF playOrder%(pvJ%)=pvN%-1 THEN pvPrev%=1
+              IF playOrder%(pvJ%)=pvN%+1 THEN pvNext%=1
+            END IF
+          END FOR pvJ%
+          IF pvN%>1 AND NOT pvPrev% THEN RETurn 0
+          IF pvN%<playLength%(pvP%) AND NOT pvNext% THEN RETurn 0
+        END IF
+      END FOR pvI%
+      IF pvCount%<>playLength%(pvP%) THEN RETurn 0
+    END IF
+  END FOR pvP%
+  RETurn 1
+END DEFine

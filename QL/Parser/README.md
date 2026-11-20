@@ -8,8 +8,9 @@ compilation. This is QL code, not an F#/.NET parser.
 F#: it maps the temporary JSON tree into named puzzle/pair/cell records, validates
 the clues, then frees the tree. `pack_example.ssb` uses only those records to
 display puzzle IDs, board sizes and endpoint pairs. It does not implement the
-game or certify solvability, a stored solution, or uniqueness. The TurboPTR GUI
-is still the separate paint-grid proof in `QL/GUI`.
+game or certify solvability, a stored solution, or uniqueness. The playable
+TurboPTR interface in [`QL/GUI`](../GUI/README.md) uses these records and has its
+own rule engine, checked against the shared F# player.
 
 ## Files and prerequisites
 
@@ -78,6 +79,7 @@ STOP
 | Operation/storage | Meaning |
 |---|---|
 | `pack_load file$, nodeCapacity%` | Load and validate a generator v1 pack. |
+| `pack_load_player file$, nodeCapacity%` | Player import: up to 5 MiB; retain clues and rules only while validating all JSON bytes. |
 | `pack_parse text$, nodeCapacity%` | Same operation for JSON already in a QL string. |
 | `pack_free` | Release the game records and clear pack diagnostics. |
 | `packDoc.error%`, `.message$`, `.errorPosition` | First failure and source byte position. Zero error means success. |
@@ -120,6 +122,17 @@ silently truncating QL record strings. Decoded strings/keys also have the generi
 parser's 4096-byte accessor limit. The pair-record count is bounded at 32766.
 Unexpected operating-system errors and insufficient physical memory remain BASIC
 runtime errors; node capacity alone does not guarantee RAM is available.
+
+`pack_load_player` is an opt-in alternative for larger generator packs. It raises
+the file limit to **5 MiB of bytes**, retaining only required rule/clue fields in
+the temporary tree. Unknown metadata and stored solutions still pass the full
+JSON grammar, string/Unicode, number and nesting checks; their descendants use
+scratch node zero and stack frames instead of consuming value handles. Only
+this entry point enables the projection, and it resets the mode before returning.
+The original generic parser and `pack_load`/`pack_parse` contracts are unchanged.
+Required-name escapes, duplicate last-member behaviour and schema validation
+are preserved. The 32766 retained-node/pair limits still apply. The GUI uses a
+larger Turbo dataspace and 16 MiB emulator configuration for these imports.
 
 Pack failures use named Turbo MANIFEST constants: `PACK_ERR_JSON%` (1),
 `PACK_ERR_SCHEMA%` (2), `PACK_ERR_FORMAT%` (3), `PACK_ERR_RULES%` (4),

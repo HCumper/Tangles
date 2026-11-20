@@ -1,0 +1,572 @@
+{
+  "date": "2026-11-20",
+  "runtime": ".NET 11.0 / SDK 11.0.100 / Windows",
+  "cutComparison": {
+    "width": 8,
+    "height": 8,
+    "pairs": 6,
+    "minLength": 4,
+    "maxLength": 16,
+    "maxAttempts": 500,
+    "firstSeed": 0,
+    "seedCount": 150,
+    "solverWork": 2000000,
+    "styles": [
+      {
+        "Style": "random",
+        "Requested": 150,
+        "Generated": 150,
+        "MeanGenerationMs": 2.0659406666666666,
+        "MeanEvaluations": 374.6933333333333,
+        "TurnsPerPath": 1.948888888888889,
+        "StraightPathPercent": 14.222222222222221,
+        "BorderEndpointPercent": 52.44444444444444,
+        "MeanLengthDeviation": 3.5288888888888876,
+        "Grades": {
+          "easy": 107,
+          "hard": 40,
+          "unrated": 3
+        },
+        "Uniqueness": {
+          "multiple": 2,
+          "notEstablished": 1,
+          "unique": 147
+        },
+        "Status": {
+          "budgetExceeded": 1,
+          "complete": 149
+        }
+      },
+      {
+        "Style": "varied",
+        "Requested": 150,
+        "Generated": 150,
+        "MeanGenerationMs": 1.9572546666666677,
+        "MeanEvaluations": 374.6933333333333,
+        "TurnsPerPath": 1.9622222222222223,
+        "StraightPathPercent": 12.444444444444445,
+        "BorderEndpointPercent": 52.22222222222222,
+        "MeanLengthDeviation": 3.4829629629629633,
+        "Grades": {
+          "easy": 107,
+          "hard": 40,
+          "unrated": 3
+        },
+        "Uniqueness": {
+          "multiple": 2,
+          "notEstablished": 1,
+          "unique": 147
+        },
+        "Status": {
+          "budgetExceeded": 1,
+          "complete": 149
+        }
+      }
+    ],
+    "conclusion": "Varied cuts slightly reduced straight witness paths; grade distribution did not improve. Random cuts remain the default."
+  },
+  "recipeSurvey": [
+    {
+      "target": "medium",
+      "width": 8,
+      "height": 8,
+      "pairs": 8,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        42
+      ],
+      "requests": 10,
+      "selected": 7,
+      "meanRequestMs": 13.32923,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 500,
+      "solverWork": 2000000
+    },
+    {
+      "target": "medium",
+      "width": 8,
+      "height": 8,
+      "pairs": 9,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        42
+      ],
+      "requests": 10,
+      "selected": 9,
+      "meanRequestMs": 4.93559,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 500,
+      "solverWork": 2000000
+    },
+    {
+      "target": "medium",
+      "width": 12,
+      "height": 12,
+      "pairs": 12,
+      "seeds": [
+        0,
+        1,
+        42
+      ],
+      "requests": 3,
+      "selected": 0,
+      "meanRequestMs": 1812.5902,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 5000,
+      "solverWork": 20000000
+    },
+    {
+      "target": "medium",
+      "width": 12,
+      "height": 12,
+      "pairs": 14,
+      "seeds": [
+        0,
+        1,
+        42
+      ],
+      "requests": 3,
+      "selected": 2,
+      "meanRequestMs": 847.5443333333334,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 5000,
+      "solverWork": 20000000
+    },
+    {
+      "target": "medium",
+      "width": 12,
+      "height": 12,
+      "pairs": 16,
+      "seeds": [
+        0,
+        1,
+        42
+      ],
+      "requests": 3,
+      "selected": 1,
+      "meanRequestMs": 979.6936999999999,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 5000,
+      "solverWork": 20000000
+    },
+    {
+      "target": "medium",
+      "width": 12,
+      "height": 12,
+      "pairs": 18,
+      "seeds": [
+        0,
+        1,
+        42
+      ],
+      "requests": 3,
+      "selected": 1,
+      "meanRequestMs": 437.1297666666666,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 5000,
+      "solverWork": 20000000
+    },
+    {
+      "target": "medium",
+      "width": 12,
+      "height": 12,
+      "pairs": 20,
+      "seeds": [
+        0,
+        1,
+        42
+      ],
+      "requests": 3,
+      "selected": 3,
+      "meanRequestMs": 4.868566666666666,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 5000,
+      "solverWork": 20000000
+    },
+    {
+      "target": "medium",
+      "width": 12,
+      "height": 12,
+      "pairs": 24,
+      "seeds": [
+        0,
+        1,
+        42
+      ],
+      "requests": 3,
+      "selected": 3,
+      "meanRequestMs": 3.6783,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 5000,
+      "solverWork": 20000000
+    },
+    {
+      "target": "medium",
+      "width": 16,
+      "height": 16,
+      "pairs": 20,
+      "seeds": [
+        0,
+        42
+      ],
+      "requests": 2,
+      "selected": 0,
+      "meanRequestMs": 5132.1542,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 10000,
+      "solverWork": 100000000
+    },
+    {
+      "target": "medium",
+      "width": 16,
+      "height": 16,
+      "pairs": 24,
+      "seeds": [
+        0,
+        42
+      ],
+      "requests": 2,
+      "selected": 0,
+      "meanRequestMs": 4581.5836,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 10000,
+      "solverWork": 100000000
+    },
+    {
+      "target": "medium",
+      "width": 16,
+      "height": 16,
+      "pairs": 28,
+      "seeds": [
+        0,
+        42
+      ],
+      "requests": 2,
+      "selected": 0,
+      "meanRequestMs": 6620.7618,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 10000,
+      "solverWork": 100000000
+    },
+    {
+      "target": "medium",
+      "width": 16,
+      "height": 16,
+      "pairs": 32,
+      "seeds": [
+        0,
+        42
+      ],
+      "requests": 2,
+      "selected": 0,
+      "meanRequestMs": 3651.37385,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 10000,
+      "solverWork": 100000000
+    },
+    {
+      "target": "medium",
+      "width": 16,
+      "height": 16,
+      "pairs": 36,
+      "seeds": [
+        0,
+        42
+      ],
+      "requests": 2,
+      "selected": 2,
+      "meanRequestMs": 283.12155,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 10000,
+      "solverWork": 100000000
+    },
+    {
+      "target": "hard",
+      "width": 8,
+      "height": 8,
+      "pairs": 6,
+      "seeds": [
+        0,
+        1,
+        42
+      ],
+      "requests": 3,
+      "selected": 3,
+      "meanRequestMs": 5.441333333333333,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 500,
+      "solverWork": 2000000
+    },
+    {
+      "target": "hard",
+      "width": 8,
+      "height": 8,
+      "pairs": 7,
+      "seeds": [
+        0,
+        1,
+        42
+      ],
+      "requests": 3,
+      "selected": 3,
+      "meanRequestMs": 1.6235333333333333,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 500,
+      "solverWork": 2000000
+    },
+    {
+      "target": "hard",
+      "width": 8,
+      "height": 8,
+      "pairs": 8,
+      "seeds": [
+        0,
+        1,
+        42
+      ],
+      "requests": 3,
+      "selected": 3,
+      "meanRequestMs": 1.1745666666666668,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 500,
+      "solverWork": 2000000
+    },
+    {
+      "target": "hard",
+      "width": 12,
+      "height": 12,
+      "pairs": 16,
+      "seeds": [
+        0,
+        1,
+        42
+      ],
+      "requests": 3,
+      "selected": 3,
+      "meanRequestMs": 63.204633333333334,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 5000,
+      "solverWork": 20000000
+    },
+    {
+      "target": "hard",
+      "width": 12,
+      "height": 12,
+      "pairs": 18,
+      "seeds": [
+        0,
+        1,
+        42
+      ],
+      "requests": 3,
+      "selected": 3,
+      "meanRequestMs": 9.190100000000001,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 5000,
+      "solverWork": 20000000
+    },
+    {
+      "target": "hard",
+      "width": 12,
+      "height": 12,
+      "pairs": 20,
+      "seeds": [
+        0,
+        1,
+        42
+      ],
+      "requests": 3,
+      "selected": 3,
+      "meanRequestMs": 7.0827,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 5000,
+      "solverWork": 20000000
+    },
+    {
+      "target": "hard",
+      "width": 16,
+      "height": 16,
+      "pairs": 30,
+      "seeds": [
+        0,
+        42
+      ],
+      "requests": 2,
+      "selected": 2,
+      "meanRequestMs": 447.8731,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 10000,
+      "solverWork": 100000000
+    },
+    {
+      "target": "hard",
+      "width": 16,
+      "height": 16,
+      "pairs": 32,
+      "seeds": [
+        0,
+        42
+      ],
+      "requests": 2,
+      "selected": 2,
+      "meanRequestMs": 511.32335,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 10000,
+      "solverWork": 100000000
+    },
+    {
+      "target": "hard",
+      "width": 16,
+      "height": 16,
+      "pairs": 34,
+      "seeds": [
+        0,
+        42
+      ],
+      "requests": 2,
+      "selected": 2,
+      "meanRequestMs": 398.47765000000004,
+      "candidateLimit": 100,
+      "improvementLimit": 0,
+      "layoutBudget": 10000,
+      "solverWork": 100000000
+    }
+  ],
+  "samples": [
+    {
+      "path": "puzzles/ramp-8x8-easy-hard.json",
+      "sha256": "6ff97bd1c8ca1e3a18de59edf5d819678f57abac9e000c9e312f98166d596fba",
+      "count": 12,
+      "grades": {
+        "easy": 4,
+        "medium": 4,
+        "hard": 4
+      },
+      "hardTrialSteps": [
+        2,
+        2,
+        6,
+        20
+      ],
+      "batch": {
+        "requests": 12,
+        "rejectedSearches": 0,
+        "rejectedDuplicates": 0,
+        "requestLimit": null,
+        "candidateBudget": 2400,
+        "candidatesConsidered": 461
+      },
+      "sharedPlayerCompleted": true,
+      "replayedFromExportedMetadata": true
+    },
+    {
+      "path": "puzzles/ramp-12x12-easy-hard.json",
+      "sha256": "577f7b304ee667b04caaad4229234e1bdcb6b5f0744639dfd085eb463f90230c",
+      "count": 6,
+      "grades": {
+        "easy": 2,
+        "medium": 2,
+        "hard": 2
+      },
+      "hardTrialSteps": [
+        4,
+        12
+      ],
+      "batch": {
+        "requests": 7,
+        "rejectedSearches": 1,
+        "rejectedDuplicates": 0,
+        "requestLimit": null,
+        "candidateBudget": 1200,
+        "candidatesConsidered": 252
+      },
+      "sharedPlayerCompleted": true,
+      "replayedFromExportedMetadata": true
+    },
+    {
+      "path": "puzzles/ramp-16x16-easy-hard.json",
+      "sha256": "ed7a6d219daa487fd78e59f25232271aacb6480854962555afb1ad89ba791f42",
+      "count": 6,
+      "grades": {
+        "easy": 2,
+        "medium": 2,
+        "hard": 2
+      },
+      "hardTrialSteps": [
+        2,
+        12
+      ],
+      "batch": {
+        "requests": 7,
+        "rejectedSearches": 1,
+        "rejectedDuplicates": 0,
+        "requestLimit": null,
+        "candidateBudget": 1200,
+        "candidatesConsidered": 365
+      },
+      "sharedPlayerCompleted": true,
+      "replayedFromExportedMetadata": true
+    }
+  ],
+  "verification": {
+    "releaseTestsPassed": 161,
+    "releaseBuildWarnings": 0,
+    "releaseBuildErrors": 0,
+    "preservedFastSeedSnapshots": 8
+  },
+  "scope": "Fixed-seed deterministic solver estimates; small recipe samples; no human calibration. Timing includes unsuccessful recipe requests and is host-dependent.",
+  "sourceSha256": {
+    "src/Tangles.Generator/CommandLine.fs": "8e02137a43b7eefc0845c071f00acffe22133bf9c474cbf0386b8d2895f90080",
+    "src/Tangles.Generator/CoverageSearch.fs": "1f7ee1e02138acb723c47e265fa0ed4cbe1798db999a97a7811782ba898d432f",
+    "src/Tangles.Generator/Difficulty.fs": "ca5c74b6c203c1680707b57df456a587ffb431800c04fc3c7df0319ead264259",
+    "src/Tangles.Generator/Export.fs": "565b89739be91166b76a447d14eba764ffa4e3660c426fde1681cbde0848a4cd",
+    "src/Tangles.Generator/Generation.fs": "e03f9d3564bf3913da5d751eaaa1d8e5ba8c5048981553d932ad00f50a227bfb",
+    "src/Tangles.Generator/GenerationPolicy.fs": "5550c1a80aafaaa426bf5b08557e7c798a14247556017e15da852cecb0a0e603",
+    "src/Tangles.Generator/GenerationSupport.fs": "48d918a7f1ebd28a875dd25cd9ee8d80a1634ed6f6129deeb973010d63a67028",
+    "src/Tangles.Generator/GuidedGeneration.fs": "9954a7da169c41752d6dbd00a0521cc463d9bb4c9d523a3cfdc1c5977dea6870",
+    "src/Tangles.Generator/Program.fs": "065eb25aea107f914f7862238828cd6fda320e2f8cbf6e6bed83e3e41b42dbf4",
+    "src/Tangles.Generator/Ramp.fs": "002a7c89c086950ddac814d0c15a1d21f8cd975ed956b8f6ba8fc3f824d27bee",
+    "src/Tangles.Generator/Solver.fs": "2f46ea22f52d338f678c21f5d232c9bfc643d6b2aa429c02bd45fd542928ddde",
+    "src/Tangles.Generator/Symmetry.fs": "3a129b9cceda2b801009797a3b0f6be01ac9334f22e0e6c4b68455cb3d1bef43",
+    "tools/benchmark-pack-quality.fsx": "6a3d8820492d40f0ac67a2aab3ddf4748b1c55ec246f4b61cbacb64c115afc93",
+    "src/Tangles.Core/Play.fs": "94e08743ccb66eb881baf744689232152dcb40305d56644d0563ac8ba63ea8f6",
+    "src/Tangles.Core/Validation.fs": "065524938860517a80d95a9edb418237d522e711264b32088b85d90e149b5205"
+  }
+}

@@ -1,53 +1,75 @@
-## Tangles GUI experiment. This is a paint grid, not the puzzle player.
-## SMSQ/E GD2, TurboPTR TPTR_EXT, 800x600 or larger; no TPTR_BAS required.
-## Colours are RGB numbers kept in real variables, never signed % integers.
-DIM guiColours(16),guiCells%(7,7),gt$(80)
-guiWindow = 0 : guiDefinition = 0 : guiChannel = 0
-guiSelected% = 1 : guiPainted% = 0 : guiStrokes% = 0
-guiLastX% = -1 : guiLastY% = -1 : guiQuit% = 0
+## Native Tangles player. SMSQ/E GD2, SSB 2.8, TurboPTR, 800x600 minimum.
+## Clues and saved player paths only: the generator's witness is never used.
+#INCLUDE progress_ssb
+MANIFEST : GUI_PACKS% = 64
+MANIFEST : GUI_CURSOR_KEYS% = 1
+DIM guiColours(16),guiNames$(GUI_PACKS%,128),guiFiles$(GUI_PACKS%,255)
+DIM guiRoot$(255),guiPackFile$(255),guiPackName$(128),guiPrompt$(255),guiNotice$(160)
+DIM guiResume$(255),guiDetailsStamp$(1024)
+DIM guiDrawOwner%(4095),guiDrawOrder%(4095),guiDirty%(4095)
+DIM guiDrawMask%(4095),guiFields$(22,255),guiLegendStamp$(15,160)
+DIM guiLegendPair%(15)
+guiWindow=0 : guiDefinition=0 : guiChannel=0 : guiQuit%=0
+guiCatalogCount%=0 : guiCatalogSelected%=0 : guiPuzzle%=0
+guiCellSize%=60 : guiViewX%=0 : guiViewY%=0 : guiCursorX%=0 : guiCursorY%=0
+guiKeyboard%=0 : guiLegend%=1 : guiRoot$=DATAD$ : guiDetailsStamp$=""
+guiDrawCursor%=-1 : guiBadge%=-1
 guiPalette
 OPEN #0,con
-guiMaximum=W_MAX
-guiScreenX%=INT(guiMaximum/65536)
+guiMaximum=W_MAX : guiScreenX%=INT(guiMaximum/65536)
 guiScreenY%=guiMaximum-65536*guiScreenX%
-IF guiScreenX%<800 OR guiScreenY%<600 THEN
-  PRINT #0,"Tangles needs an 800x600 SMSQ/E desktop."
-  STOP
-END IF
-IF DISP_TYPE<16 THEN
-  PRINT #0,"Tangles needs a GD2 high-colour display."
-  STOP
-END IF
+IF guiScreenX%<800 OR guiScreenY%<600 THEN PRINT #0,"Tangles needs an 800x600 SMSQ/E desktop." : STOP
+IF DISP_TYPE<16 THEN PRINT #0,"Tangles needs a GD2 high-colour display." : STOP
 guiMakeDefinition
 IF COMPILED THEN
-  guiWindow = M_SETUP(#100,guiDefinition,0)
-  guiChannel = M_PRPOS(guiWindow,16*65536+16)
+  guiWindow=M_SETUP(#100,guiDefinition,0) : guiChannel=M_PRPOS(guiWindow,16*65536+16)
 ELSE
-  BOUTL
-  guiWindow = M_SETUP(#0,guiDefinition,0)
-  guiChannel = M_PULLD(guiWindow,16*65536+16)
+  BOUTL : guiWindow=M_SETUP(#0,guiDefinition,0) : guiChannel=M_PULLD(guiWindow,16*65536+16)
 END IF
-OPEN #4,con
-guiBind
-guiDraw
-guiPosition = BRPTR(48,0,guiWindow)
+OPEN #4,con : guiBind
+progressRoot$=guiRoot$ : guiCatalog
+guiResume$="" : guiResumePuzzle%=1
+guiResumeChannel%=FOP_IN(guiRoot$ & "tangles_session")
+IF guiResumeChannel%>=0 THEN
+  progressError%=0 : guiResume$=progress_line$(guiResumeChannel%)
+  guiResumeNumber=progress_number(guiResumeChannel%) : CLOSE #guiResumeChannel%
+  IF progressError% OR guiResumeNumber<1 OR guiResumeNumber>10000 THEN
+    guiResume$=""
+  ELSE
+    guiResumePuzzle%=guiResumeNumber
+  END IF
+END IF
+IF LEN(guiResume$) THEN guiLoad guiResume$,guiResume$
+IF NOT playReady% AND guiCatalogCount% THEN guiLoad guiFiles$(1),guiNames$(1)
+IF playReady% THEN guiSelect guiResumePuzzle%
+guiDraw : guiPosition=BRPTR(48,0,guiWindow)
 REPeat guiMain
-  guiPosition = BRPTR(11,guiPosition,guiWindow)
-  guiStatus = PEEK_L(guiWindow)
-  POKE_L guiStatus+$20,guiPosition
-  guiX% = PEEK_W(guiStatus+$E)
-  guiY% = PEEK_W(guiStatus+$10)
-  guiKey% = PEEK(guiStatus+$12)
+  guiEvent
   SELect ON guiKey%
-    =27: guiQuit% = 1
-    =67,99: guiClear
+    =81,113: guiQuit%=1
+    =27: progress_save : guiKeyboard%=0
+    =85,117,26: play_undo : progress_save : guiKeyboard%=0
+    =67,99: play_reset : progress_save : guiKeyboard%=0
     =82,114: guiDraw
     =77,109,$F5: guiMove
+    =78,110: guiSelect guiPuzzle%+1
+    =80,112: guiSelect guiPuzzle%-1
+    =74,106: guiJump
+    =75,107: guiChoose
+    =76,108: guiImport
+    =43,61: guiZoom 1
+    =45: guiZoom -1
+    =192: guiArrow -1,0
+    =200: guiArrow 1,0
+    =208: guiArrow 0,-1
+    =216: guiArrow 0,1
+    =32,10: guiSpace
     =1: guiClick
   END SELect
   IF guiQuit% THEN EXIT guiMain
+  guiUpdate : guiDetails
 END REPeat guiMain
-guiClose
+progress_save : guiSessionSave : guiClose : pack_free
 STOP
 
 DEFine PROCedure guiPalette
@@ -63,104 +85,356 @@ END DEFine
 
 DEFine PROCedure guiMakeDefinition
   LOCal gd%
-  ## Native new-style WMAN definition, described in TurboPTR Appendix 1.
-  ## Fixed header 48 bytes; one layout; terminator; status length/area/size.
-  ## Relative word pointers are offsets from the pointer's own address.
   guiDefinition=ALCHP(512)
   FOR gd%=0 TO 508 STEP 4
     POKE_L guiDefinition+gd%,0
   END FOR gd%
   POKE_W guiDefinition,768 : POKE_W guiDefinition+2,568
+  ## wwa..kfl / sw..kfl: deliver arrows, Space and Enter to this window,
+  ## instead of letting PTR_GEN use them to steer/click the mouse pointer.
+  POKE guiDefinition+8,GUI_CURSOR_KEYS%
   POKE_W guiDefinition+10,-32766 : POKE_W guiDefinition+12,7
   POKE_W guiDefinition+$30,768 : POKE_W guiDefinition+$32,568
-  POKE_W guiDefinition+$34,256-$34
-  POKE_W guiDefinition+$3A,-1
-  POKE_W guiDefinition+$3C,0
-  ## 124-byte working header plus one 22-byte information window entry.
+  POKE_W guiDefinition+$34,256-$34 : POKE_W guiDefinition+$3A,-1
   POKE_L guiDefinition+126,146
-  ## One full-client information window, no objects. Terminate its list.
   POKE_W guiDefinition+256,768 : POKE_W guiDefinition+258,568
+  POKE guiDefinition+264,GUI_CURSOR_KEYS%
   POKE_W guiDefinition+268,7 : POKE_W guiDefinition+274,-1
 END DEFine
 
 DEFine PROCedure guiBind
   SET_CHANNEL #4,SWIN(0,0,guiWindow)
-  COLOUR_24
-  OVER #4,0 : UNDER #4,0 : CSIZE #4,0,0
+  COLOUR_24 : OVER #4,0 : UNDER #4,0 : CSIZE #4,0,0
 END DEFine
 
-DEFine PROCedure guiText(gx%,gy%,gt$)
-  CURSOR #4,gx%,gy%
-  PRINT #4,gt$;
+DEFine PROCedure guiText(VAL gx%,VAL gy%,VAL gt$)
+  CURSOR #4,gx%,gy% : PRINT #4,gt$;
+END DEFine
+
+DEFine FuNction guiShort$(VAL gsText$,VAL gsLength%)
+  LOCal gsI%,gsOut$(255),gsCode%
+  gsOut$=""
+  FOR gsI%=1 TO LEN(gsText$)
+    gsCode%=CODE(gsText$(gsI%))
+    IF gsCode%>=32 AND gsCode%<127 THEN gsOut$=gsOut$ & CHR$(gsCode%)
+  END FOR gsI%
+  IF LEN(gsOut$)>gsLength% THEN gsOut$=gsOut$(1 TO gsLength%-1) & "~"
+  RETurn gsOut$
+END DEFine
+
+DEFine PROCedure guiButton(VAL gbX%,VAL gbY%,VAL gbW%,VAL gbText$)
+  BLOCK #4,gbW%,26,gbX%,gbY%,$D8DFD4
+  INK #4,$24302D : STRIP #4,$D8DFD4 : guiText gbX%+6,gbY%+7,gbText$
 END DEFine
 
 DEFine PROCedure guiDraw
-  LOCal dx%,dy%,di%
+  LOCal grI%
+  guiDetailsStamp$=""
+  FOR grI%=0 TO 22
+    guiFields$(grI%)=""
+  END FOR grI%
+  FOR grI%=0 TO 15
+    guiLegendStamp$(grI%)="" : guiLegendPair%(grI%)=0
+  END FOR grI%
+  guiBadge%=-1
   PAPER #4,$F0EEE7 : INK #4,$24302D : CLS #4
   BLOCK #4,768,36,0,0,$263C35
   INK #4,$FFFFFF : STRIP #4,$263C35
-  guiText 16,10,"TANGLES  /  SSB + TurboPTR"
-  guiText 578,10,"Move [M]"
-  guiText 672,10,"Quit [Esc]"
-  BLOCK #4,481,481,16,52,$50605F
-  FOR dy%=0 TO 7
-    FOR dx%=0 TO 7
-      guiCell dx%,dy%
-    END FOR dx%
-  END FOR dy%
-  guiSwatches
+  guiText 16,10,"TANGLES / Connect the matching endpoints"
+  guiText 578,10,"Move [M]" : guiText 678,10,"Quit [Q]"
+  guiButton 512,48,240,"Packs [K]"
+  guiButton 512,126,72,"< [P]" : guiButton 588,126,76,"Jump [J]" : guiButton 668,126,84,"[N] >"
+  guiButton 512,218,112,"Undo [U]" : guiButton 640,218,112,"Reset [C]"
+  guiButton 512,252,240,"Load JSON pack [L]"
+  guiButton 512,530,64,"Zoom +" : guiButton 582,530,64,"Zoom -"
   INK #4,$24302D : STRIP #4,$F0EEE7
-  guiText 528,52,"SIXTEEN COLOURS"
-  guiText 528,72,"Choose a letter, then drag"
-  guiText 528,408,"Selected:"
-  guiText 528,464,"Drag left button on grid."
-  guiText 528,484,"C = clear   R = redraw"
-  guiText 528,504,"M = move    Esc = quit"
-  guiText 528,542,"GUI proof / 8 x 8 paint grid"
-  BLOCK #4,208,30,528,426,$D8DFD4
-  STRIP #4,$D8DFD4 : guiText 584,434,"Clear [C]"
-  guiDetails
+  guiText 512,474,"Drag a letter to its partner."
+  guiText 512,490,"Keep paths apart. No self-touching."
+  guiText 512,506,"Arrows + Space draw. Esc stops."
+  guiBoard : guiDetails
 END DEFine
 
-DEFine PROCedure guiCell(cx%,cy%)
-  LOCal cc%,rgb
-  cc%=guiCells%(cx%,cy%) : rgb=$192D36
-  IF cc% THEN rgb=guiColours(cc%)
-  BLOCK #4,59,59,17+60*cx%,53+60*cy%,rgb
-  IF cc% THEN
-    INK #4,$101820 : STRIP #4,rgb
-    guiText 42+60*cx%,76+60*cy%,CHR$(64+cc%)
+DEFine PROCedure guiBoard
+  LOCal gvI%
+  guiDrawViewX%=guiViewX% : guiDrawViewY%=guiViewY% : guiDrawSize%=guiCellSize%
+  guiDrawCursor%=-1
+  IF guiKeyboard% AND playReady% THEN guiDrawCursor%=guiCursorY%*playWidth%+guiCursorX%
+  BLOCK #4,480,480,16,60,$192D36
+  IF NOT playReady% THEN RETurn
+  FOR gvI%=0 TO playSize%-1
+    guiDrawOwner%(gvI%)=playOwner%(gvI%) : guiDrawOrder%(gvI%)=playOrder%(gvI%)
+    guiDrawMask%(gvI%)=guiMask%(gvI%)
+    guiCell gvI%
+  END FOR gvI%
+END DEFine
+
+## Undirected visible connections, independent of the route's orientation.
+DEFine FuNction guiMask%(VAL gmCell%)
+  LOCal gmMask%,gmBit%,gmI%,gmN%,gmPair%
+  gmMask%=0 : gmBit%=1 : gmPair%=playOwner%(gmCell%)
+  IF NOT gmPair% THEN RETurn 0
+  FOR gmI%=1 TO 4
+    gmN%=gmCell%-1 : IF gmI%=2 THEN gmN%=gmCell%+1
+    IF gmI%=3 THEN gmN%=gmCell%-playWidth%
+    IF gmI%=4 THEN gmN%=gmCell%+playWidth%
+    IF gmN%>=0 AND gmN%<playSize% THEN
+      IF playOwner%(gmN%)=gmPair% AND ABS(playOrder%(gmN%)-playOrder%(gmCell%))=1 THEN
+        IF play_adjacent%(gmN%,gmCell%) THEN gmMask%=gmMask%+gmBit%
+      END IF
+    END IF
+    gmBit%=gmBit%*2
+  END FOR gmI%
+  RETurn gmMask%
+END DEFine
+
+## Paint just the changed arms/centre. Extending a path never clears a square
+## first, and an endpoint's colour and letter remain in place throughout.
+DEFine PROCedure guiDelta(VAL gcCell%,VAL gdMask%)
+  LOCal gdX%,gdY%,gdPair%,gdOld%,gdNew%,gdBit%,gdI%,gdHalf%,gdThick%,gdLo%,gdHi%
+  LOCal gdRX%,gdRY%,gdW%,gdH%,gdEndpoint%,gdColourChanged%,gdRGB
+  gdX%=(gcCell% MOD playWidth%)-guiViewX% : gdY%=INT(gcCell%/playWidth%)-guiViewY%
+  IF gdX%<0 OR gdY%<0 OR (gdX%+1)*guiCellSize%>480 OR (gdY%+1)*guiCellSize%>480 THEN RETurn
+  gdX%=16+gdX%*guiCellSize% : gdY%=60+gdY%*guiCellSize%
+  gdPair%=playOwner%(gcCell%) : gdEndpoint%=playEndpoint%(gcCell%)
+  gdColourChanged%=(gdPair%<>guiDrawOwner%(gcCell%))
+  IF gdEndpoint% THEN gdPair%=gdEndpoint% : gdColourChanged%=0
+  gdRGB=$192D36 : IF gdPair% THEN gdRGB=guiColours(1+(gdPair%-1) MOD 16)
+  gdHalf%=INT(guiCellSize%/2) : gdThick%=INT(guiCellSize%/4) : IF gdThick%<2 THEN gdThick%=2
+  gdLo%=gdHalf%-INT(gdThick%/2) : gdHi%=gdLo%+gdThick%
+  IF NOT gdEndpoint% AND gdColourChanged% THEN BLOCK #4,gdThick%,gdThick%,gdX%+gdLo%,gdY%+gdLo%,gdRGB
+  gdBit%=1
+  FOR gdI%=1 TO 4
+    gdOld%=INT(guiDrawMask%(gcCell%)/gdBit%) MOD 2 : gdNew%=INT(gdMask%/gdBit%) MOD 2
+    IF gdOld%<>gdNew% OR (gdNew% AND gdColourChanged%) THEN
+      gdRX%=gdX%+gdLo% : gdRY%=gdY%+gdLo% : gdW%=gdThick% : gdH%=gdThick%
+      SELect ON gdI%
+        =1: gdRX%=gdX% : gdW%=gdLo%
+        =2: gdRX%=gdX%+gdHi% : gdW%=guiCellSize%-gdHi%
+        =3: gdRY%=gdY% : gdH%=gdLo%
+        =4: gdRY%=gdY%+gdHi% : gdH%=guiCellSize%-gdHi%
+      END SELect
+      IF gdEndpoint% THEN
+        SELect ON gdI%
+          =1: gdW%=2
+          =2: gdRX%=gdX%+guiCellSize%-2 : gdW%=2
+          =3: gdH%=2
+          =4: gdRY%=gdY%+guiCellSize%-2 : gdH%=2
+        END SELect
+      END IF
+      IF gdNew% THEN
+        BLOCK #4,gdW%,gdH%,gdRX%,gdRY%,gdRGB
+      ELSE
+        BLOCK #4,gdW%,gdH%,gdRX%,gdRY%,$192D36
+        ## Restore the static top/left grid line under a removed connector.
+        IF gdI%=1 THEN BLOCK #4,1,gdH%,gdX%,gdRY%,$50605F
+        IF gdI%=3 THEN BLOCK #4,gdW%,1,gdRX%,gdY%,$50605F
+      END IF
+    END IF
+    gdBit%=gdBit%*2
+  END FOR gdI%
+END DEFine
+
+DEFine PROCedure guiCell(VAL gcCell%)
+  LOCal gcX%,gcY%,gcP%,gcE%,gcN%,gcHalf%,gcThick%,gcI%,gcLimit%
+  LOCal gcRGB,gcText$(128)
+  gcX%=(gcCell% MOD playWidth%)-guiViewX% : gcY%=INT(gcCell%/playWidth%)-guiViewY%
+  IF gcX%<0 OR gcY%<0 OR (gcX%+1)*guiCellSize%>480 OR (gcY%+1)*guiCellSize%>480 THEN RETurn
+  gcX%=16+gcX%*guiCellSize% : gcY%=60+gcY%*guiCellSize%
+  BLOCK #4,guiCellSize%,guiCellSize%,gcX%,gcY%,$50605F
+  BLOCK #4,guiCellSize%-1,guiCellSize%-1,gcX%+1,gcY%+1,$192D36
+  gcP%=playOwner%(gcCell%) : gcE%=playEndpoint%(gcCell%)
+  gcHalf%=INT(guiCellSize%/2) : gcThick%=INT(guiCellSize%/4) : IF gcThick%<2 THEN gcThick%=2
+  IF gcP% THEN
+    gcRGB=guiColours(1+(gcP%-1) MOD 16)
+    BLOCK #4,gcThick%,gcThick%,gcX%+gcHalf%-INT(gcThick%/2),gcY%+gcHalf%-INT(gcThick%/2),gcRGB
+    FOR gcI%=1 TO 4
+      gcN%=gcCell%-1 : IF gcI%=2 THEN gcN%=gcCell%+1
+      IF gcI%=3 THEN gcN%=gcCell%-playWidth%
+      IF gcI%=4 THEN gcN%=gcCell%+playWidth%
+      IF gcN%>=0 AND gcN%<playSize% THEN
+        IF playOwner%(gcN%)=gcP% AND ABS(playOrder%(gcN%)-playOrder%(gcCell%))=1 THEN
+          IF play_adjacent%(gcN%,gcCell%) THEN
+            SELect ON gcI%
+              =1: BLOCK #4,gcHalf%+1,gcThick%,gcX%,gcY%+gcHalf%-INT(gcThick%/2),gcRGB
+              =2: BLOCK #4,guiCellSize%-gcHalf%,gcThick%,gcX%+gcHalf%,gcY%+gcHalf%-INT(gcThick%/2),gcRGB
+              =3: BLOCK #4,gcThick%,gcHalf%+1,gcX%+gcHalf%-INT(gcThick%/2),gcY%,gcRGB
+              =4: BLOCK #4,gcThick%,guiCellSize%-gcHalf%,gcX%+gcHalf%-INT(gcThick%/2),gcY%+gcHalf%,gcRGB
+            END SELect
+          END IF
+        END IF
+      END IF
+    END FOR gcI%
+  END IF
+  IF gcE% THEN
+    gcRGB=guiColours(1+(gcE%-1) MOD 16)
+    BLOCK #4,guiCellSize%-4,guiCellSize%-4,gcX%+2,gcY%+2,gcRGB
+    IF guiCellSize%>=14 THEN
+      gcLimit%=INT((guiCellSize%-4)/6) : gcText$=guiShort$(playLabels$(gcE%),128)
+      IF LEN(gcText$)<>LEN(playLabels$(gcE%)) OR LEN(gcText$)>gcLimit% THEN gcText$=gcE%
+      IF LEN(gcText$)>gcLimit% THEN gcText$="?"
+      INK #4,$101820 : STRIP #4,gcRGB
+      guiText gcX%+INT((guiCellSize%-6*LEN(gcText$))/2),gcY%+gcHalf%-5,gcText$
+    END IF
+  END IF
+  IF guiKeyboard% AND gcCell%=guiCursorY%*playWidth%+guiCursorX% THEN
+    BLOCK #4,guiCellSize%,2,gcX%,gcY%,$FFFFFF
+    BLOCK #4,2,guiCellSize%,gcX%,gcY%,$FFFFFF
+    BLOCK #4,guiCellSize%,2,gcX%,gcY%+guiCellSize%-2,$FFFFFF
+    BLOCK #4,2,guiCellSize%,gcX%+guiCellSize%-2,gcY%,$FFFFFF
   END IF
 END DEFine
 
-DEFine PROCedure guiSwatches
-  LOCal si%,sx%,sy%
-  FOR si%=1 TO 16
-    sx%=528+108*((si%-1) MOD 2) : sy%=104+36*INT((si%-1)/2)
-    BLOCK #4,100,30,sx%,sy%,guiColours(si%)
-    INK #4,$101820 : STRIP #4,guiColours(si%)
-    guiText sx%+44,sy%+7,CHR$(64+si%)
-    IF si%=guiSelected% THEN
-      BLOCK #4,100,2,sx%,sy%,$101820
-      BLOCK #4,100,2,sx%,sy%+28,$101820
-      BLOCK #4,2,30,sx%,sy%,$101820
-      BLOCK #4,2,30,sx%+98,sy%,$101820
+DEFine PROCedure guiUpdate
+  LOCal guI%,guJ%,guN%,guMask%,guCursor%
+  IF NOT playReady% THEN RETurn
+  IF guiDrawViewX%<>guiViewX% OR guiDrawViewY%<>guiViewY% OR guiDrawSize%<>guiCellSize% THEN guiBoard : RETurn
+  guCursor%=-1 : IF guiKeyboard% THEN guCursor%=guiCursorY%*playWidth%+guiCursorX%
+  FOR guI%=0 TO playSize%-1
+    guiDirty%(guI%)=0
+  END FOR guI%
+  FOR guI%=0 TO playSize%-1
+    IF guiDrawOwner%(guI%)<>playOwner%(guI%) OR guiDrawOrder%(guI%)<>playOrder%(guI%) THEN
+      guiDirty%(guI%)=1
+      FOR guJ%=1 TO 4
+        guN%=guI%-1 : IF guJ%=2 THEN guN%=guI%+1
+        IF guJ%=3 THEN guN%=guI%-playWidth%
+        IF guJ%=4 THEN guN%=guI%+playWidth%
+        IF guN%>=0 AND guN%<playSize% THEN guiDirty%(guN%)=1
+      END FOR guJ%
     END IF
-  END FOR si%
+  END FOR guI%
+  IF guCursor%<>guiDrawCursor% THEN
+    IF guCursor%>=0 THEN guiDirty%(guCursor%)=1
+    IF guiDrawCursor%>=0 THEN guiDirty%(guiDrawCursor%)=1
+  END IF
+  FOR guI%=0 TO playSize%-1
+    IF guiDirty%(guI%) THEN
+      guMask%=guiMask%(guI%)
+      IF guI%=guCursor% OR guI%=guiDrawCursor% THEN
+        guiCell guI%
+      ELSE
+        guiDelta guI%,guMask%
+      END IF
+      guiDrawMask%(guI%)=guMask%
+    END IF
+    guiDrawOwner%(guI%)=playOwner%(guI%) : guiDrawOrder%(guI%)=playOrder%(guI%)
+  END FOR guI%
+  guiDrawCursor%=guCursor%
 END DEFine
 
 DEFine PROCedure guiDetails
-  BLOCK #4,120,18,596,408,$F0EEE7
+  LOCal geI%,geP%,geX%,geY%,geCursor%,geText$(160),geStamp$(1024)
+  ## Cache the displayed state: pointer motion must not erase the legend.
+  geStamp$=LEN(guiPackName$) & ":" & guiPackName$ & guiPuzzle% & ":" & playReady%
+  geStamp$=geStamp$ & ":" & LEN(guiNotice$) & ":" & guiNotice$
+  IF playReady% THEN
+    IF playActive% THEN guiLegend%=1+16*INT((playActive%-1)/16)
+    geStamp$=geStamp$ & ":" & playWidth% & ":" & playHeight% & ":" & playFull%
+    geStamp$=geStamp$ & ":" & packDoc.puzzleCount% & ":" & playConnected% & ":" & playSolved%
+    geStamp$=geStamp$ & ":" & playUsed% & ":" & playSize% & ":" & guiLegend%
+    geStamp$=geStamp$ & ":" & guiCursorX% & ":" & guiCursorY% & ":" & LEN(playMessage$) & ":" & playMessage$
+    FOR geI%=0 TO 15
+      geP%=guiLegend%+geI%
+      IF geP%<=playPairCount% THEN
+        geCursor%=0
+        IF playLength%(geP%)>1 THEN geCursor%=playEndpoint%(playTail%(geP%))
+        geStamp$=geStamp$ & ":" & geCursor%
+      END IF
+    END FOR geI%
+  END IF
+  IF geStamp$=guiDetailsStamp$ THEN RETurn
+  guiDetailsStamp$=geStamp$
+  guiField 0,512,80,240,guiPackName$
+  IF NOT playReady% THEN guiField 22,16,544,480,guiNotice$ : RETurn
+  geText$=playWidth% & "x" & playHeight% & " / "
+  IF playFull% THEN
+    geText$=geText$ & "FULL COVERAGE"
+  ELSE
+    geText$=geText$ & "CONNECTIONS ONLY"
+  END IF
+  guiField 1,512,96,240,geText$
+  geText$="Puzzle " & guiPuzzle% & " / " & packDoc.puzzleCount% : guiField 2,512,112,240,geText$
+  geText$=playConnected% & " / " & playPairCount% & " pairs connected"
+  IF playSolved% THEN geText$="PUZZLE COMPLETE!"
+  guiField 3,512,164,230,geText$
+  geCursor%=0
+  IF playSolved% THEN geCursor%=1
+  IF NOT playSolved% AND playConnected%=playPairCount% THEN geCursor%=2
+  IF geCursor%<>guiBadge% THEN
+    guiBadge%=geCursor%
+    SELect ON guiBadge%
+      =0: BLOCK #4,8,10,744,164,$F0EEE7
+      =1: BLOCK #4,8,10,744,164,$38AE61
+      =2: BLOCK #4,8,10,744,164,$E5BD28
+    END SELect
+  END IF
+  geText$=playUsed% & " / " & playSize% & " cells"
+  IF NOT playFull% THEN geText$=geText$ & " (gaps allowed)"
+  guiField 4,512,184,240,geText$
+  IF playActive% THEN guiLegend%=1+16*INT((playActive%-1)/16)
+  FOR geI%=0 TO 15
+    geP%=guiLegend%+geI%
+    geX%=512+120*(geI% MOD 2) : geY%=294+20*INT(geI%/2)
+    IF geP%<=playPairCount% THEN
+      geText$=geP% & ":" & guiShort$(playLabels$(geP%),12)
+      IF playLength%(geP%)>1 THEN
+        IF playEndpoint%(playTail%(geP%)) THEN geText$=geText$ & " OK"
+      END IF
+      IF NOT pack_equal%(geText$,guiLegendStamp$(geI%)) OR guiLegendPair%(geI%)<>geP% THEN
+        IF guiLegendPair%(geI%)<>geP% THEN
+          BLOCK #4,112,18,geX%,geY%,guiColours(1+(geP%-1) MOD 16)
+          guiLegendStamp$(geI%)=""
+        END IF
+        INK #4,$101820 : STRIP #4,guiColours(1+(geP%-1) MOD 16)
+        geCursor%=LEN(guiLegendStamp$(geI%))-LEN(geText$) : IF geCursor%<0 THEN geCursor%=0
+        guiText geX%+4,geY%+4,geText$ & FILL$(" ",geCursor%)
+        guiLegendStamp$(geI%)=geText$ : guiLegendPair%(geI%)=geP%
+      END IF
+    ELSE
+      IF guiLegendPair%(geI%) THEN BLOCK #4,112,18,geX%,geY%,$F0EEE7
+      guiLegendPair%(geI%)=0 : guiLegendStamp$(geI%)=""
+    END IF
+  END FOR geI%
+  geCursor%=playEndpoint%(guiCursorY%*playWidth%+guiCursorX%)
+  geText$="Cursor " & guiCursorX% & "," & guiCursorY%
+  IF geCursor% THEN geText$=geText$ & ": " & guiShort$(playLabels$(geCursor%),20)
+  guiField 21,512,458,240,geText$
+  geText$=playMessage$ : IF geText$="" THEN geText$=guiNotice$
+  IF geText$="" AND playSolved% THEN geText$="Puzzle complete. Any valid route counts."
+  IF geText$="" AND playFull% AND playConnected%=playPairCount% THEN geText$="All pairs connected. Fill the remaining squares to finish."
+  guiField 22,16,544,480,geText$
+END DEFine
+
+## Opaque, padded text replaces the old value in one write. Do not blank a
+## whole field first; most pointer events do not change any displayed text.
+DEFine PROCedure guiField(VAL ftIndex%,VAL ftX%,VAL ftY%,VAL ftWidth%,VAL ftText$)
+  LOCal ftShown$(255),ftPad%
+  ftShown$=guiShort$(ftText$,INT(ftWidth%/6))
+  IF pack_equal%(ftShown$,guiFields$(ftIndex%)) THEN RETurn
+  ftPad%=LEN(guiFields$(ftIndex%))-LEN(ftShown$) : IF ftPad%<0 THEN ftPad%=0
   INK #4,$24302D : STRIP #4,$F0EEE7
-  guiText 600,408,CHR$(64+guiSelected%)
-  BLOCK #4,480,20,16,542,$F0EEE7
-  CURSOR #4,16,542
-  PRINT #4,"Cells: ";guiPainted%;"    Strokes: ";guiStrokes%;
+  guiText ftX%,ftY%,ftShown$ & FILL$(" ",ftPad%)
+  guiFields$(ftIndex%)=ftShown$
+END DEFine
+
+DEFine PROCedure guiEvent
+  ## Wait for a key/click, not passive pointer movement (which needs no redraw).
+  guiPosition=BRPTR(3,guiPosition,guiWindow)
+  guiStatus=PEEK_L(guiWindow) : POKE_L guiStatus+$20,guiPosition
+  guiX%=PEEK_W(guiStatus+$E) : guiY%=PEEK_W(guiStatus+$10) : guiKey%=PEEK(guiStatus+$12)
+END DEFine
+
+DEFine FuNction guiLocate%(VAL glX%,VAL glY%)
+  LOCal glCX%,glCY%
+  IF NOT playReady% OR glX%<16 OR glY%<60 OR glX%>=496 OR glY%>=540 THEN RETurn -1
+  glCX%=INT((glX%-16)/guiCellSize%)+guiViewX% : glCY%=INT((glY%-60)/guiCellSize%)+guiViewY%
+  IF glCX%>=playWidth% OR glCY%>=playHeight% THEN RETurn -1
+  RETurn glCY%*playWidth%+glCX%
 END DEFine
 
 DEFine PROCedure guiClick
-  LOCal ci%,col%,row%
-  IF guiY%>=0 AND guiY%<36 THEN
+  LOCal giCell%,giRow%
+  IF guiY%<36 THEN
     IF guiX%>=664 THEN
       guiQuit%=1
     ELSE
@@ -168,77 +442,262 @@ DEFine PROCedure guiClick
     END IF
     RETurn
   END IF
-  IF guiX%>=528 AND guiX%<736 THEN
-    IF guiY%>=104 AND guiY%<392 THEN
-      col%=INT((guiX%-528)/108) : row%=INT((guiY%-104)/36)
-      IF (guiX%-528) MOD 108<100 AND (guiY%-104) MOD 36<30 THEN
-        guiSelected%=1+col%+2*row% : guiSwatches : guiDetails
-      END IF
-    END IF
-    IF guiY%>=426 AND guiY%<456 THEN guiClear
+  IF guiX%>=512 THEN
+    SELect ON guiY%
+      =48 TO 74: guiChoose
+      =126 TO 152
+        IF guiX%<584 THEN guiSelect guiPuzzle%-1
+        IF guiX%>=588 AND guiX%<664 THEN guiJump
+        IF guiX%>=668 THEN guiSelect guiPuzzle%+1
+      =218 TO 244
+        IF guiX%<632 THEN
+          play_undo
+        ELSE
+          play_reset
+        END IF
+        progress_save : guiKeyboard%=0
+      =252 TO 278: guiImport
+      =530 TO 556
+        IF guiX%<578 THEN
+          guiZoom 1
+        ELSE
+          guiZoom -1
+        END IF
+      =294 TO 454
+        giRow%=guiLegend%+2*INT((guiY%-294)/20)+INT((guiX%-512)/120)
+        IF playReady% AND giRow%<=playPairCount% THEN
+          guiCursorX%=playStart%(giRow%) MOD playWidth% : guiCursorY%=INT(playStart%(giRow%)/playWidth%)
+          guiKeyboard%=1 : guiEnsure
+        END IF
+    END SELect
     RETurn
   END IF
-  IF guiX%>=16 AND guiX%<496 AND guiY%>=52 AND guiY%<532 THEN guiDrag
+  giCell%=guiLocate%(guiX%,guiY%) : IF giCell%>=0 THEN guiDrag giCell%
 END DEFine
 
-DEFine PROCedure guiDrag
-  LOCal dp,dn,dl
-  guiLastX%=-1 : guiLastY%=-1 : guiStrokes%=guiStrokes%+1
-  dp=BRPTR(48,0,guiWindow) : guiPaint
-  REPeat dl
-    dn=BRPTR(12,dp,guiWindow)
-    IF dn=dp THEN EXIT dl
-    guiPaint
-    dp=dn
-  END REPeat dl
-  guiPosition=dp
-  guiDetails
+DEFine PROCedure guiDrag(VAL gdCell%)
+  LOCal gdOld,gdNew,gdTarget%,gdOK%,gdKeyboard%,gdPressed%,gdPrevious%
+  gdKeyboard%=guiKeyboard% : guiKeyboard%=0 : gdOK%=play_begin%(gdCell%)
+  IF gdKeyboard% THEN guiUpdate
+  IF NOT gdOK% THEN progress_save : RETurn
+  guiCursorX%=gdCell% MOD playWidth% : guiCursorY%=INT(gdCell%/playWidth%)
+  ## Keep the original press position: a fresh read here can swallow the first move.
+  gdOld=guiPosition : gdPrevious%=gdCell% : guiUpdate : guiDetails
+  REPeat gdLoop
+    gdNew=BRPTR(12,gdOld,guiWindow)
+    gdPressed%=PEEK(PEEK_L(guiWindow)+$13)
+    gdTarget%=guiLocate%(PEEK_W(PEEK_L(guiWindow)+$E),PEEK_W(PEEK_L(guiWindow)+$10))
+    ## Include the release position before finishing, even if no move was read first.
+    IF gdTarget%>=0 AND gdTarget%<>gdPrevious% THEN guiTrace gdTarget% : guiUpdate : guiDetails
+    gdPrevious%=gdTarget%
+    gdOld=gdNew
+    IF gdPressed% MOD 2=0 THEN EXIT gdLoop
+  END REPeat gdLoop
+  guiPosition=gdOld : progress_save
 END DEFine
 
-DEFine PROCedure guiPaint
-  LOCal px%,py%,tx%,ty%,sx%,sy%
-  px%=PEEK_W(PEEK_L(guiWindow)+$E) : py%=PEEK_W(PEEK_L(guiWindow)+$10)
-  IF px%<16 OR px%>=496 OR py%<52 OR py%>=532 THEN
-    guiLastX%=-1 : guiLastY%=-1 : RETurn
+DEFine PROCedure guiTrace(VAL gtCell%)
+  LOCal gtLast%,gtX%,gtY%,gtDX%,gtDY%,gtNext%,gtOK%
+  IF NOT playActive% THEN RETurn
+  REPeat gtLoop
+    gtLast%=playTail%(playActive%) : IF gtLast%=gtCell% THEN EXIT gtLoop
+    gtX%=gtLast% MOD playWidth% : gtY%=INT(gtLast%/playWidth%)
+    gtDX%=(gtCell% MOD playWidth%)-gtX% : gtDY%=INT(gtCell%/playWidth%)-gtY%
+    IF ABS(gtDX%)>=ABS(gtDY%) THEN
+      IF gtDX%>0 THEN gtX%=gtX%+1
+      IF gtDX%<0 THEN gtX%=gtX%-1
+    ELSE
+      IF gtDY%>0 THEN gtY%=gtY%+1
+      IF gtDY%<0 THEN gtY%=gtY%-1
+    END IF
+    gtNext%=gtY%*playWidth%+gtX% : gtOK%=play_step%(gtNext%) : IF NOT gtOK% THEN EXIT gtLoop
+  END REPeat gtLoop
+END DEFine
+
+DEFine PROCedure guiArrow(VAL gaDX%,VAL gaDY%)
+  IF NOT playReady% THEN RETurn
+  guiCursorX%=guiCursorX%+gaDX% : guiCursorY%=guiCursorY%+gaDY%
+  IF guiCursorX%<0 THEN guiCursorX%=0
+  IF guiCursorY%<0 THEN guiCursorY%=0
+  IF guiCursorX%>=playWidth% THEN guiCursorX%=playWidth%-1
+  IF guiCursorY%>=playHeight% THEN guiCursorY%=playHeight%-1
+  guiKeyboard%=1 : guiTrace guiCursorY%*playWidth%+guiCursorX% : guiEnsure
+END DEFine
+
+DEFine PROCedure guiSpace
+  LOCal gkOK%
+  IF NOT playReady% THEN RETurn
+  guiKeyboard%=1
+  IF playActive% THEN
+    progress_save
+  ELSE
+    gkOK%=play_begin%(guiCursorY%*playWidth%+guiCursorX%)
   END IF
-  tx%=INT((px%-16)/60) : ty%=INT((py%-52)/60)
-  IF guiLastX%<0 THEN guiLastX%=tx% : guiLastY%=ty%
-  ## Conservative orthogonal interpolation: horizontal, then vertical.
-  ## Every intervening cell is visited even if the pointer moves quickly.
-  sx%=1 : sy%=1
-  IF tx%<guiLastX% THEN sx%=-1
-  IF ty%<guiLastY% THEN sy%=-1
-  REPeat gx
-    guiPut guiLastX%,guiLastY%
-    IF guiLastX%=tx% THEN EXIT gx
-    guiLastX%=guiLastX%+sx%
-  END REPeat gx
-  REPeat gy
-    guiPut guiLastX%,guiLastY%
-    IF guiLastY%=ty% THEN EXIT gy
-    guiLastY%=guiLastY%+sy%
-  END REPeat gy
 END DEFine
 
-DEFine PROCedure guiPut(px%,py%)
-  IF guiCells%(px%,py%)=guiSelected% THEN RETurn
-  IF guiCells%(px%,py%)=0 THEN guiPainted%=guiPainted%+1
-  guiCells%(px%,py%)=guiSelected%
-  guiCell px%,py%
+DEFine PROCedure guiEnsure
+  LOCal gnVisible%
+  gnVisible%=INT(480/guiCellSize%)
+  IF guiCursorX%<guiViewX% THEN guiViewX%=guiCursorX%
+  IF guiCursorY%<guiViewY% THEN guiViewY%=guiCursorY%
+  IF guiCursorX%>=guiViewX%+gnVisible% THEN guiViewX%=guiCursorX%-gnVisible%+1
+  IF guiCursorY%>=guiViewY%+gnVisible% THEN guiViewY%=guiCursorY%-gnVisible%+1
 END DEFine
 
-DEFine PROCedure guiClear
-  DIM guiCells%(7,7)
-  guiPainted%=0 : guiStrokes%=0
+DEFine PROCedure guiZoom(VAL gzDirection%)
+  IF NOT playReady% THEN RETurn
+  guiCellSize%=guiCellSize%+gzDirection%*6
+  IF guiCellSize%<7 THEN guiCellSize%=7
+  IF guiCellSize%>60 THEN guiCellSize%=60
+  guiEnsure
+END DEFine
+
+DEFine PROCedure guiSelect(VAL gpPuzzle%)
+  IF gpPuzzle%<1 OR gpPuzzle%>packDoc.puzzleCount% OR gpPuzzle%=guiPuzzle% THEN RETurn
+  progress_save : guiPuzzle%=gpPuzzle% : play_open guiPuzzle% : progress_load
+  guiCursorX%=0 : guiCursorY%=0 : guiViewX%=0 : guiViewY%=0 : guiKeyboard%=0 : guiLegend%=1
+  guiCellSize%=INT(480/playWidth%)
+  IF guiCellSize%*playHeight%>480 THEN guiCellSize%=INT(480/playHeight%)
+  IF guiCellSize%>60 THEN guiCellSize%=60
+  guiNotice$="" : guiSessionSave : guiDraw
+END DEFine
+
+DEFine PROCedure guiLoad(VAL gfFile$,VAL gfName$)
+  LOCal gfOld$(255),gfError$(160),gfDesc$(160),gfI%,gfFound%
+  progress_save : gfOld$=guiPackFile$ : playMessage$="" : guiNotice$="Loading JSON pack..." : guiDetails
+  pack_load_player gfFile$,32766
+  IF packDoc.error% THEN
+    gfError$=packDoc.message$ : IF LEN(gfOld$) THEN pack_load_player gfOld$,32766
+    guiNotice$=gfError$ : playMessage$="" : guiDraw : RETurn
+  END IF
+  guiPackFile$=gfFile$ : guiPackName$=guiShort$(gfName$,128) : guiPuzzle%=0
+  gfFound%=0
+  FOR gfI%=1 TO guiCatalogCount%
+    IF pack_equal%(guiFiles$(gfI%),gfFile$) THEN gfFound%=gfI%
+  END FOR gfI%
+  IF NOT gfFound% AND guiCatalogCount%<GUI_PACKS% THEN
+    guiCatalogCount%=guiCatalogCount%+1 : gfFound%=guiCatalogCount%
+    guiFiles$(gfFound%)=gfFile$
+    gfDesc$=guiShort$(gfName$,60) & " / " & packPuzzles(1).width% & "x" & packPuzzles(1).height%
+    IF packDoc.requireFullCoverage% THEN
+      gfDesc$=gfDesc$ & " / full coverage"
+    ELSE
+      gfDesc$=gfDesc$ & " / connections only"
+    END IF
+    guiNames$(gfFound%)=gfDesc$
+  END IF
+  guiCatalogSelected%=gfFound%
+  playReady%=0 : guiSelect 1
+END DEFine
+
+DEFine PROCedure guiCatalog
+  LOCal glChannel%,glI%,glValue,glName$(1024),glFile$(1024)
+  glChannel%=FOP_IN(guiRoot$ & "tangles_config")
+  IF glChannel%>=0 THEN
+    progressError%=0 : glFile$=progress_line$(glChannel%) : CLOSE #glChannel%
+    IF NOT progressError% AND LEN(glFile$)<=200 AND LEN(glFile$)>0 THEN progressRoot$=glFile$
+  END IF
+  glChannel%=FOP_IN(guiRoot$ & "tangles_catalog")
+  IF glChannel%<0 THEN guiNotice$="No catalogue. Press L to load a generator JSON pack." : RETurn
+  progressError%=0 : glValue=progress_number(glChannel%)
+  IF glValue>=1 AND glValue<=GUI_PACKS% AND NOT progressError% THEN
+    FOR glI%=1 TO glValue
+      glName$=progress_line$(glChannel%) : glFile$=progress_line$(glChannel%)
+      IF LEN(glName$)<=128 AND LEN(glFile$)<=200 AND NOT progressError% THEN
+        guiCatalogCount%=guiCatalogCount%+1
+        guiNames$(guiCatalogCount%)=glName$ : guiFiles$(guiCatalogCount%)=guiRoot$ & glFile$
+      END IF
+    END FOR glI%
+  END IF
+  CLOSE #glChannel%
+END DEFine
+
+DEFine PROCedure guiChoose
+  LOCal goSelected%,goFirst%,goI%,goDone%
+  IF NOT guiCatalogCount% THEN guiImport : RETurn
+  goSelected%=guiCatalogSelected% : IF goSelected%<1 THEN goSelected%=1
+  goDone%=0
+  REPeat goLoop
+    goFirst%=1+8*INT((goSelected%-1)/8) : BLOCK #4,720,476,24,48,$D8DFD4
+    INK #4,$24302D : STRIP #4,$D8DFD4
+    guiText 40,62,"Choose pack: arrows / Enter, click a row, Esc cancels."
+    FOR goI%=goFirst% TO goFirst%+7
+      IF goI%<=guiCatalogCount% THEN
+        IF goI%=goSelected% THEN BLOCK #4,684,42,40,90+48*(goI%-goFirst%),$B9C9B7
+        STRIP #4,$D8DFD4 : IF goI%=goSelected% THEN STRIP #4,$B9C9B7
+        guiText 48,98+48*(goI%-goFirst%),guiShort$(guiNames$(goI%),108)
+      END IF
+    END FOR goI%
+    STRIP #4,$D8DFD4 : guiText 40,492,"P / N = page. L = import another JSON pack."
+    guiEvent
+    SELect ON guiKey%
+      =27: EXIT goLoop
+      =208: IF goSelected%>1 THEN goSelected%=goSelected%-1
+      =216: IF goSelected%<guiCatalogCount% THEN goSelected%=goSelected%+1
+      =80,112: goSelected%=goSelected%-8 : IF goSelected%<1 THEN goSelected%=1
+      =78,110: goSelected%=goSelected%+8 : IF goSelected%>guiCatalogCount% THEN goSelected%=guiCatalogCount%
+      =10: goDone%=1 : EXIT goLoop
+      =76,108: guiImport : EXIT goLoop
+      =1
+        IF guiY%>=90 AND guiY%<474 AND guiX%>=40 AND guiX%<724 THEN
+          goSelected%=goFirst%+INT((guiY%-90)/48)
+          IF goSelected%<=guiCatalogCount% THEN goDone%=1 : EXIT goLoop
+        END IF
+    END SELect
+  END REPeat goLoop
+  IF goDone% THEN guiLoad guiFiles$(goSelected%),guiNames$(goSelected%)
+  guiDraw
+END DEFine
+
+DEFine PROCedure guiInput(VAL gxTitle$,VAL gxInitial$)
+  LOCal gxText$(255),gxShow$(255)
+  gxText$=gxInitial$ : guiPrompt$="" : guiPromptOK%=0
+  REPeat gxLoop
+    BLOCK #4,720,150,24,200,$D8DFD4
+    INK #4,$24302D : STRIP #4,$D8DFD4 : guiText 40,216,gxTitle$
+    gxShow$=gxText$ : IF LEN(gxShow$)>108 THEN gxShow$=gxShow$(LEN(gxShow$)-107 TO)
+    guiText 40,250,gxShow$ & "_"
+    guiText 40,300,"Enter accepts. Esc cancels. Ctrl+U clears. Backspace erases."
+    guiEvent
+    SELect ON guiKey%
+      =27: EXIT gxLoop
+      =10: guiPromptOK%=1 : guiPrompt$=gxText$ : EXIT gxLoop
+      =21: gxText$=""
+      =8,194: IF LEN(gxText$) THEN gxText$=gxText$(1 TO LEN(gxText$)-1)
+      =32 TO 126: IF LEN(gxText$)<255 THEN gxText$=gxText$ & CHR$(guiKey%)
+    END SELect
+  END REPeat gxLoop
+END DEFine
+
+DEFine PROCedure guiJump
+  LOCal gjText$(255),gjI%,gjValue,gjGood%,gjCode%
+  IF NOT playReady% THEN RETurn
+  gjText$=guiPuzzle% : guiInput "Jump to puzzle number",gjText$
+  IF guiPromptOK% THEN
+    gjValue=0 : gjGood%=(LEN(guiPrompt$)>0 AND LEN(guiPrompt$)<=5)
+    FOR gjI%=1 TO LEN(guiPrompt$)
+      gjCode%=CODE(guiPrompt$(gjI%))-48
+      IF gjCode%<0 OR gjCode%>9 THEN gjGood%=0
+      IF gjGood% THEN gjValue=gjValue*10+gjCode%
+    END FOR gjI%
+    IF gjGood% AND gjValue>=1 AND gjValue<=packDoc.puzzleCount% THEN
+      guiSelect gjValue
+    ELSE
+      playMessage$="Enter a puzzle number within this pack."
+    END IF
+  END IF
+  guiDraw
+END DEFine
+
+DEFine PROCedure guiImport
+  guiInput "Load generator JSON: enter a QL filename (e.g. nfa1_mypack_json)",guiRoot$
+  IF guiPromptOK% AND LEN(guiPrompt$)>0 THEN guiLoad guiPrompt$,guiPrompt$
   guiDraw
 END DEFine
 
 DEFine PROCedure guiMove
-  POKE_L PEEK_L(guiWindow)+$20,guiPosition
-  BCHWIN guiWindow
-  guiBind
-  guiDraw
-  guiPosition=BRPTR(48,0,guiWindow)
+  POKE_L PEEK_L(guiWindow)+$20,guiPosition : BCHWIN guiWindow
+  guiBind : guiDraw : guiPosition=BRPTR(48,0,guiWindow)
 END DEFine
 
 DEFine PROCedure guiClose
@@ -246,4 +705,14 @@ DEFine PROCedure guiClose
   IF guiWindow THEN BUNST guiWindow : BRCHP guiWindow
   IF guiChannel THEN CLOS guiChannel
   IF guiDefinition THEN BRCHP guiDefinition
+END DEFine
+
+DEFine PROCedure guiSessionSave
+  LOCal gzChannel%
+  IF NOT playReady% OR LEN(guiPackFile$)=0 THEN RETurn
+  gzChannel%=FOP_OVER(guiRoot$ & "tangles_session")
+  IF gzChannel%<0 THEN RETurn
+  PRINT #gzChannel%,guiPackFile$
+  PRINT #gzChannel%,guiPuzzle%
+  CLOSE #gzChannel%
 END DEFine

@@ -5,7 +5,7 @@ open System.Text.Json
 open System.IO
 open System.Text
 
-type PlayablePuzzle = { Id: string; Puzzle: Puzzle }
+type PlayablePuzzle = { Id: string; Puzzle: Puzzle; Solution: SolutionPath list option }
 type PlayablePack = { Puzzles: PlayablePuzzle array }
 type PackCatalogEntry = { Name: string; Path: string }
 
@@ -28,6 +28,19 @@ module PuzzlePacks =
 
     let private cell (element: JsonElement) = { X = integer "x" element; Y = integer "y" element }
 
+    // Hints are optional. Missing or invalid witnesses must not prevent play,
+    // and verification claims in the file cannot substitute for validation.
+    let private hintSolution board entry =
+        try
+            let paths =
+                (property "solution" entry).EnumerateArray()
+                |> Seq.map (fun path ->
+                    { Label = text "label" path
+                      Cells = (property "cells" path).EnumerateArray() |> Seq.map cell |> List.ofSeq })
+                |> List.ofSeq
+            if Validation.solution board paths |> List.isEmpty then Some paths else None
+        with _ -> None
+
     /// Static hosts list available packs explicitly; descriptions come from the
     /// validated packs themselves rather than duplicated catalogue metadata.
     let readCatalog (json: string) : Result<PackCatalogEntry array, string> =
@@ -43,8 +56,8 @@ module PuzzlePacks =
             |> Ok
         with error -> Error ("Could not load pack list: " + error.Message)
 
-    /// Load only clues from the generator's v1 format. Stored solutions and
-    /// verification claims are deliberately not part of the playable model.
+    /// Load clues and optional validated hint paths from the generator's v1
+    /// format. Completion still accepts any route satisfying the puzzle rules.
     let read (json: string) : Result<PlayablePack, string> =
         try
             if json.Length > 5 * 1024 * 1024 then failwith "Puzzle packs must be smaller than 5 MB."
@@ -77,7 +90,7 @@ module PuzzlePacks =
                         |> List.ofSeq
                     let board = { Width = width; Height = height; RequireFullCoverage = requireFullCoverage; Pairs = pairs }
                     match Validation.puzzle board with
-                    | [] -> { Id = text "id" entry; Puzzle = board }
+                    | [] -> { Id = text "id" entry; Puzzle = board; Solution = hintSolution board entry }
                     | errors -> failwith (String.concat " " errors))
                 |> Array.ofSeq
             let conflictingIds =

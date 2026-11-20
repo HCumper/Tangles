@@ -103,7 +103,7 @@ let ``solver JSON becomes the primary grade and retains the original geometry es
     Assert.Equal("cell-domain-reasoning-v1", document.Difficulty.Method)
     Assert.Equal("reasoningEstimate", document.Verification.Difficulty)
     Assert.Equal("unique", document.Verification.Uniqueness)
-    Assert.Equal("solver-guided-hamiltonian-partition-v1", pack.Generation.Algorithm)
+    Assert.Equal("solver-guided-hamiltonian-partition-v5", pack.Generation.Algorithm)
     let old = Difficulty.assess puzzle.Puzzle
     Assert.Equal(old.Score, document.Difficulty.GeometricEstimate.Value.Score)
     Assert.Equal<Difficulty.Component array>(old.Components, document.Difficulty.GeometricEstimate.Value.Components)
@@ -184,7 +184,7 @@ let ``trial floors are enforced and exported without changing the game rules`` (
     let puzzle = GuidedGeneration.generate CancellationToken.None options policy |> require
     Assert.True(puzzle.Quality.Value.Reasoning.Value.TrialSteps >= 25)
     let pack = Export.createPack options [|puzzle|]
-    Assert.Equal("solver-guided-hamiltonian-partition-v2",pack.Generation.Algorithm)
+    Assert.Equal("solver-guided-hamiltonian-partition-v6",pack.Generation.Algorithm)
     Assert.Equal(25,pack.Generation.Selection.Value.MinTrials)
     Assert.Equal(25,pack.Puzzles[0].Selection.Value.MinTrials)
     Assert.Equal(puzzle.Puzzle,(Export.toJson pack |> PuzzlePacks.read |> require).Puzzles[0].Puzzle)
@@ -206,7 +206,7 @@ let ``expert floors select and export first-answer depth and effort`` () =
     let pack = Export.createPack options [|first|]
     Assert.Equal(1,pack.Generation.Selection.Value.MinBranchDepth)
     Assert.Equal(1,pack.Generation.Selection.Value.MinFirstSolutionNodes)
-    Assert.Equal("solver-guided-hamiltonian-partition-v2",pack.Generation.Algorithm)
+    Assert.Equal("solver-guided-hamiltonian-partition-v6",pack.Generation.Algorithm)
 
 [<Fact>]
 let ``CLI validates reasoning floors and restricts depth floors to expert`` () =

@@ -35,7 +35,7 @@ h1 { margin:0; font-family:Georgia,"Times New Roman",serif; font-size:43px; font
 .endpoint-label { fill:#172737; font-family:ui-sans-serif,system-ui,sans-serif; font-size:19px; font-weight:800; }
 #keyboard-cursor { visibility:hidden; fill:none; stroke:white; stroke-width:2; stroke-dasharray:5 4; }
 .board-placeholder { display:grid; place-items:center; min-height:400px; color:#d1d9dd; text-align:center; padding:20px; }
-.board-toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; padding-top:16px; }
+.board-toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; padding-top:16px; }
 .edit-actions { display:flex; gap:8px; }
 .save-note { font-size:10px; color:var(--muted); text-align:right; }
 .sidebar { display:flex; flex-direction:column; gap:17px; padding-top:39px; }

@@ -140,7 +140,7 @@ let ``generated witnesses satisfy an independent rule checker across seeds`` wid
 
 [<Fact>]
 let ``generation and export are reproducible from a seed`` () =
-    let options = Generation.defaults -123
+    let options = Generation.defaults 123
     let first = generate options
     let second = generate options
     Assert.True((first = second))
@@ -201,13 +201,13 @@ let ``invalid witnesses cannot be exported as validated`` () =
     Assert.Throws<ArgumentException>(fun () -> Export.createPack options [| invalid |] |> ignore) |> ignore
 
 [<Fact>]
-let ``command line handles rectangular boards batches and negative seeds`` () =
-    match CommandLine.parse 99 [| "--width"; "7"; "--height"; "5"; "--pairs"; "4"; "--seed"; "-10"; "--count"; "3"; "--show-solution" |] with
+let ``command line handles rectangular boards batches and nonnegative seeds`` () =
+    match CommandLine.parse 99 [| "--width"; "7"; "--height"; "5"; "--pairs"; "4"; "--seed"; "10"; "--count"; "3"; "--show-solution" |] with
     | Ok (Generate options) ->
         Assert.Equal(7, options.Generation.Width)
         Assert.Equal(5, options.Generation.Height)
         Assert.Equal(4, options.Generation.PairCount)
-        Assert.Equal(-10, options.Generation.Seed)
+        Assert.Equal(10, options.Generation.Seed)
         Assert.Equal(3, options.Count)
         Assert.True(options.ShowSolution)
     | _ -> failwith "Expected a valid generation command."
@@ -250,7 +250,7 @@ let ``full coverage witnesses fill every cell without self contact across seeds`
 
 [<Fact>]
 let ``full coverage generation is reproducible`` () =
-    let options = { Generation.defaults -123 with Mode = FullCoverage }
+    let options = { Generation.defaults 123 with Mode = FullCoverage }
     let first, second = generate options, generate options
     Assert.Equal(first, second)
     Assert.Equal(Export.toJson (Export.createPack options [| first |]), Export.toJson (Export.createPack options [| second |]))
@@ -334,7 +334,7 @@ let ``exports distinguish the new full coverage algorithm and preserve connect o
     Assert.Equal("tangles-5860d9285de33d0007e8e7b55bfbe3614b052cdcd4336ce589fd368fee142328", connect.Puzzles[0].Id)
     let fullOptions = { options with Mode = FullCoverage }
     let full = Export.createPack fullOptions [|generate fullOptions|]
-    Assert.Equal("hamiltonian-path-partition-v2", full.Generation.Algorithm)
+    Assert.Equal("hamiltonian-path-partition-v3", full.Generation.Algorithm)
 
 [<Theory>]
 [<InlineData(1)>]

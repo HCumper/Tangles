@@ -16,4 +16,10 @@
     <Compile Include="Main.fs" />
     <Compile Include="Startup.fs" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../puzzles/*-20261120.json;../../puzzles/ramp-*.json"
+             Link="wwwroot/packs/%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

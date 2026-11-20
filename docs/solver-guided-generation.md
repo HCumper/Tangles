@@ -94,12 +94,15 @@ invariant or a calibrated human rating.
 
 ## Candidate selection and improvement
 
-Full-coverage targets use `solver-guided-hamiltonian-partition-v1`:
+Full-coverage targets use `solver-guided-hamiltonian-partition-v5` (or `v6`
+when reasoning floors are requested):
 
 1. Mix a fresh Hamiltonian traversal using the shared backbite implementation.
 2. Search for an exact split into induced paths within the requested lengths.
-   Larger boards get longer uninterrupted descent before restarting. The fast
-   generator's structured fallback is not used to satisfy a difficulty target.
+   Larger boards get longer uninterrupted descent before restarting. Exact-length
+   settings also try a structured start early; otherwise the final proposal can
+   try one if mixed searches have produced no assessable layout. Structured
+   witnesses undergo the same exact difficulty checks as every other candidate.
 3. Assess a valid candidate from its endpoints only.
 4. Apply 1..4 backbites and cut again. Keep proposals that improve the target's
    reasoning tier/refutation count, allowing equal-score moves for exploration.
@@ -111,11 +114,14 @@ branching. Expert is a separate explicit choice. An easier puzzle is never
 silently substituted for an unmet target.
 
 Selected batches exclude duplicate clue layouts, ignoring labels, pair order
-and endpoint direction. Rotations/reflections remain distinct. They retry failed
-requests with deterministic new seeds, retain each puzzle's replayable request
+and endpoint direction. Rotations/reflections are also excluded using a separate selection key; assessment keys and progress IDs retain their original orientation. They retry failed
+requests with deterministic, separately derived batch seeds, retain each puzzle's replayable request
 seed, and sort full-coverage output by score and trial count. Every player still
 accepts any valid completion; uniqueness is a generation property, not an added
-game rule. `--require-unique` explicitly enforces it for otherwise unfiltered
+game rule. Seeds are nonnegative integers; `generation.batchSeedAlgorithm`
+records the versioned batch derivation. See [reliability and replay](generator-reliability.md)
+for seed compatibility, error handling and explicit work counters.
+`--require-unique` explicitly enforces it for otherwise unfiltered
 selection as well.
 
 ## Budgets and limits
@@ -193,9 +199,9 @@ branch; it is not a minimum over all search orders, or a count of guesses a
 human must make. The total `searchNodes` includes subsequent uniqueness work.
 
 When any minimum is enabled, generation records
-`solver-guided-hamiltonian-partition-v2`. Expert depth/effort floors also make
+`solver-guided-hamiltonian-partition-v6`. Expert depth/effort floors also make
 hill-climbing and pack ordering prefer first-answer depth, then first-answer
-nodes, then trial count. Otherwise v1 generation order is preserved. The
+nodes, then trial count. Without floors, v5 selection priorities are used. The
 `cell-domain-reasoning-v1` tiers and displayed score formulas are unchanged;
 the new measurements are additive. Generation policy and per-puzzle selection
 metadata retain all three floors so the selection can be replayed.
@@ -256,3 +262,7 @@ Reproduce the paired comparison with a preserved baseline pack:
 dotnet build src/Tangles.Generator -c Release --disable-build-servers
 dotnet fsi --reference:src/Tangles.Core/bin/Release/net11.0/Tangles.Core.dll --reference:src/Tangles.Generator/bin/Release/net11.0/Tangles.Generator.dll tools/benchmark-reasoning.fsx artifacts/harder-puzzles/before-8x8.json artifacts/harder-puzzles/reasoning-8x8.json
 ```
+
+Optional upper effort bounds, cut weighting and mixed-grade ramps are described
+in [pack quality](pack-quality.md). Bounds remain unset by default; their
+selection policy is recorded as `symmetry-effort-v1`.

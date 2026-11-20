@@ -64,6 +64,14 @@ type App() as this =
         | Some loaded -> "tangles.player.v1." + loaded.Puzzles[current].Id
         | None -> ""
 
+    member private _.HintPaths =
+        match pack, game with
+        | Some loaded, Some state ->
+            loaded.Puzzles[current].Solution
+            |> Option.map (fun solution -> Play.hintCandidates solution state)
+            |> Option.defaultValue []
+        | _ -> []
+
     member private _.Save() = task {
         match game with
         | Some state ->
@@ -245,6 +253,7 @@ type App() as this =
             match game with
             | None -> ()
             | Some state ->
+                let mutable feedback = ""
                 let result =
                     match action with
                     | "begin" -> Play.start { X = x; Y = y } state
@@ -252,11 +261,24 @@ type App() as this =
                     | "end" -> Ok (Play.finish state)
                     | "undo" -> Ok (Play.undo state)
                     | "reset" -> Ok (Play.reset state)
+                    | "hint" ->
+                        let candidates = this.HintPaths |> List.toArray
+                        if candidates.Length = 0 then Error "No hint is available for this puzzle."
+                        else
+                            let path = candidates[Random.Shared.Next candidates.Length]
+                            Play.reveal path state
+                            |> Result.map (fun next ->
+                                let cleared = state.Paths |> Map.toList |> List.filter (fun (label, _) -> not (next.Paths.ContainsKey label)) |> List.length
+                                feedback <-
+                                    if cleared = 0 then $"Filled colour {path.Label}. Undo will restore your previous paths."
+                                    elif cleared = 1 then $"Filled colour {path.Label} and cleared one conflicting path. Undo restores both."
+                                    else $"Filled colour {path.Label} and cleared {cleared} conflicting paths. Undo restores them."
+                                next)
                     | _ -> Error "Unknown board action."
                 match result with
-                | Ok next -> game <- Some next; notice <- ""; accepted <- true
+                | Ok next -> game <- Some next; notice <- feedback; accepted <- true
                 | Error message -> notice <- message
-                if action = "end" || action = "undo" || action = "reset" then do! this.Save()
+                if action = "end" || action = "undo" || action = "reset" || action = "hint" then do! this.Save()
                 this.Refresh()
         return accepted
     }
@@ -315,6 +337,7 @@ type App() as this =
         let completed = game |> Option.map Play.completedCount |> Option.defaultValue 0
         let pairCount = game |> Option.map (fun g -> g.Puzzle.Pairs.Length) |> Option.defaultValue 0
         let solved = game |> Option.exists Play.isComplete
+        let hintAvailable = not this.HintPaths.IsEmpty
         let fullCoverage = game |> Option.exists _.Puzzle.RequireFullCoverage
         let filled = game |> Option.map (Play.paths >> List.sumBy (fun path -> path.Cells.Length)) |> Option.defaultValue 0
         let squareCount = game |> Option.map (fun state -> state.Puzzle.Width * state.Puzzle.Height) |> Option.defaultValue 0
@@ -381,6 +404,13 @@ type App() as this =
                                 attr.``class`` "edit-actions"
                                 this.Button("↶ Undo", busy || (game |> Option.forall (fun s -> s.History.IsEmpty && s.BeforeStroke.IsNone)), fun () -> this.BoardInput("undo", 0, 0) |> ignore)
                                 this.Button("Reset", busy || (game |> Option.forall _.Paths.IsEmpty), fun () -> this.BoardInput("reset", 0, 0) |> ignore)
+                                button {
+                                    attr.id "hint-button"; attr.``type`` "button"
+                                    attr.disabled (busy || not hintAvailable)
+                                    "title" => (if solved then "Puzzle complete" elif not hintAvailable then "Hints need a valid stored solution in the puzzle pack" else "Fill a random colour using the stored solution")
+                                    on.click (fun _ -> this.BoardInput("hint", 0, 0) |> ignore)
+                                    "Hint"
+                                }
                             }
                             span { attr.``class`` "save-note"; "Progress stays in this browser" }
                         }

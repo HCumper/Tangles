@@ -94,13 +94,7 @@ module Difficulty =
         // Canonical order makes the report independent of pair-list order.
         let pairs = board.Pairs |> List.toArray |> Array.sortWith (fun a b -> StringComparer.Ordinal.Compare(a.Label, b.Label))
         let owners = Array.create cells -1
-        let neighbours =
-            Array.init cells (fun cell ->
-                let x, y = cell % width, cell / width
-                [| if x > 0 then cell - 1
-                   if x + 1 < width then cell + 1
-                   if y > 0 then cell - width
-                   if y + 1 < height then cell + width |])
+        let neighbours = GenerationSupport.neighbours width height
         for pairIndex in 0 .. pairs.Length - 1 do
             owners[index pairs[pairIndex].Start] <- pairIndex
             owners[index pairs[pairIndex].Finish] <- pairIndex

@@ -22,5 +22,7 @@
     <Compile Include="DifficultyTests.fs" />
     <Compile Include="SolverTests.fs" />
     <Compile Include="GuidedGenerationTests.fs" />
+    <Compile Include="GenerationRegressionTests.fs" />
+    <Compile Include="PackQualityTests.fs" />
   </ItemGroup>
 </Project>

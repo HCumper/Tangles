@@ -58,12 +58,7 @@ module Solver =
         let text = $"{board.Width}x{board.Height}:{board.RequireFullCoverage}:{pairs}"
         SHA256.HashData(Encoding.UTF8.GetBytes text) |> Convert.ToHexString
 
-    let private neighbours width height =
-        Array.init (width * height) (fun c ->
-            [| if c % width > 0 then c - 1
-               if c % width + 1 < width then c + 1
-               if c >= width then c - width
-               if c + width < width * height then c + width |])
+    let private neighbours = GenerationSupport.neighbours
 
     let private canonicalPairs (board: Puzzle) =
         let index (c: Cell) = c.Y * board.Width + c.X
@@ -152,15 +147,18 @@ module Solver =
                                             elif fixedCount = required[cell] then
                                                 if update dom next (dom[next] &&& (~~~bit)) record false then changed <- true
 
+            let discovery = Array.zeroCreate<int> count
+            let low = Array.zeroCreate<int> count
+            let mandatory = Array.zeroCreate<bool> count
             let routes (dom: uint64 array) record =
                 let mutable changed = false
                 for colour in 0 .. k - 1 do
                     spend ()
                     let bit = 1UL <<< colour
                     let a,b = ends[colour]
-                    let discovery = Array.create count -1
-                    let low = Array.zeroCreate count
-                    let mandatory = Array.create count false
+                    Array.Fill(discovery, -1)
+                    Array.Clear low
+                    Array.Clear mandatory
                     let mutable clock = 0
                     // Tarjan low links identify every vertex separating the two
                     // endpoints in one DFS, rather than one flood-fill per cell.
@@ -340,12 +338,7 @@ module Solver =
             owner[index pairs[i].Start] <- i
             owner[index pairs[i].Finish] <- i
         let random = Random 0x54414E47
-        let shuffle (a: 'a array) =
-            for i in a.Length - 1 .. -1 .. 1 do
-                let j = random.Next(i + 1)
-                let temp = a[i]
-                a[i] <- a[j]
-                a[j] <- temp
+        let shuffle items = GenerationSupport.shuffle random items
         let mutable usedTrials = 0
         let mutable success = None
         while usedTrials < trials && success.IsNone do

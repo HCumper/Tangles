@@ -8,6 +8,7 @@ type GenerationMode = ConnectOnly | FullCoverage
 
 type GenerationOptions =
     { Mode: GenerationMode
+      CutStyle: CutStyle
       Width: int
       Height: int
       PairCount: int
@@ -21,13 +22,26 @@ type GeneratedPuzzle =
       Solution: SolutionPath list
       Seed: int
       Attempts: int
-      Quality: GenerationPolicy.Report option }
+      Quality: GenerationPolicy.Report option
+      Work: GenerationWork }
+
+type private GrowthWorkspace(count) =
+    member val Local = Array.zeroCreate<bool> count
+    member val Starts = Array.zeroCreate<int> count
+    member val Path = ResizeArray<int>()
+    member val Candidates = Array.zeroCreate<int array> (count + 1)
 
 module Generation =
-    let fullCoverageAlgorithm = "hamiltonian-path-partition-v2"
+    let fullCoverageAlgorithm = "hamiltonian-path-partition-v3"
+
+    let algorithm (options: GenerationOptions) =
+        if options.Mode = ConnectOnly then "random-path-growth-v1"
+        elif options.CutStyle = VariedCuts then "hamiltonian-path-partition-varied-v1"
+        else fullCoverageAlgorithm
 
     let defaults seed =
         { Mode = ConnectOnly
+          CutStyle = RandomCuts
           Width = 8
           Height = 8
           PairCount = 6
@@ -36,12 +50,16 @@ module Generation =
           MaxAttempts = 500
           Seed = seed }
 
-    let validateOptions options =
-        [ if options.Width < 1 || options.Width > 64
+    let validateOptions (options: GenerationOptions) =
+        [ if options.Seed < 0 then
+              "Seed must be between 0 and 2147483647. Negative seeds are not supported; use the corresponding positive seed for older packs."
+          if options.Width < 1 || options.Width > 64
              || options.Height < 1 || options.Height > 64 then
               "Width and height must each be between 1 and 64."
           if options.PairCount < 1 then
               "The number of pairs must be positive."
+          if options.CutStyle <> RandomCuts && options.Mode <> FullCoverage then
+              "--cut-style varied requires full-coverage mode."
           if options.MinPathLength < 2 then
               "Minimum path length must be at least 2, including endpoints."
           if options.MaxPathLength < options.MinPathLength then
@@ -57,24 +75,18 @@ module Generation =
               if options.PairCount = 1 && options.Width > 1 && options.Height > 1 then
                   "One path cannot fill a two-dimensional rectangle without touching itself." ]
 
-    let private shuffle (random: Random) (items: 'a array) =
-        for i in items.Length - 1 .. -1 .. 1 do
-            let j = random.Next(i + 1)
-            let value = items[i]
-            items[i] <- items[j]
-            items[j] <- value
-
-    let private label index =
-        if index < 26 then string (char (int 'A' + index)) else string (index + 1)
-
     /// Search only a bounded number of extensions. Failure is a failed attempt,
     /// not a proof that the requested configuration is impossible.
     let private tryGrowPath (random: Random) (cancellation: CancellationToken)
-                            (neighbours: int array array) (occupied: bool array) targetLength =
-        let local = Array.create occupied.Length false
-        let path = ResizeArray<int>()
-        let starts = [| for i in 0 .. occupied.Length - 1 do if not occupied[i] then i |]
-        shuffle random starts
+                            (neighbours: int array array) (occupied: bool array) (scratch: GrowthWorkspace) targetLength =
+        let local, path, starts = scratch.Local, scratch.Path, scratch.Starts
+        path.Clear()
+        let mutable startCount = 0
+        for i in 0 .. occupied.Length - 1 do
+            if not occupied[i] then
+                starts[startCount] <- i
+                startCount <- startCount + 1
+        GenerationSupport.shufflePrefix random starts startCount
         let mutable budget = 2048
 
         let rec extend current =
@@ -86,17 +98,22 @@ module Generation =
             elif budget <= 0 then
                 false
             else
-                let candidates =
-                    neighbours[current]
-                    |> Array.filter (fun next ->
-                        not occupied[next] && not local[next]
-                        && (neighbours[next] |> Array.sumBy (fun n -> if local[n] then 1 else 0)) = 1)
-
-                shuffle random candidates
+                let depth = path.Count
+                if isNull scratch.Candidates[depth] then scratch.Candidates[depth] <- Array.zeroCreate 4
+                let candidates = scratch.Candidates[depth]
+                let mutable candidateCount = 0
+                for next in neighbours[current] do
+                    if not occupied[next] && not local[next] then
+                        let mutable touches = 0
+                        for n in neighbours[next] do if local[n] then touches <- touches + 1
+                        if touches = 1 then
+                            candidates[candidateCount] <- next
+                            candidateCount <- candidateCount + 1
+                GenerationSupport.shufflePrefix random candidates candidateCount
                 let mutable found = false
                 let mutable index = 0
 
-                while not found && index < candidates.Length && budget > 0 do
+                while not found && index < candidateCount && budget > 0 do
                     let next = candidates[index]
                     local[next] <- true
                     path.Add next
@@ -113,7 +130,7 @@ module Generation =
         let mutable found = false
         let mutable index = 0
 
-        while not found && index < starts.Length && budget > 0 do
+        while not found && index < startCount && budget > 0 do
             let start = starts[index]
             local[start] <- true
             path.Add start
@@ -125,152 +142,104 @@ module Generation =
 
             index <- index + 1
 
-        if found then Some (path.ToArray()) else None
+        if found then
+            let cells = path.ToArray()
+            for cell in cells do local[cell] <- false
+            Some cells
+        else None
 
-    /// Each candidate is a Hamiltonian traversal. Split it into disjoint induced
-    /// paths: any nonconsecutive neighbouring cells must be in different paths.
-    /// Backbite moves preserve the traversal; bounded local search seeks layouts
-    /// which can be split into exactly the requested number of paths.
-    let private tryCover (random: Random) (cancellation: CancellationToken)
-                         (neighbours: int array array) options =
-        let count = options.Width * options.Height
-        let search = CoverageSearch(options.Width, options.Height, options.PairCount, options.MinPathLength, options.MaxPathLength, random, cancellation)
-        let freshTraversal mix = search.Fresh mix
-        let analyse order positions = search.Analyse(order, positions)
-        let partition order ends = search.Partition(order, ends)
-        let backbite order positions = search.Backbite(order, positions)
-        let initialOrder, initialPositions, initialScore = freshTraversal true
-        let mutable order = initialOrder
-        let mutable positions = initialPositions
-        let mutable score = initialScore
-        let mutable attempt = 0
-        let mutable firstSuccess: int option = None
-        let mutable result = None
-        // Keep a valid witness while exploring further layouts for variety.
-        let refinement = max 64 count
-        // Reserve up to 128 candidates for a structured search with tight bounds,
-        // well-mixed traversal may be very difficult to partition. Never replace
-        // an already found mixed witness with this fallback.
-        let fallbackAt = if options.MaxAttempts >= 128 then max 64 (options.MaxAttempts - 128) else -1
-        let mutable sinceRestart = 0
-        while attempt < options.MaxAttempts
-              && (firstSuccess.IsNone || attempt - firstSuccess.Value < refinement) do
-            cancellation.ThrowIfCancellationRequested()
-            if firstSuccess.IsNone && attempt > 0 && (sinceRestart = 128 || attempt = fallbackAt) then
-                let resetOrder, resetPositions, resetScore = freshTraversal (attempt <> fallbackAt)
-                order <- resetOrder
-                positions <- resetPositions
-                score <- resetScore
-                sinceRestart <- 0
-            let candidate, nextPositions = Array.copy order, Array.copy positions
-            if sinceRestart > 0 then
-                // Periodic larger proposals help leave plateaux in the segment
-                // count without spending more partition evaluations.
-                let moves = if sinceRestart % 8 = 0 then max 2 (count / 4) else 1
-                for _ in 1 .. moves do
-                    cancellation.ThrowIfCancellationRequested()
-                    backbite candidate nextPositions
-            attempt <- attempt + 1
-            sinceRestart <- sinceRestart + 1
-            let ends, nextScore = analyse candidate nextPositions
-            if nextScore <= options.PairCount then
-                match partition candidate ends with
-                | Some paths ->
-                    result <- Some paths
-                    if firstSuccess.IsNone then firstSuccess <- Some attempt
-                | None -> ()
-            if nextScore <= score || random.NextDouble() < exp (float (score - nextScore) / 0.4) then
-                order <- candidate
-                positions <- nextPositions
-                score <- nextScore
-        result |> Option.map (fun paths -> paths, attempt)
+    let internal makeGenerated options attempt work (solution: SolutionPath list) =
+        if solution.Length <> options.PairCount
+           || (solution |> List.exists (fun path -> path.Cells.Length < options.MinPathLength || path.Cells.Length > options.MaxPathLength)) then
+            Error (GenerationFailure.create InternalFailure "Internal solution validation failed: path count or length does not match the requested bounds." work)
+        else
+            let board =
+                { Width = options.Width
+                  Height = options.Height
+                  RequireFullCoverage = options.Mode = FullCoverage
+                  Pairs =
+                    solution |> List.map (fun path ->
+                        { Label = path.Label; Start = List.head path.Cells; Finish = List.last path.Cells }) }
+            match Validation.solution board solution with
+            | [] -> Ok { Puzzle = board; Solution = solution; Seed = options.Seed; Attempts = attempt; Quality = None; Work = work }
+            | errors -> Error (GenerationFailure.create InternalFailure ("Internal solution validation failed: " + String.concat " " errors) work)
 
-    let private makeGenerated options attempt (solution: SolutionPath list) =
-        let board =
-            { Width = options.Width
-              Height = options.Height
-              RequireFullCoverage = options.Mode = FullCoverage
-              Pairs =
-                solution |> List.map (fun path ->
-                    { Label = path.Label; Start = List.head path.Cells; Finish = List.last path.Cells }) }
-        { Puzzle = board; Solution = solution; Seed = options.Seed; Attempts = attempt; Quality = None }
+    let internal fromPaths options attempt work (paths: int array array) =
+        let solution =
+            paths |> Array.mapi (fun i cells ->
+                { Label = GenerationSupport.label i
+                  Cells = cells |> Array.map (fun cell -> { X = cell % options.Width; Y = cell / options.Width }) |> List.ofArray })
+            |> List.ofArray
+        makeGenerated options attempt work solution
 
-    let generate (cancellation: CancellationToken) options : Result<GeneratedPuzzle, string> =
+    let internal generateResult (cancellation: CancellationToken) (options: GenerationOptions) : Result<GeneratedPuzzle, GenerationFailure> =
         match validateOptions options with
-        | _ :: _ as errors -> Error (String.concat " " errors)
+        | _ :: _ as errors -> Error (GenerationFailure.create InvalidOptions (String.concat " " errors) GenerationWork.zero)
         | [] ->
             let random = Random options.Seed
             let cellCount = options.Width * options.Height
 
-            let neighbours =
-                Array.init cellCount (fun index ->
-                    let x, y = index % options.Width, index / options.Width
-                    [| if x > 0 then index - 1
-                       if x + 1 < options.Width then index + 1
-                       if y > 0 then index - options.Width
-                       if y + 1 < options.Height then index + options.Width |])
+            match options.Mode with
+            | FullCoverage ->
+                let search = CoverageSearch(options.Width, options.Height, options.PairCount, options.MinPathLength, options.MaxPathLength, random, cancellation, options.CutStyle)
+                let fallbackAt = if options.MaxAttempts >= 128 then max 64 (options.MaxAttempts - 128) else -1
+                match search.Find(options.MaxAttempts, 128, max 64 cellCount, fallbackAt, true) with
+                | Some layout -> fromPaths options search.Work.TraversalEvaluations search.Work layout.Paths
+                | None ->
+                    Error (GenerationFailure.create SearchExhausted
+                        $"No candidate found after {search.Work.TraversalEvaluations} attempts (seed {options.Seed}). Try another seed, more attempts, or different pair/path-length settings. This does not prove impossibility."
+                        search.Work)
+            | ConnectOnly ->
+                let neighbours = GenerationSupport.neighbours options.Width options.Height
+                let scratch = GrowthWorkspace cellCount
+                let mutable attempt = 0
+                let mutable result = None
+                while result.IsNone && attempt < options.MaxAttempts do
+                    cancellation.ThrowIfCancellationRequested()
+                    attempt <- attempt + 1
+                    let occupied = Array.create cellCount false
+                    let paths = ResizeArray<SolutionPath>()
+                    let mutable freeCount = cellCount
+                    let mutable failed = false
 
-            let mutable attempt = 0
-            let mutable result = None
+                    while not failed && paths.Count < options.PairCount do
+                        let remainingPairs = options.PairCount - paths.Count - 1
+                        let maximum = min options.MaxPathLength (freeCount - remainingPairs * options.MinPathLength)
+                        let target = random.Next(options.MinPathLength, maximum + 1)
 
-            if options.Mode = FullCoverage then
-                match tryCover random cancellation neighbours options with
-                | Some (paths, attempts) ->
-                    let solution =
-                        paths |> Array.mapi (fun i indices ->
-                            { Label = label i
-                              Cells = indices |> Array.map (fun index -> { X = index % options.Width; Y = index / options.Width }) |> List.ofArray })
-                        |> List.ofArray
-                    result <- Some (makeGenerated options attempts solution)
-                | None -> ()
+                        let grown =
+                            match tryGrowPath random cancellation neighbours occupied scratch target with
+                            | Some cells -> Some cells
+                            | None when target <> options.MinPathLength ->
+                                tryGrowPath random cancellation neighbours occupied scratch options.MinPathLength
+                            | None -> None
 
-            while options.Mode = ConnectOnly && result.IsNone && attempt < options.MaxAttempts do
-                cancellation.ThrowIfCancellationRequested()
-                attempt <- attempt + 1
-                let occupied = Array.create cellCount false
-                let paths = ResizeArray<SolutionPath>()
-                let mutable freeCount = cellCount
-                let mutable failed = false
+                        match grown with
+                        | None -> failed <- true
+                        | Some indices ->
+                            for index in indices do
+                                occupied[index] <- true
 
-                while not failed && paths.Count < options.PairCount do
-                    let remainingPairs = options.PairCount - paths.Count - 1
-                    let maximum = min options.MaxPathLength (freeCount - remainingPairs * options.MinPathLength)
-                    let target = random.Next(options.MinPathLength, maximum + 1)
+                            freeCount <- freeCount - indices.Length
 
-                    let grown =
-                        match tryGrowPath random cancellation neighbours occupied target with
-                        | Some cells -> Some cells
-                        | None when target <> options.MinPathLength ->
-                            tryGrowPath random cancellation neighbours occupied options.MinPathLength
-                        | None -> None
+                            paths.Add
+                                { Label = GenerationSupport.label paths.Count
+                                  Cells =
+                                    indices
+                                    |> Array.map (fun index -> { X = index % options.Width; Y = index / options.Width })
+                                    |> List.ofArray }
 
-                    match grown with
-                    | None -> failed <- true
-                    | Some indices ->
-                        for index in indices do
-                            occupied[index] <- true
+                    if not failed then
+                        let solution = List.ofSeq paths
 
-                        freeCount <- freeCount - indices.Length
+                        result <- Some (makeGenerated options attempt { GenerationWork.zero with BoardAttempts = attempt } solution)
 
-                        paths.Add
-                            { Label = label paths.Count
-                              Cells =
-                                indices
-                                |> Array.map (fun index -> { X = index % options.Width; Y = index / options.Width })
-                                |> List.ofArray }
+                match result with
+                | Some generated -> generated
+                | None ->
+                    Error (GenerationFailure.create SearchExhausted
+                        $"No candidate found after {attempt} attempts (seed {options.Seed}). Try another seed or fewer/shorter paths. This does not prove impossibility."
+                        { GenerationWork.zero with BoardAttempts = attempt })
 
-                if not failed then
-                    let solution = List.ofSeq paths
-
-                    result <- Some (makeGenerated options attempt solution)
-
-            match result with
-            | None ->
-                let suggestion =
-                    if options.Mode = FullCoverage then "Try another seed, more attempts, or different pair/path-length settings."
-                    else "Try another seed or fewer/shorter paths."
-                Error $"No candidate found after {options.MaxAttempts} attempts (seed {options.Seed}). {suggestion} This does not prove impossibility."
-            | Some generated ->
-                match Validation.solution generated.Puzzle generated.Solution with
-                | [] -> Ok generated
-                | errors -> Error ("Internal solution validation failed: " + String.concat " " errors)
+    let generate cancellation options =
+        generateResult cancellation options |> Result.mapError _.Message

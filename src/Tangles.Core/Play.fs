@@ -77,6 +77,49 @@ module Play =
         if state.Paths.IsEmpty then state
         else { state with Paths = Map.empty; History = state.Paths :: state.History |> List.truncate 100 }
 
+    /// Prefer unconnected colours. If full coverage is still incomplete after
+    /// all pairs connect, offer routes that differ from the stored solution.
+    let hintCandidates (solution: SolutionPath list) state =
+        if isComplete state then []
+        else
+            let unfinished =
+                solution |> List.filter (fun path ->
+                    let pair = state.Puzzle.Pairs |> List.find (fun pair -> pair.Label = path.Label)
+                    state.Paths |> Map.tryFind path.Label
+                    |> Option.forall (fun cells ->
+                        cells.Length < 2 || (List.last cells <> pair.Start && List.last cells <> pair.Finish)))
+            if not unfinished.IsEmpty then unfinished
+            else
+                solution |> List.filter (fun path ->
+                    state.Paths |> Map.tryFind path.Label
+                    |> Option.forall (fun cells -> cells <> path.Cells && cells <> List.rev path.Cells))
+
+    /// Reveal one whole route, removing only paths it intersects. The complete
+    /// change, including removed paths, is a single undoable action.
+    let reveal (path: SolutionPath) state =
+        let joinsEndpoints =
+            state.Puzzle.Pairs |> List.tryFind (fun pair -> pair.Label = path.Label)
+            |> Option.exists (fun pair ->
+                match path.Cells with
+                | first :: _ when path.Cells.Length > 1 ->
+                    let last = List.last path.Cells
+                    (first = pair.Start && last = pair.Finish) || (first = pair.Finish && last = pair.Start)
+                | _ -> false)
+        match Validation.partialSolution state.Puzzle [ path ] with
+        | _ :: _ as errors -> Error (String.concat " " errors)
+        | [] when not joinsEndpoints -> Error "A hint must connect its matching endpoints."
+        | [] ->
+            let state = finish state
+            let occupied = Set.ofList path.Cells
+            let nextPaths =
+                state.Paths
+                |> Map.filter (fun label cells -> label <> path.Label && not (cells |> List.exists occupied.Contains))
+                |> Map.add path.Label path.Cells
+            let history =
+                if nextPaths = state.Paths then state.History
+                else state.Paths :: state.History |> List.truncate 100
+            Ok { state with Paths = nextPaths; History = history }
+
     let restore saved state =
         match Validation.partialSolution state.Puzzle saved with
         | [] -> Ok { state with Paths = saved |> List.map (fun p -> p.Label, p.Cells) |> Map.ofList; Active = None; BeforeStroke = None; History = [] }

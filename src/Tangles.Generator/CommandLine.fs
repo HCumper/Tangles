@@ -7,6 +7,7 @@ open System.Collections.Generic
 type CommandOptions =
     { Generation: GenerationOptions
       Selection: GenerationPolicy.Options
+      Ramp: RampSpec option
       Count: int
       OutputPath: string option
       ShowSolution: bool
@@ -25,14 +26,17 @@ Usage: Tangles.Generator [options]
   --pairs N          Number of endpoint pairs (default 6)
   --min-length N     Minimum path cells, including endpoints (default 4)
   --max-length N     Maximum path cells, including endpoints (default 16)
-  --seed N           Reproducible integer seed (random when omitted)
+  --seed N           Reproducible seed, 0..2147483647 (random when omitted)
   --count N          Puzzles in this batch, 1..10000 (default 1)
   --max-attempts N   Candidate attempts per puzzle, 1..10000 (default 500)
   --difficulty D    Full-coverage target: any (default), easy, medium, hard, expert
+  --ramp RANGE      Compose exact graded sections, e.g. easy..hard (default count 12)
+  --cut-style STYLE random (default) or modest varied weighting; full coverage only
   --candidates N    Bounded selection proposals, 1..10000 (default 100)
   --improve-steps N Further proposals after reaching the target, 0..10000 (default 100)
   --solver-work N   Deterministic work budget per assessment (default 2000000)
   --min-trials N    Minimum contradiction eliminations for hard/expert (default 0)
+  --max-trials N    Optional maximum contradiction eliminations (unset by default)
   --min-depth N     Expert: minimum branch depth to the first answer (default 0)
   --min-search-nodes N  Expert: minimum nodes before the first answer (default 0)
   --assess          Record clue-only solver reasoning and solution-count evidence
@@ -48,8 +52,11 @@ Connect-only allows unused cells; full-coverage requires every square to be used
 Hard uses contradiction trials; expert allows branching. Targets are exact.
 Targeted full-coverage search mixes fresh traversals and hill-climbs solver grade.
 --max-attempts bounds each fresh layout search; --candidates also bounds retries.
+Batch seed derivation: splitmix64-batch-v1; the first request retains --seed.
 Selected batches allow at most 2 * count * candidates proposals in total.
-JSON includes reasoning, selection statistics and provisional difficulty grades.
+Batches reject rotated/reflected clues; fast batches allow at most 10 * count requests.
+JSON includes reasoning, explicit work counters and provisional difficulty grades.
+The legacy attempts field is retained; use work for board/refinement/search counts.
 Uniqueness remains optional; a solver limit never certifies uniqueness or hardness.
 Grades have not been calibrated against human play. Any valid route still counts.
 An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
@@ -62,6 +69,7 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
             let mutable options =
                 { Generation = Generation.defaults defaultSeed
                   Selection = GenerationPolicy.defaults
+                  Ramp = None
                   Count = 1
                   OutputPath = None
                   ShowSolution = false
@@ -70,7 +78,7 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
             let seen = HashSet<string>()
             let mutable index = 0
             let mutable error = None
-            let numeric = set [ "--width"; "--height"; "--pairs"; "--min-length"; "--max-length"; "--seed"; "--count"; "--max-attempts"; "--candidates"; "--improve-steps"; "--solver-work"; "--min-trials"; "--min-depth"; "--min-search-nodes" ]
+            let numeric = set [ "--width"; "--height"; "--pairs"; "--min-length"; "--max-length"; "--seed"; "--count"; "--max-attempts"; "--candidates"; "--improve-steps"; "--solver-work"; "--min-trials"; "--max-trials"; "--min-depth"; "--min-search-nodes" ]
 
             while index < args.Length && error.IsNone do
                 let arg = args[index]
@@ -84,7 +92,7 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
                 elif arg = "--assess" then options <- { options with Selection = { options.Selection with Assess = true } }
                 elif arg = "--require-unique" then options <- { options with Selection = { options.Selection with RequireUnique = true } }
                 elif arg = "--avoid-shortest" then options <- { options with Selection = { options.Selection with AvoidShortest = true } }
-                elif arg = "--output" || arg = "--mode" || arg = "--difficulty" || numeric.Contains arg then
+                elif arg = "--output" || arg = "--mode" || arg = "--difficulty" || arg = "--ramp" || arg = "--cut-style" || numeric.Contains arg then
                     if index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal) then
                         error <- Some $"Missing value for {arg}."
                     else
@@ -96,6 +104,15 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
                             | "connect-only" -> options <- { options with Generation = { options.Generation with Mode = ConnectOnly } }
                             | "full-coverage" -> options <- { options with Generation = { options.Generation with Mode = FullCoverage } }
                             | _ -> error <- Some "Mode must be connect-only or full-coverage."
+                        elif arg = "--ramp" then
+                            match Ramp.parse value with
+                            | Ok spec -> options <- { options with Ramp = Some spec }
+                            | Error message -> error <- Some message
+                        elif arg = "--cut-style" then
+                            match value with
+                            | "random" -> options <- { options with Generation = { options.Generation with CutStyle = RandomCuts } }
+                            | "varied" -> options <- { options with Generation = { options.Generation with CutStyle = VariedCuts } }
+                            | _ -> error <- Some "Cut style must be random or varied."
                         elif arg = "--difficulty" then
                             let target = match value with "any" -> Some AnyDifficulty | "easy" -> Some Easy | "medium" -> Some Medium | "hard" -> Some Hard | "expert" -> Some Expert | _ -> None
                             match target with
@@ -123,6 +140,7 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
                                 | "--improve-steps" -> options <- { options with Selection = { options.Selection with ImproveSteps = number } }
                                 | "--solver-work" -> options <- { options with Selection = { options.Selection with SolverWork = number } }
                                 | "--min-trials" -> options <- { options with Selection = { options.Selection with MinTrials = number } }
+                                | "--max-trials" -> options <- { options with Selection = { options.Selection with MaxTrials = Some number } }
                                 | "--min-depth" -> options <- { options with Selection = { options.Selection with MinBranchDepth = number } }
                                 | "--min-search-nodes" -> options <- { options with Selection = { options.Selection with MinFirstSolutionNodes = number } }
                                 | _ -> ()
@@ -134,10 +152,24 @@ An attempt limit is not a proof of impossibility. Ctrl+C cancels generation.
             match error with
             | Some message -> Error message
             | None ->
+                if options.Ramp.IsSome then
+                    let spec = options.Ramp.Value
+                    options <- { options with
+                                    Count = if seen.Contains "--count" then options.Count else 12
+                                    Ramp = Some { spec with AutoMaxLength = not (seen.Contains "--max-length")
+                                                            AutoMaxAttempts = not (seen.Contains "--max-attempts")
+                                                            AutoSolverWork = not (seen.Contains "--solver-work") } }
                 let errors =
-                    [ yield! GuidedGeneration.validateOptions options.Generation options.Selection
-                      if options.Count < 1 || options.Count > 10000 then "Count must be between 1 and 10000."
-                      if options.Force && options.OutputPath.IsNone then "--force requires --output." ]
+                    [ match options.Ramp with
+                      | None -> yield! GuidedGeneration.validateOptions options.Generation options.Selection
+                      | Some spec ->
+                          if seen.Contains "--pairs" || seen.Contains "--difficulty" then
+                              yield "--ramp chooses pair counts and targets; do not combine it with --pairs or --difficulty."
+                          match Ramp.plan options.Generation options.Selection options.Count spec with
+                          | Error message -> yield message
+                          | Ok _ -> ()
+                      if options.Count < 1 || options.Count > 10000 then yield "Count must be between 1 and 10000."
+                      if options.Force && options.OutputPath.IsNone then yield "--force requires --output." ]
 
                 match errors with
                 | [] -> Ok (Generate options)

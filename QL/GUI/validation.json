@@ -1,42 +1,165 @@
 {
-  "testedAt": "2026-11-17T04:25:35.962430+00:00",
+  "validatedAt": "2026-11-18T13:11:49.804053+00:00",
   "passed": true,
   "toolchain": "SSB 2.8.0 / Turbo 5.09 / SMSQmulator SMSQ/E",
-  "target": "SMSQ/E on SMSQmulator 68000 CPU, 8 MiB RAM, mode 32, 800x600",
-  "compilerReport": [
-    "TURBO: Parsing done, 0 errors and 0 warnings.",
-    "TURBO Code generation completed at 13980 lines per minute."
-  ],
-  "sourceSha256": "69fc06257f5e50540eb2b3c6b51907fcff500de1dfa276fbd165534b622461e9",
-  "executableSha256": "62eb30d76298c0e043b14e1c7fcd94b7efb125acb22cc8e80e33797473cd551a",
+  "target": "SMSQmulator 68000, SMSQ/E, 16 MiB RAM, GD2 mode 32, 800x600",
+  "sourceSha256": {
+    "GUI/tangles.ssb": "554dfa3981222ca01ae9b9bc6a6f0428e35712175b37b8ddb2c58012b3b99ce3",
+    "GUI/play.ssb": "6c6a0f27309bccdf26f00e07affe63cb05176ca6f0c802ba57ce835b0bab87f5",
+    "GUI/progress.ssb": "2aa796a57f386d721402520e2f6358f7d5ca14ae729a9b5d736567a8c12aba27",
+    "GUI/build.ssb": "95c58dab55003f2a388b6c08ba9aa5bc297c1764aa6b23fcf21bab57aebd77e2",
+    "Parser/pack.ssb": "7f44359e6350611f67d66eb45f0ca39ee977c46735c03e07c4d01c364f7fc0d5",
+    "Parser/json.ssb": "0260d582e671c59f95ea0e3948a6212ded38719fffcc5a1b8009bb40682b56c1"
+  },
+  "executableSha256": "50c68af6fc132558dd6af601b434f1a56e89bf75c4aca3d90e5dbfac3cb4a7b4",
+  "compilerErrors": 0,
+  "compilerWarnings": 57,
   "checkedFiles": {
-    "tangles.ssb": "69fc06257f5e50540eb2b3c6b51907fcff500de1dfa276fbd165534b622461e9",
-    "build.ssb": "d1079e9a9cf5723900c337323b0e872caf975b1df7a24bcee4cac60384b1d085",
-    "build.py": "a7f196bf63d00a5ff49523a2bc30a82da86d6c974603cd78b5d483343468edcd",
-    "GuiCheck.java": "907b8484bd845252ce47b227df8051ed04d26b4f5afbf7b13ccb2831a73eeccc"
+    "GuiCheck.java": "63b14ee59a3d97b7bb7a8d6f54a46df97a473d7d6976711860de75950fbe4631",
+    "PlayerOracle.fsx": "1fd159dda68dd9c70483bd9df6bdae09e1ef752e60470158fc168abb30b491eb",
+    "test_player.py": "acd570ab2c570a9a412f5fe6b66f41b587ad252faf90de9b85167e76459fa543",
+    "build.py": "de9932118eacdc9ac668655ecf25562f64c4654d409f4c67645f2a7ff7586335",
+    "run.ps1": "cdb6a9d99fd298076d482d34f01136e784e7b67a7687003bccb06c1378bb86fe"
   },
   "runtimeDependencies": {
-    "tptr_ext": "90353755a800393d459bae42e4a4450f805e4773d81fd2a1a17a7e8b797f47cd",
-    "ttk": "f83ab612cdd63f872fcd40631b5be00f78a76dcfb2e4b4cc58f68a5ef66976ef"
+    "ttk": "f83ab612cdd63f872fcd40631b5be00f78a76dcfb2e4b4cc58f68a5ef66976ef",
+    "tptr_ext": "90353755a800393d459bae42e4a4450f805e4773d81fd2a1a17a7e8b797f47cd"
   },
-  "smoke": {
+  "gameplay": {
+    "passed": true,
+    "compiled": true,
+    "reference": "Tangles.Core.Play",
+    "transitions": 2333,
+    "cases": 8,
+    "largePackBytes": 2460329,
+    "errors": [],
+    "folder": "player-tests-1795005459875529400"
+  },
+  "pointerIntegration": {
     "passed": true,
     "resolution": "800x600",
     "mode": 32,
     "colours": 16,
     "compiled": true,
-    "checks": [
-      "palette",
-      "drag",
-      "interpolation",
-      "release",
-      "redraw",
-      "move",
-      "clear",
-      "quit"
-    ]
+    "assertions": 47,
+    "folder": "C:/Source/Tangles/QL/GUI/build/latest/gui-check-1795006934468",
+    "screenUpdateIntervalMs": 16,
+    "harnessSha256": "88a7262b213f57b94e2b3aeaa96d9750422f3c741b9d89df669d542e6e6881b8",
+    "scope": "Full 47-check regression run at the previous 16 ms display interval; game executable unchanged."
   },
-  "assertionsPassed": 32,
-  "input": "Real emulated mouse/button linkage and keyboard queue; rendered pixel assertions; no direct calls to BASIC paint routines.",
-  "limits": "Paint-grid proof, no puzzle rules or packs. Other applications covering/uncovering the window and other display backends have not been tested."
+  "jsonRegression": {
+    "passed": true,
+    "compiled": true,
+    "example": false,
+    "ramMiB": 8,
+    "caseCount": 60,
+    "packCount": 3,
+    "packNodes": {
+      "fullcoverage_json": 2178,
+      "quickstart_json": 66,
+      "starter_json": 1784
+    },
+    "packSha256": {
+      "fullcoverage_json": "ee0bd963ab545d634f6cf8e40ec50bca9bcd8dc109dfae32fd2fad9a5d8c4636",
+      "quickstart_json": "5011abbeb6fe94bb280c64fd374b9cf98df54c1741c7c697b0074136fe683cc8",
+      "starter_json": "5363ab7b933aff7cde018c0ce267e7351533bd425c8adf0addea156ae06e58b5"
+    },
+    "librarySha256": "0260d582e671c59f95ea0e3948a6212ded38719fffcc5a1b8009bb40682b56c1",
+    "manifestCount": 105,
+    "manifestsPreserved": true,
+    "errors": [],
+    "folder": "1794970787281942600",
+    "testedAt": "2026-11-18T03:00:47.569833+00:00"
+  },
+  "packRegression": {
+    "passed": true,
+    "compiled": true,
+    "runtimeOnly": false,
+    "ramMiB": 8,
+    "caseCount": 114,
+    "loaderSha256": "7f44359e6350611f67d66eb45f0ca39ee977c46735c03e07c4d01c364f7fc0d5",
+    "parserSha256": "0260d582e671c59f95ea0e3948a6212ded38719fffcc5a1b8009bb40682b56c1",
+    "suiteSha256": "07e3d6aef1f29d523a9eafa8fa90c0c84f2c2ac105f570f3cb324a8f02f98167",
+    "driverSha256": "6c063f718eb755b7962d9f1aaa2a4b461cc3d5baa131e7c213809a24a4c1388c",
+    "errors": [],
+    "folder": "1794970785853158100",
+    "testedAt": "2026-11-18T03:00:56.836171+00:00"
+  },
+  "limits": "5 MiB JSON bytes, depth 32, 32766 retained clue nodes/pairs, sides 1..64, 128-byte UTF-8 IDs/labels. Native labels use numeric aliases when not displayable. Other emulator/display backends and overlapping QL jobs are not tested.",
+  "rendering": {
+    "scenario": "Press A at (0,0), extend to (1,0), jitter within that square and release; 3x3 board, 60-pixel squares.",
+    "baseline": {
+      "screenFills": 34,
+      "filledPixels": 216469,
+      "unchangedLegendWrites": 4,
+      "endpointEraseEvents": 7,
+      "moveLatencyMs": 15.7342
+    },
+    "baselineSourceSha256": "b6ec9d6a1fc73ffb9cd037ccbe5429b3619c4ed3e148b4d2d03a4f9a9df69fcd",
+    "current": {
+      "screenFills": 3,
+      "filledPixels": 600,
+      "unchangedLegendWrites": 0,
+      "endpointEraseEvents": 0,
+      "moveLatencyMs": 21.5639
+    },
+    "checks": "Endpoint colour remains present after every native block fill; unchanged legend is untouched; incremental images match full redraws after extension, corner, reset/undo, retracing and 16x16 drawing.",
+    "scope": "Screen block-fill work for this fixed test; elapsed move timing is host-dependent, not a guaranteed frame rate."
+  },
+  "display": {
+    "setting": "SCREEN-UPDATE-RATE",
+    "previousIntervalMs": 16,
+    "intervalMs": 8,
+    "idleThrottling": true,
+    "scope": "SMSQmulator presentation timer, not SMSQ/E pointer sampling or a guaranteed frame rate.",
+    "desktopVerified": true
+  },
+  "pointerRenderCheck": {
+    "passed": true,
+    "compiled": true,
+    "assertions": 7,
+    "screenUpdateIntervalMs": 8,
+    "folder": "C:\\Source\\Tangles\\QL\\GUI\\build\\latest\\gui-check-1795007323779",
+    "harnessSha256": "63b14ee59a3d97b7bb7a8d6f54a46df97a473d7d6976711860de75950fbe4631",
+    "invocation": "GuiCheck -Dql.renderProbeOnly=true",
+    "scope": "Startup, rapid partial stroke and release, untouched legend, endpoint preservation, small-area painting and full-redraw image comparison."
+  },
+  "pointerTiming": {
+    "samplesPerProfile": 90,
+    "baseline16ms": {
+      "samples": 90,
+      "intervalMs": 16,
+      "idleSleep": 1,
+      "rasterMedianMs": 14.0049,
+      "rasterP95Ms": 23.4774,
+      "presentationMedianMs": 22.0185,
+      "presentationP95Ms": 35.9834,
+      "presentationMaxMs": 53.0093,
+      "processCpuCores": 0.04898035057235303
+    },
+    "current8ms": {
+      "samples": 90,
+      "intervalMs": 8,
+      "idleSleep": 1,
+      "rasterMedianMs": 9.5746,
+      "rasterP95Ms": 24.3035,
+      "presentationMedianMs": 16.0766,
+      "presentationP95Ms": 28.924,
+      "presentationMaxMs": 43.9441,
+      "processCpuCores": 0.05549903533796737
+    },
+    "comparison8msWithoutIdleThrottling": {
+      "samples": 90,
+      "intervalMs": 8,
+      "idleSleep": 0,
+      "rasterMedianMs": 11.0002,
+      "rasterP95Ms": 23.5115,
+      "presentationMedianMs": 16.0721,
+      "presentationP95Ms": 28.9481,
+      "presentationMaxMs": 33.678,
+      "processCpuCores": 0.04635216473212261
+    },
+    "probeSha256": "5fa7306d12fc24839d1d1ab3bdec3a510c2bb6acfcf57b08b632228ae8a758c9",
+    "scope": "Isolated native-emulator pointer raster and scheduled presentation-request timing; excludes Swing/Windows compositor and physical monitor latency. Each fixed-seed move waits for both observations; timings are host-dependent."
+  }
 }

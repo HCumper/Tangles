@@ -1,9 +1,9 @@
 ## Translate with SSB 2.8, then LOAD the resulting BASIC and CHARGE.
 TURBO_objfil "ram1_tangles_exe"
 TURBO_repfil "ram1_tangles_err"
-TURBO_taskn "Tangles GUI proof"
+TURBO_taskn "Tangles"
 TURBO_windo 0
-TURBO_objdat 256
+TURBO_objdat 10240
 TURBO_buffersz 64
 TURBO_list 0
 TURBO_model ">"

@@ -26,7 +26,7 @@ desktop and 390-pixel mobile widths; `--browser` selects another installed
 Chromium executable. It does not touch existing browser windows or saves.
 
 The QL-aware ZIP includes native executable attributes and an SFA-header
-copy for SMSQmulator host-folder extraction, portable boot/restart files,
+copy for SMSQmulator and QPC host-folder extraction, portable boot/restart files,
 runtime extensions and the same 641-puzzle catalogue as the web edition.
 Tangles code, documentation and bundled puzzle packs use the [MIT License](LICENSE).
 Bundled third-party components retain their own [terms and notices](THIRD-PARTY-NOTICES.md).

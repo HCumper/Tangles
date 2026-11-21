@@ -5,7 +5,10 @@ For the ready-to-run **1.00** download, follow the
 The release archive is produced by `python tools/prepare-release.py`.
 It contains compiled code, both executable-header forms, portable `boot`
 and `start`, runtime dependencies, original third-party distributions and
-the matching puzzle catalogue. Build instructions below are for development.
+the matching puzzle catalogue. The launcher selects the header-bearing
+executable for SMSQmulator NFA/SFA and QPC DOS host folders automatically.
+QPC users must disable DOS filename-extension conversion as described in
+the installation guide. Build instructions below are for development.
 
 Native SSB 2.8 / TurboPTR player for SMSQ/E at **800x600 or larger, GD2 high
 colour**. This replaces the paint-grid proof with a playable game. It uses the

@@ -2,7 +2,8 @@ TANGLES 1.00 - QL QUICK START
 
 Requirements
   SMSQ/E with Pointer Environment/GD2 high colour, 800x600 or larger,
-  16 MiB RAM and a writable data directory. Tested with SMSQmulator.
+  16 MiB RAM and a writable data directory. Tested with SMSQmulator and
+  QPC II 5.02 / SMSQ/E 3.38 (32 MiB RAM).
   Configure the screen before launching. This package does not include
   an emulator, a Java runtime or an SMSQ/E ROM.
 
@@ -19,6 +20,26 @@ SMSQmulator host-folder installation
   header. Keep tangles_sfa_exe intact. Do not execute tangles_exe through
   NFA1: Windows extraction cannot restore its QDOS file attributes.
 
+QPC host-folder installation
+  1. Extract the ZIP on Windows into a new Tangles folder. Keep both
+     tangles_exe and tangles_sfa_exe under their supplied names.
+  2. Open QPC's configuration (hold Shift while starting QPC if needed).
+     Select 800x600 or larger, High colour (mode 32), and 32 MB memory.
+  3. In Devices, set DOS1 to the extracted Tangles folder. Turn OFF
+     Convert file extensions ("." vs "_"). Click OK, then Save and OK
+     in the main configuration. This retains the supplied QL filenames.
+  4. At the QL prompt enter:
+
+       DATA_USE "dos1_"
+       LRUN dos1_boot
+
+  The launcher selects tangles_sfa_exe automatically for QPC's DOS device.
+  Its Qemu-compatible header supplies executable type and dataspace after
+  Windows extraction. No copying, renaming or attribute-setting is needed.
+  Keep DOS1 pointed at this writable folder for puzzle packs and saves.
+  If using another DOS drive or a subdirectory, substitute its full QL
+  prefix in BOTH DATA_USE and LRUN.
+
 Native QL file-system installation
   Extract this ZIP using a QDOS-aware unzip into a NEW directory, for
   example win1_tangles_. This restores tangles_exe's executable type
@@ -28,14 +49,17 @@ Native QL file-system installation
        LRUN win1_tangles_boot
 
   Changing a filename to end in _exe does not restore executable metadata.
-  Preserve the ZIP until extraction has succeeded. QPC and other SMSQ/E
-  platforms have not yet received the release's hands-on compatibility test.
+  Preserve the ZIP until extraction has succeeded. The QPC test uses its
+  DOS host-folder device; other SMSQ/E platforms require separate testing.
 
 Starting again in the same interpreter session
   boot loads Turbo Toolkit and TurboPTR. Load them once per session.
   After quitting the player, use:
 
+  SMSQmulator:
        LRUN nfa1_start
+  QPC:
+       LRUN dos1_start
 
   Substitute your installation prefix if different. DATA_USE must still
   identify the directory containing tangles_catalog. Existing users who
@@ -75,7 +99,7 @@ Saving and upgrades
 Package contents
   boot / start           Portable launch/restart BASIC files
   tangles_exe            Native executable, with QDOS ZIP metadata
-  tangles_sfa_exe        Same executable with a Qemu/SFA file header
+  tangles_sfa_exe        Header-bearing executable for SFA and QPC DOS
   ttk / tptr_ext         Unmodified runtime extensions
   tangles_catalog        The 12-pack, 641-puzzle catalogue
   pack00_json ...        Matching generator JSON packs

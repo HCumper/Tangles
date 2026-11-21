@@ -213,5 +213,30 @@
     "boot": true,
     "hints": true,
     "saveAndResume": true
+  },
+  "qpcPackageCheck": {
+    "passed": true,
+    "testedAt": "2026-11-21T22:36:29.694447+00:00",
+    "platform": "QPC II 5.02 / SMSQ/E 3.38",
+    "resolution": "800x600",
+    "mode": 32,
+    "ramMiB": 32,
+    "packageSha256": "5d3a986faf2468c125cf56a152672353a16d69e6efae086e34a2755b82c8246f",
+    "launcherSha256": {
+      "boot": "95b92ff97620e72dbe00f27c292f949ff0746638280a370f44dc159612762814",
+      "start": "b3b1f38f1eaf1855707a5f890e6fd2d0e2930d441e066ed33e547e69bffe10a9"
+    },
+    "headerExecutableSha256": "ee07e63f1e2270a6547a30de578694b45f252190422130c2183f98add27935f1",
+    "nativeExecutableSha256": "c3c92684a3735a5990976146ff3d7c9fe6a2f83d02ab6b7674834d8426f1b828",
+    "checks": [
+      "Unmodified ZIP extracted into an isolated host folder",
+      "DOS1 mapped to that folder with filename-extension conversion disabled",
+      "DATA_USE dos1_ and packaged boot start the 1.00 player",
+      "Starter puzzle loads and Hint completes one colour",
+      "Q saves progress and closes the compiled job",
+      "DATA_USE DOS1_ and packaged start restart without reloading extensions",
+      "The completed colour and selected puzzle survive restart"
+    ],
+    "scope": "Manual Windows computer-use check in a separate QPC instance. Both executable forms retain their ZIP contents; no renaming or executable substitution. Existing user installation and saves were not used."
   }
 }

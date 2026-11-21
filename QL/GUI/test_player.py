@@ -20,18 +20,21 @@ def main():
     parser.add_argument('--ssb-root', type=Path, default=Path('C:/Source/Structured Super Basic'))
     parser.add_argument('--oracle', type=Path)
     parser.add_argument('--work', type=Path)
+    parser.add_argument('--core-dll', type=Path, default=Path('C:/Source/codex-workspace/.scratch/tangles-generator-fixes/artifacts/bin/Tangles.Core/release/Tangles.Core.dll'))
     parser.add_argument('--timeout', type=int, default=600)
     args = parser.parse_args()
-    work = (args.work or ROOT / 'build' / ('player-tests-' + str(time.time_ns()))).resolve()
+    work = (args.work or Path('C:/Source/codex-workspace/.scratch/tangles-generator-fixes/ql-player-tests')).resolve()
     work.mkdir(parents=True, exist_ok=True)
+    for name in ('done', 'report', 'result', 'errorlog', 'target_exe'):
+        (work/name).unlink(missing_ok=True)
     oracle = args.oracle or work / 'oracle.json'
     if not args.oracle:
-        subprocess.run(['dotnet', 'fsi', str(ROOT/'PlayerOracle.fsx'), '--', str(oracle)], check=True, cwd=REPO)
+        subprocess.run(['dotnet', 'fsi', '--reference:'+str(args.core_dll.resolve()), str(ROOT/'PlayerOracle.fsx'), '--', str(oracle)], check=True, cwd=REPO)
     cases = json.loads(oracle.read_text())
-    codes = {'begin': 0, 'move': 1, 'end': 2, 'undo': 3, 'reset': 4, 'save': 5, 'reload': 6}
+    codes = {'begin': 0, 'move': 1, 'end': 2, 'undo': 3, 'reset': 4, 'save': 5, 'reload': 6, 'hint': 7}
     for name in ('ssb280_exe', 'parser_task', 'codegen_task', 'ttk', 'env_bin'):
         shutil.copy2(args.ssb_root/'build/compiled-app'/name, work/name)
-    for name in ('play', 'progress'):
+    for name in ('play', 'progress', 'hints'):
         shutil.copy2(ROOT/(name+'.ssb'), work/(name+'_ssb'))
     for name in ('json', 'pack'):
         shutil.copy2(ROOT.parent/'Parser'/(name+'.ssb'), work/(name+'_ssb'))
@@ -47,18 +50,20 @@ def main():
     lines = ['TURBO_objfil "ram1_target_exe"', 'TURBO_repfil "nfa1_report"',
              'TURBO_windo 0', 'TURBO_objdat 6144', 'TURBO_buffersz 64',
              'TURBO_list 0', 'TURBO_model ">"', 'TURBO_optim 0',
-             '#INCLUDE progress_ssb', 'OPEN_NEW #9,"nfa1_result"']
+             '#INCLUDE hints_ssb', 'OPEN_NEW #9,"nfa1_result"']
     for i, case in enumerate(cases):
         lines += [f'testCase%={i}', f'pack_load_player "nfa1_case{i}",256',
                   'PRINT #9,"LOAD|";testCase%;"|";packDoc.error%',
                   'IF packDoc.error% THEN CLOSE #9 : STOP', 'play_open 1',
+                  f'hint_load "nfa1_case{i}",1',
+                  f'PRINT #9,"HINT{i}|";hintAvailable%',
                   f'testInput%=FOP_IN("nfa1_ops{i}")',
                   f'FOR testStep%=1 TO {len(case["steps"])}',
                   'testAction%=progress_number(testInput%)', 'testCell%=progress_number(testInput%)',
                   'testOK%=1', 'SELect ON testAction%',
                   '=0: testOK%=play_begin%(testCell%)', '=1: testOK%=play_step%(testCell%)',
                   '=2: play_finish', '=3: play_undo', '=4: play_reset', '=5: progress_save',
-                  '=6: play_open 1 : progress_load', 'END SELect', 'test_dump',
+                  '=6: play_open 1 : progress_load', '=7: testOK%=hint_reveal%(testCell%)', 'END SELect', 'test_dump',
                   'END FOR testStep%', 'CLOSE #testInput%',
                   'PRINT #9,"VALID|";testCase%;"|";play_valid%']
     # Save rollback: the second slot is intentionally damaged, and the first
@@ -80,17 +85,29 @@ def main():
               'PRINT #9,"P|";testI%;"|";progress_hex$(packPuzzles(testI%).id$);"|";packPuzzles(testI%).width%;"|";packPuzzles(testI%).height%;"|";packPuzzles(testI%).pairCount%',
               'END FOR testI%', 'FOR testI%=1 TO packDoc.pairCount%',
               'PRINT #9,"E|";testI%;"|";progress_hex$(packPairs(testI%).label$);"|";packPairs(testI%).start.x%;"|";packPairs(testI%).start.y%;"|";packPairs(testI%).finish.x%;"|";packPairs(testI%).finish.y%',
-              'END FOR testI%', 'END IF', 'CLOSE #9',
+              'END FOR testI%',
+              'play_open 100 : hint_load "nfa1_large",100',
+              'PRINT #9,"LATEHINT|";hintAvailable%;"|";packDoc.error%',
+              'IF hintAvailable% THEN', 'FOR testI%=1 TO playPairCount%',
+              'testOK%=hint_reveal%(testI%)', 'END FOR testI%',
+              'PRINT #9,"LATESOLVED|";playSolved%;"|";play_valid%', 'END IF',
+              'END IF', 'CLOSE #9',
               'OPEN_NEW #9,"nfa1_done":PRINT #9,"OK":CLOSE #9', 'STOP',
               'DEFine PROCedure test_dump',
               'PRINT #9,"S|";testCase%;"|";testStep%;"|";testOK%;"|";playActive%;"|";playHistoryCount%;"|";playConnected%;"|";playUsed%;"|";playSolved%;"|";',
               'FOR testI%=0 TO playSize%-1',
               'PRINT #9,playOwner%(testI%);":";playOrder%(testI%);",";',
-              'END FOR testI%', 'PRINT #9', 'END DEFine']
+              'END FOR testI%', 'PRINT #9',
+              'testChoice%=hint_choose% : PRINT #9,"CAND|";testCase%;"|";testStep%;"|";testChoice%;"|";',
+              'IF hint_current% AND NOT playSolved% THEN',
+              'FOR testI%=1 TO playPairCount%', 'IF hintClear%(testI%) THEN PRINT #9,testI%;",";',
+              'END FOR testI%', 'END IF', 'PRINT #9', 'END DEFine']
     (work/'input_ssb').write_text('\n'.join(lines)+'\n', encoding='ascii')
     (work/'boot').write_text('''100 LRESPR "nfa1_env_bin"
 110 LRESPR "nfa1_ttk"
 120 SETENV "SSBWORK=nfa1_"
+121 SETENV "SSBSTART=1"
+122 SETENV "SSBINC=1"
 130 SETENV "SSBWORK2=ram1_"
 140 SETENV "SSBRECWORK=ram1_"
 150 SETENV "SSBOVER=Y"
@@ -108,6 +125,9 @@ def main():
         process = subprocess.Popen(['java','-Dql.ramMiB=16','-cp',cp,'QlRun',str(args.ssb_root/'build/SMSQE'),str(work),str(args.timeout),str(work/'commands')], stdout=log, stderr=subprocess.STDOUT)
         until=time.monotonic()+args.timeout+30
         while process.poll() is None:
+            if (work/'errorlog').exists():
+                process.terminate(); process.wait(timeout=10)
+                raise RuntimeError((work/'errorlog').read_text('latin1'))
             try:
                 report=(work/'report').read_text('latin1')
                 if '**** ERROR' in report:
@@ -135,9 +155,19 @@ def main():
             elif row[0]=='VALID' and row[2]!='1': errors.append('Restored path validation: '+line)
             elif row[0]=='P': large_p.append(row)
             elif row[0]=='E': large_e.append(row)
+            elif row[0]=='CAND':
+                key=int(row[1]),int(row[2]); want=expected[key]['candidates']
+                candidates=[int(v) for v in row[4].split(',') if v]
+                choice=int(row[3])
+                if candidates!=want or (choice not in want if want else choice!=0):
+                    errors.append(f'{cases[key[0]]["name"]} step {key[1]} hint candidates {candidates}/{choice} != {want}')
             else: checks[row[0]]=row[1:]
     if seen!=set(expected): errors.append(f'Missing transitions: {len(seen)}/{len(expected)}')
     for name,want in [('RECOVER',['2','2']),('BADMETA',['1','0']),('ESCAPED',['0','1']),('LARGE',['0','100','1200'])]:
+        if checks.get(name)!=want: errors.append(f'{name}: {checks.get(name)} != {want}')
+    for i,case in enumerate(cases):
+        if checks.get(f'HINT{i}')!=[str(int(case['hintAvailable']))]: errors.append(f'{case["name"]}: hint availability {checks.get(f"HINT{i}")}')
+    for name,want in [('LATEHINT',['1','0']),('LATESOLVED',['1','1'])]:
         if checks.get(name)!=want: errors.append(f'{name}: {checks.get(name)} != {want}')
     large=json.loads((work/'large').read_text())
     wanted_p=[['P',str(i+1),p['id'].encode().hex().upper(),str(p['width']),str(p['height']),str(len(p['pairs']))] for i,p in enumerate(large['puzzles'])]

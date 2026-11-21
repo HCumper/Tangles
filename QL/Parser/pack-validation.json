@@ -1,7 +1,7 @@
 {
-  "validatedAt": "2026-11-18T03:12:57.260066+00:00",
-  "loaderSha256": "7f44359e6350611f67d66eb45f0ca39ee977c46735c03e07c4d01c364f7fc0d5",
-  "parserSha256": "0260d582e671c59f95ea0e3948a6212ded38719fffcc5a1b8009bb40682b56c1",
+  "validatedAt": "2026-11-21T02:24:47.047349+00:00",
+  "loaderSha256": "59d7b299e3e64fe61a3904995e8b88b1aeb2ad105ba723b0ea23653414675fa5",
+  "parserSha256": "bde2005368f68f332059a32daf4157877cb3cb7836ca5e0124601890f613dd69",
   "target": "SSB 2.8.0 / Turbo 5.09 / SMSQmulator SMSQ/E",
   "runs": [
     {
@@ -10,24 +10,35 @@
       "runtimeOnly": false,
       "ramMiB": 8,
       "caseCount": 114,
-      "loaderSha256": "7f44359e6350611f67d66eb45f0ca39ee977c46735c03e07c4d01c364f7fc0d5",
-      "parserSha256": "0260d582e671c59f95ea0e3948a6212ded38719fffcc5a1b8009bb40682b56c1",
+      "loaderSha256": "59d7b299e3e64fe61a3904995e8b88b1aeb2ad105ba723b0ea23653414675fa5",
+      "parserSha256": "bde2005368f68f332059a32daf4157877cb3cb7836ca5e0124601890f613dd69",
       "suiteSha256": "07e3d6aef1f29d523a9eafa8fa90c0c84f2c2ac105f570f3cb324a8f02f98167",
       "driverSha256": "6c063f718eb755b7962d9f1aaa2a4b461cc3d5baa131e7c213809a24a4c1388c",
       "errors": [],
-      "folder": "1794970785853158100",
-      "testedAt": "2026-11-18T03:00:56.836171+00:00"
+      "folder": "C:\\Source\\codex-workspace\\.scratch\\tangles-generator-fixes\\ql-pack-parity",
+      "testedAt": "2026-11-21T01:52:13.754949+00:00"
     }
   ],
   "playerProjection": {
     "passed": true,
     "compiled": true,
     "reference": "Tangles.Core.Play",
-    "transitions": 2333,
-    "cases": 8,
+    "transitions": 2438,
+    "cases": 21,
     "largePackBytes": 2460329,
     "errors": [],
-    "folder": "player-tests-1794970787096448300"
+    "folder": "C:\\Source\\codex-workspace\\.scratch\\tangles-generator-fixes\\ql-player-tests"
   },
-  "scope": "Current-source compiled regression and original 100-puzzle pack import. Earlier interpreted/example runs remain in git history."
+  "scope": "Current-source compiled regression and original 100-puzzle pack import. Earlier interpreted/example runs remain in git history.",
+  "currentPackRegression": {
+    "passed": true,
+    "compiled": true,
+    "pack": "full-coverage-12x12-hard-100-20261120.json",
+    "sha256": "bf0fde03ee9444951300b4c12e0a9f4ed392c9ad6a975d52a3a0d36a3cf92db6",
+    "puzzles": 100,
+    "pairs": 800,
+    "transitions": 2438,
+    "lastPuzzleHints": true,
+    "errors": []
+  }
 }

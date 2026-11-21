@@ -17,6 +17,14 @@
     <Compile Include="Startup.fs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="../../LICENSE" Link="wwwroot/LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../COPYRIGHT.txt" Link="wwwroot/COPYRIGHT.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../docs/releases/1.00.md"
+             Link="wwwroot/release-notes.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../third-party/web/**/*"
+             Link="wwwroot/third-party/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <Content Include="../../puzzles/*-20261120.json;../../puzzles/ramp-*.json"
              Link="wwwroot/packs/%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest"

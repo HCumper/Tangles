@@ -1,5 +1,12 @@
 # Tangles QL player
 
+For the ready-to-run **1.00** download, follow the
+[release installation guide](../../docs/QL-Install.txt).
+The release archive is produced by `python tools/prepare-release.py`.
+It contains compiled code, both executable-header forms, portable `boot`
+and `start`, runtime dependencies, original third-party distributions and
+the matching puzzle catalogue. Build instructions below are for development.
+
 Native SSB 2.8 / TurboPTR player for SMSQ/E at **800x600 or larger, GD2 high
 colour**. This replaces the paint-grid proof with a playable game. It uses the
 same generator JSON as the web player and ports `Tangles.Core.Play`'s rules;
@@ -9,7 +16,13 @@ same generator JSON as the web player and ports `Tangles.Core.Play`'s rules;
   keyboard play. Start at either endpoint or resume an existing path; retrace to
   shorten. Occupied cells, foreign endpoints and self-touching are rejected.
 - Both connections-only and full-coverage rules, taken from the JSON. Any valid
-  solution counts. Stored witnesses and difficulty/verification claims are ignored.
+  solution counts. Difficulty/verification claims never override the rules.
+- The same sixteen pastel colours and pack choices as the web player, with a
+  512-pixel board at 800x600, compact controls and a separate How to play panel.
+- Hint button / H reveals one random unfinished colour. It clears intersecting
+  paths; a single Undo restores the entire change. Hinted routes are saved just
+  like drawn routes. Missing or invalid optional solutions disable hints while
+  leaving normal play available.
 - Pack chooser with board-size/coverage descriptions, local JSON import, previous,
   next and jump-to-puzzle controls. Failed imports preserve the current game.
 - Whole-stroke undo (100 entries), undoable reset, connection/fill counts and
@@ -48,9 +61,12 @@ python QL/GUI/build.py --turboptr QL/GUI/build/latest/tptr_ext --check
 
 The real SSB translator and Turbo compiler run inside SMSQ/E. `build/latest/`
 contains the executable, dependencies, translated BASIC, build manifest and
-diagnostics. The build also copies the three web packs and all JSON files from
-`puzzles/`, unchanged, into a native `tangles_catalog` with dimension/coverage
-descriptions. The executable reserves 10 MiB dataspace; use **16 MiB RAM** for
+diagnostics. The build reads the web player's `wwwroot/packs.json` and copies
+those packs, unchanged and in the same order, into a native `tangles_catalog`
+with the same names plus dimension/coverage descriptions. This includes the
+latest six 100-puzzle 12x12 packs; other packs can still be imported. The build
+reuses a scratch directory (override with `--work`). The executable reserves
+10 MiB dataspace; use **16 MiB RAM** for
 the supplied player setup and larger pack imports. A stock 128 KB QL is not a
 target. Turbo's existing "only exists as a LOCAL" string warnings are diagnostic;
 successful builds must have zero errors and complete code generation.
@@ -110,6 +126,7 @@ the data directory. Imports accept a complete QL filename, e.g.
 | Keyboard drawing | Arrows move the cursor; Space/Enter starts/stops |
 | End a keyboard stroke | Esc |
 | Undo / reset | U or Ctrl+Z / C; reset can be undone |
+| Reveal one colour / instructions | H / I, or the Hint / How to play buttons |
 | Previous / next / jump | P / N / J |
 | Packs / import JSON | K / L |
 | Zoom | + / -; arrows pan the cursor into view |
@@ -127,13 +144,32 @@ a truncated latest save falls back to the previous valid generation. The full
 ID, dimensions, coverage and ordered endpoint pairs are checked, so a filename
 hash collision cannot apply another puzzle's routes. Invalid routes are discarded.
 Undo history is session-local, matching the web player's restored progress.
+The launcher preserves a resumed pack by its content when catalogue ordering
+changes, keeping a local copy if it has left the catalogue.
 
 The player import uses `pack_load_player`: up to **5 MiB of JSON bytes**, depth
 32, at most 32766 retained clue nodes and pair records, with 128-byte UTF-8
-IDs/labels. Ignored solutions/metadata still undergo syntax, Unicode and nesting
-validation but consume no value nodes. The original 2.46 MB, 100-puzzle 12x12
+IDs/labels. On initial loading, solutions/metadata still undergo syntax, Unicode
+and nesting validation but consume no value nodes. The original 2.46 MB, 100-puzzle 12x12
 pack is tested unchanged. These explicit QL limits can reject larger or more
 densely populated packs that the web loader accepts.
+
+`hints.ssb` lazily reads just the selected puzzle using its recorded byte span,
+then validates every stored path: known unique labels, integer coordinates,
+correct endpoints, adjacent moves, no overlap or self-touching, and complete
+coverage when required. Invalid witnesses do not change the clues or drawn
+paths. A selected puzzle object is limited to 1 MiB and 32766 retained nodes
+for hints; exceeding that limit disables hints for that puzzle. This keeps a
+whole 100-puzzle witness out of QL memory. Turbo Toolkit `SET_POSITION` provides
+file seeking; Toolkit II/Turbo Toolkit are included in the supplied launcher.
+The initial import still reads and validates the entire pack. Large packs can
+take minutes on an emulator because the existing reader fetches one byte at a
+time; the UI shows "Loading JSON pack..." until it is ready.
+
+Hints prefer unfinished colours. If every pair connects but a full-coverage
+board still has gaps, they choose a route differing from the stored solution;
+the same route drawn in reverse already counts as matching. Hints stop after
+any valid completion, even one differing from the generator's solution.
 
 The native QL font cannot render arbitrary UTF-8 labels. The loader retains
 their exact bytes; endpoints use a numeric legend index if a label is not
@@ -143,11 +179,11 @@ zoom in and use the cursor/legend to identify it.
 ## Verification
 
 ```powershell
-dotnet build Tangles.slnx -c Release --disable-build-servers
+dotnet build src/Tangles.Core/Tangles.Core.fsproj -c Release --artifacts-path C:/Source/codex-workspace/.scratch/tangles-generator-fixes/artifacts --disable-build-servers
 python QL/GUI/test_player.py
 python QL/GUI/build.py --turboptr QL/GUI/build/latest/tptr_ext --check
-python QL/tools/test_json.py --compile
-python QL/tools/test_packs.py --compile
+python QL/tools/test_json.py --compile --work C:/Source/codex-workspace/.scratch/tangles-generator-fixes/ql-json-tests
+python QL/tools/test_packs.py --compile --work C:/Source/codex-workspace/.scratch/tangles-generator-fixes/ql-pack-tests
 ```
 
 `test_player.py` obtains reference traces from the actual shared F# engine,
@@ -155,6 +191,10 @@ then compiles and runs the QL engine under SMSQ/E and compares every accepted
 action, active path, cell/order map, undo depth, connection count and completion
 flag. It also exercises save/reload, interrupted-save fallback, rejected malformed
 metadata, escaped required names and every clue in the 100-puzzle pack.
+Hint tests compare availability, the complete eligible-colour set and random
+choice membership, revealed cells, conflicts, undo and save/reload against F#,
+including reversed routes, missing/invalid witnesses and full-coverage gaps.
+The last puzzle of a multi-megabyte pack tests seeking beyond 16-bit offsets.
 
 `GuiCheck.java` drives the compiled executable using SMSQmulator's emulated
 mouse/keyboard linkage and checks rendered pixels, rather than calling BASIC
@@ -167,6 +207,6 @@ drag, checks that an endpoint is never temporarily erased and an unrelated
 legend entry is never repainted, and compares incremental images with a complete
 redraw after extensions, corners, undo/reset, retracing and a 16x16 stroke.
 `build/latest/render-metrics.json` records the result. On the same 3x3 test case,
-the previous cached renderer used 34 block fills covering 216,469 pixels; the
-incremental renderer uses 3 fills covering 600 pixels. This measures screen I/O,
+the previous cached renderer used 34 block fills covering 216,469 pixels. Current
+incremental figures are recorded for the larger board in validation.json. This measures screen I/O,
 not a guaranteed frame rate on every QL or emulator.

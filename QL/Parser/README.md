@@ -86,7 +86,7 @@ STOP
 | `packDoc.jsonError%` | Underlying JSON error class for `PACK_ERR_JSON%`; otherwise zero. |
 | `packDoc.formatVersion%`, `.requireFullCoverage%` | Validated format/rule settings. |
 | `packDoc.puzzleCount%`, `.pairCount%` | Number of published puzzles and total pairs. |
-| `packPuzzles(1..puzzleCount%)` | `TanglesPuzzle` records with `id$`, `width%`, `height%`, `requireFullCoverage%`, `firstPair%`, `pairCount%`. |
+| `packPuzzles(1..puzzleCount%)` | `TanglesPuzzle` records with `id$`, `width%`, `height%`, `requireFullCoverage%`, `firstPair%`, `pairCount%`, and real-valued `sourceStart`/`sourceLength` byte spans. |
 | `packPairs(1..pairCount%)` | `TanglesPair` records with `label$`, nested `start.x%`/`start.y%` and `finish.x%`/`finish.y%`. |
 
 Each puzzle's pairs occupy the contiguous range starting at `firstPair%`, of
@@ -133,6 +133,14 @@ The original generic parser and `pack_load`/`pack_parse` contracts are unchanged
 Required-name escapes, duplicate last-member behaviour and schema validation
 are preserved. The 32766 retained-node/pair limits still apply. The GUI uses a
 larger Turbo dataspace and 16 MiB emulator configuration for these imports.
+
+The GUI's separate `hints.ssb` layer can reopen the source file and seek to
+`sourceStart-1` to read `sourceLength` bytes. These are one-based byte spans of
+the original puzzle object, not tree handles; they remain valid only for that
+unchanged file. The real-valued fields support positions above 32767. An opt-in
+`jsonHintOnly%` projection retains only the selected object's optional solution;
+the hint layer validates it independently and frees the temporary tree. Neither
+normal pack loading nor the generic parser starts retaining witnesses.
 
 Pack failures use named Turbo MANIFEST constants: `PACK_ERR_JSON%` (1),
 `PACK_ERR_SCHEMA%` (2), `PACK_ERR_FORMAT%` (3), `PACK_ERR_RULES%` (4),

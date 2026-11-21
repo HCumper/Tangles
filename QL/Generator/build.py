@@ -105,6 +105,7 @@ def main():
         release=ROOT/'build/latest';release.mkdir(parents=True,exist_ok=True)
         for name,target in [('target_exe','generator_exe'),('ttk','ttk'),('output_bas','output_bas'),('report','report')]:
             shutil.copy2(args.work/name,release/target)
+        shutil.copy2(args.work/'output_bas',ROOT/'generator.bas')
         (release/'build.json').write_text(json.dumps({'compiled':True,'sourceSha256':sources,
             'executableSha256':hashlib.sha256((release/'generator_exe').read_bytes()).hexdigest(),
             'toolchain':'SSB 2.8 / Turbo 5.09 / SMSQmulator SMSQ/E'},indent=2))

@@ -68,6 +68,15 @@ DEFine PROCedure batch_cleanup
   END IF
 END DEFine
 
+## EXEC_W must regain control after both native jobs and interpreted SBASIC
+## daughter jobs. STOP only returns to a prompt, so a daughter needs QUIT.
+## Keep the main interpreter alive when the source is run manually in job 0.
+DEFine PROCedure batch_exit
+  IF COMPILED THEN RJOB -1,-gExit%
+  IF JOBID<>0 THEN QUIT -gExit%
+  STOP
+END DEFine
+
 ## Close active files before restoring an earlier output or removing a partial
 ## new destination. The outer error trap handles a second failure during recovery.
 DEFine PROCedure batch_runtime_error(VAL brError)
@@ -85,8 +94,7 @@ DEFine PROCedure batch_runtime_error(VAL brError)
   END IF
   PRINT #0,gError$
   batch_cleanup
-  IF COMPILED THEN RJOB -1,-1
-  STOP
+  batch_exit
 END DEFine
 
 ## Copy one recorded byte range using a small buffer instead of loading a pack.

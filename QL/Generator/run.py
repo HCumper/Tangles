@@ -1,4 +1,4 @@
-"""Run the compiled native generator in an isolated SMSQ/E, not on the host CPU.
+"""Run the compiled or interpreted generator in an isolated SMSQ/E.
 
 Arguments after -- are encoded as the generator's native option string.
 QL filenames such as nfa1_pack_json refer to --work (the only mounted drive).
@@ -15,11 +15,16 @@ def ql_string(value):
     return '&CHR$(34)&'.join('"'+part+'"' for part in value.split('"'))
 
 
-def run(tool,work,arguments,timeout=600,release=None,cancel=False):
+def run(tool,work,arguments,timeout=600,release=None,cancel=False,interpreted=False):
     release=release or ROOT/'build/latest'
     work.mkdir(parents=True,exist_ok=True)
-    for name in ['generator_exe','ttk']:
-        shutil.copy2(release/name,work/name)
+    shutil.copy2(release/'ttk',work/'ttk')
+    if interpreted:
+        shutil.copy2(release/'output_bas',work/'generator_bas')
+        executable='nfa1_generator_bas'
+    else:
+        shutil.copy2(release/'generator_exe',work/'generator_exe')
+        executable='sfa1_generator_exe'
     def argument(value):
         if not any(c.isspace() or c in "\"'" for c in value):return value
         if '"' not in value:return '"'+value+'"'
@@ -33,7 +38,7 @@ def run(tool,work,arguments,timeout=600,release=None,cancel=False):
 140 END WHEN
 150 LRESPR "nfa1_ttk"
 160 DATA_USE "nfa1_"
-170 EXEC_W "sfa1_generator_exe";'''+ql_string(command)+'''
+170 EXEC_W "'''+executable+'";'+ql_string(command)+'''
 180 OPEN_NEW #9,"nfa1_result"
 190 PRINT #9,result
 200 CLOSE #9
@@ -53,9 +58,10 @@ def main():
     p.add_argument('--ssb-root',type=Path,default=Path('C:/Source/Structured Super Basic'))
     p.add_argument('--work',type=Path,default=SCRATCH/'run')
     p.add_argument('--timeout',type=int,default=600)
+    p.add_argument('--interpreted',action='store_true',help='Execute translated BASIC with SBASIC and CMD$, without the compiled generator')
     p.add_argument('options',nargs=argparse.REMAINDER)
     a=p.parse_args();options=a.options[1:] if a.options[:1]==['--'] else a.options
-    status=run(a.ssb_root,a.work.resolve(),options,a.timeout)
+    status=run(a.ssb_root,a.work.resolve(),options,a.timeout,interpreted=a.interpreted)
     print('Native QDOS job return:',status)
     print('Mounted files:',a.work.resolve())
     return abs(status)

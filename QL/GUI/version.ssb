@@ -1,0 +1,3 @@
+## Release identity; keep in step with the repository VERSION file.
+DIM guiRelease$(32)
+guiRelease$="1.00"

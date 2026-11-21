@@ -12,15 +12,22 @@
 #INCLUDE batch_ssb
 ## Modules above initialise shared state and define routines. The driver below
 ## reads options, runs either help or the batch, then performs common cleanup.
-WHEN_ERROR 0
-  ## Last-resort trap: a cleanup/media error must never return success.
-  RJOB -1,-1
-END_WHEN
-## The inner handler attempts file recovery. Any error during that recovery
-## falls through to the outer handler, which always reports job failure.
-WHEN_ERROR 1
-  batch_runtime_error ERNUM%
-END_WHEN
+IF COMPILED THEN
+  ## Turbo's trap markers do nothing in the interpreter, so their bodies must
+  ## be skipped there. The outer compiled trap covers a second recovery error.
+  WHEN_ERROR 0
+    RJOB -1,-1
+  END_WHEN
+  WHEN_ERROR 1
+    batch_runtime_error ERNUM%
+  END_WHEN
+ELSE
+  ## SBASIC skips this block during normal execution and enters it on an OS
+  ## error. Use its native trap rather than executing Turbo's handler bodies.
+  WHEN ERRor
+    batch_runtime_error ERNUM
+  END WHEN
+END IF
 ## Own the console explicitly; automatic copied windows can block under EW.
 OPEN #0,con
 WINDOW #0,512,256,0,0
@@ -33,7 +40,8 @@ IF COMPILED THEN
   IF LEN(OPTION_CMD$)>4096 THEN cli_error "Option string exceeds 4096 bytes."
   IF NOT gExit% THEN gCommand$=OPTION_CMD$
 ELSE
-  gCommand$=CMD$
+  IF LEN(CMD$)>4096 THEN cli_error "Option string exceeds 4096 bytes."
+  IF NOT gExit% THEN gCommand$=CMD$
 END IF
 IF NOT gExit% THEN cli_parse gCommand$
 IF NOT gExit% THEN
@@ -48,5 +56,4 @@ END IF
 batch_cleanup
 IF gCancel% THEN gExit%=130
 IF gExit% THEN PRINT #0,"Tangles: " & gError$ & " (exit " & gen_int$(gExit%) & ")."
-IF COMPILED THEN RJOB -1,-gExit%
-STOP
+batch_exit

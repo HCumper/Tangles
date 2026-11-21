@@ -1,6 +1,6 @@
 {
-  "validatedAt": "2026-11-18T03:12:57.260066+00:00",
-  "librarySha256": "0260d582e671c59f95ea0e3948a6212ded38719fffcc5a1b8009bb40682b56c1",
+  "validatedAt": "2026-11-21T02:24:47.047349+00:00",
+  "librarySha256": "bde2005368f68f332059a32daf4157877cb3cb7836ca5e0124601890f613dd69",
   "target": "SSB 2.8.0 / Turbo 5.09 / SMSQmulator SMSQ/E",
   "runs": [
     {
@@ -20,12 +20,12 @@
         "quickstart_json": "5011abbeb6fe94bb280c64fd374b9cf98df54c1741c7c697b0074136fe683cc8",
         "starter_json": "5363ab7b933aff7cde018c0ce267e7351533bd425c8adf0addea156ae06e58b5"
       },
-      "librarySha256": "0260d582e671c59f95ea0e3948a6212ded38719fffcc5a1b8009bb40682b56c1",
-      "manifestCount": 105,
+      "librarySha256": "bde2005368f68f332059a32daf4157877cb3cb7836ca5e0124601890f613dd69",
+      "manifestCount": 108,
       "manifestsPreserved": true,
       "errors": [],
-      "folder": "1794970787281942600",
-      "testedAt": "2026-11-18T03:00:47.569833+00:00"
+      "folder": "C:\\Source\\codex-workspace\\.scratch\\tangles-generator-fixes\\ql-json-parity",
+      "testedAt": "2026-11-21T01:51:33.998102+00:00"
     }
   ],
   "scope": "Current-source compiled regression. Earlier interpreted/example runs remain in git history; not rerun for this change."

@@ -2,6 +2,7 @@ module Tangles.Player.Main
 
 open System
 open System.Net.Http
+open System.Reflection
 open System.Threading.Tasks
 open Bolero
 open Bolero.Html
@@ -37,6 +38,8 @@ let private packDescription (loaded: PlayablePack) =
 
 type App() as this =
     inherit Component()
+
+    let releaseVersion = typeof<App>.Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion.Split('+')[0]
 
     let mutable pack: PlayablePack option = None
     let mutable game: PlayState option = None
@@ -493,9 +496,14 @@ type App() as this =
                             span { attr.``class`` "file-note"; "Stays on your device · up to 5 MB" }
                         }
                         footer {
-                            if game.IsNone then "No timer. Just find your way."
-                            elif fullCoverage then "No timer. Connect every pair and fill the board."
-                            else "No timer. No need to fill the board. Just find your way."
+                            p {
+                                if game.IsNone then "No timer. Just find your way."
+                                elif fullCoverage then "No timer. Connect every pair and fill the board."
+                                else "No timer. No need to fill the board. Just find your way."
+                            }
+                            a { attr.href "release-notes.txt"; $"Tangles {releaseVersion}" }
+                            " · "
+                            a { attr.href "third-party/notices.txt"; "Credits and licences" }
                         }
                     }
                 }

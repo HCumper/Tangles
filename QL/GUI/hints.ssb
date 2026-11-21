@@ -1,0 +1,214 @@
+## Optional validated witnesses, loaded only for the selected puzzle. The
+## complete pack remains clue-only; no solution cells enter the game model.
+#INCLUDE progress_ssb
+MANIFEST : HINT_MAX_BYTES = 1048576
+DIM hintOwner%(0),hintOrder%(0),hintLength%(0),hintSeen%(0),hintClear%(0)
+DIM hintStart%(0),hintEnd%(0),hintLabels$(0,128),hintId$(128)
+hintAvailable%=0 : hintValid%=0 : hintLastPair%=0 : hintCleared%=0
+
+DEFine FuNction hint_member%(VAL hmParent%,VAL hmName$,VAL hmKind%)
+  LOCal hmNode%
+  IF NOT hintValid% THEN RETurn 0
+  hmNode%=json_member%(hmParent%,hmName$)
+  IF jsonDoc.error% OR hmNode%=0 THEN hintValid%=0 : RETurn 0
+  IF jsonNodes(hmNode%).kind%<>hmKind% THEN hintValid%=0 : RETurn 0
+  RETurn hmNode%
+END DEFine
+
+DEFine FuNction hint_integer%(VAL hiParent%,VAL hiName$,VAL hiMaximum%)
+  LOCal hiNode%,hiByte%,hiSign%,hiAt,hiEnd,hiValue
+  hiNode%=hint_member%(hiParent%,hiName$,JSON_KIND_NUMBER%)
+  IF NOT hintValid% THEN RETurn 0
+  hiAt=jsonNodes(hiNode%).start : hiEnd=hiAt+jsonNodes(hiNode%).length
+  hiValue=0 : hiSign%=1
+  IF json_byte%(hiAt)=JSON_CH_MINUS% THEN hiSign%=-1 : hiAt=hiAt+1
+  FOR hiAt=hiAt TO hiEnd-1
+    hiByte%=json_byte%(hiAt)
+    IF hiByte%<JSON_CH_ZERO% OR hiByte%>JSON_CH_NINE% THEN hintValid%=0 : RETurn 0
+    hiValue=hiValue*10+hiByte%-JSON_CH_ZERO%
+    IF hiValue>hiMaximum% THEN hintValid%=0 : RETurn 0
+  END FOR hiAt
+  IF hiSign%*hiValue<0 THEN hintValid%=0 : RETurn 0
+  RETurn hiValue
+END DEFine
+
+## The initial pack parse supplies byte spans, including for files >32767
+## bytes. Turbo Toolkit SET_POSITION seeks without scanning earlier puzzles.
+DEFine PROCedure hint_load(VAL hlFile$,VAL hlPuzzle%)
+  LOCal hlChannel%,hlI%,hlChunk%,hlOffset%,hlCount,hlAt,hlLength,hlBegin,hlByte$(1)
+  hintAvailable%=0 : hintValid%=0
+  IF NOT playReady% OR hlPuzzle%<1 OR hlPuzzle%>packDoc.puzzleCount% THEN RETurn
+  hlBegin=packPuzzles(hlPuzzle%).sourceStart : hlLength=packPuzzles(hlPuzzle%).sourceLength
+  IF hlBegin<1 OR hlLength<2 OR hlLength>HINT_MAX_BYTES THEN RETurn
+  hlChannel%=FOP_IN(hlFile$) : IF hlChannel%<0 THEN RETurn
+  IF hlBegin+hlLength-1>FLEN(#hlChannel%) THEN CLOSE #hlChannel% : RETurn
+  SET_POSITION #hlChannel%,hlBegin-1
+  IF POSITION(#hlChannel%)<>hlBegin-1 THEN CLOSE #hlChannel% : RETurn
+  jsonCluesOnly%=1 : jsonHintOnly%=1
+  json_begin hlLength,JSON_MAX_NODES%,PACK_DEPTH%
+  IF NOT jsonDoc.error% THEN
+    FOR hlAt=1 TO hlLength
+      hlChunk%=INT((hlAt-1)/JSON_CHUNK_SIZE%) : hlOffset%=hlAt-JSON_CHUNK_SIZE%*hlChunk%
+      IF hlOffset%=1 THEN
+        hlCount=hlLength-hlAt+1 : IF hlCount>JSON_CHUNK_SIZE% THEN hlCount=JSON_CHUNK_SIZE%
+        jsonChunks$(hlChunk%)=FILL$(" ",hlCount)
+      END IF
+      hlByte$=INKEY$(#hlChannel%,-1)
+      IF LEN(hlByte$)<>1 THEN json_fail JSON_ERR_FILE%,"Incomplete hint data" : EXIT hlAt
+      jsonChunks$(hlChunk%,hlOffset%)=hlByte$
+    END FOR hlAt
+  END IF
+  CLOSE #hlChannel%
+  IF NOT jsonDoc.error% THEN json_read
+  IF NOT jsonDoc.error% THEN hint_map
+  json_free : jsonCluesOnly%=0 : jsonHintOnly%=0 : jsonKeepValue%=1
+  IF NOT hintValid% THEN RETurn
+  hintWidth%=playWidth% : hintHeight%=playHeight% : hintPairCount%=playPairCount% : hintFull%=playFull% : hintId$=playId$
+  FOR hlI%=1 TO playPairCount%
+    hintStart%(hlI%)=playStart%(hlI%) : hintEnd%(hlI%)=playEnd%(hlI%) : hintLabels$(hlI%)=playLabels$(hlI%)
+  END FOR hlI%
+  hintAvailable%=1
+END DEFine
+
+DEFine PROCedure hint_map
+  LOCal hwArray%,hwPath%,hwLabel%,hwCells%,hwPoint%,hwP%,hwI%,hwJ%,hwPair%,hwX%,hwY%,hwCell%,hwFirst%,hwLast%,hwN%,hwD%,hwUsed%
+  LOCal hwText$(4096)
+  hintValid%=1
+  hwArray%=hint_member%(jsonDoc.root%,"solution",JSON_KIND_ARRAY%)
+  IF NOT hintValid% THEN RETurn
+  IF jsonNodes(hwArray%).count%<>playPairCount% THEN hintValid%=0 : RETurn
+  DIM hintOwner%(playSize%-1),hintOrder%(playSize%-1)
+  DIM hintLength%(playPairCount%),hintSeen%(playPairCount%),hintClear%(playPairCount%)
+  DIM hintStart%(playPairCount%),hintEnd%(playPairCount%),hintLabels$(playPairCount%,128)
+  FOR hwI%=0 TO playSize%-1
+    hintOwner%(hwI%)=0 : hintOrder%(hwI%)=0
+  END FOR hwI%
+  FOR hwP%=1 TO playPairCount%
+    hintSeen%(hwP%)=0 : hintLength%(hwP%)=0
+  END FOR hwP%
+  hwPath%=jsonNodes(hwArray%).first% : hwUsed%=0
+  FOR hwP%=1 TO playPairCount%
+    hwLabel%=hint_member%(hwPath%,"label",JSON_KIND_STRING%)
+    IF NOT hintValid% THEN RETurn
+    hwText$=json_string$(hwLabel%) : IF jsonDoc.error% THEN hintValid%=0 : RETurn
+    hwPair%=0
+    FOR hwI%=1 TO playPairCount%
+      IF pack_equal%(hwText$,playLabels$(hwI%)) THEN hwPair%=hwI%
+    END FOR hwI%
+    IF hwPair%=0 THEN hintValid%=0 : RETurn
+    IF hintSeen%(hwPair%) THEN hintValid%=0 : RETurn
+    hintSeen%(hwPair%)=1
+    hwCells%=hint_member%(hwPath%,"cells",JSON_KIND_ARRAY%)
+    IF NOT hintValid% THEN RETurn
+    hintLength%(hwPair%)=jsonNodes(hwCells%).count%
+    IF hintLength%(hwPair%)<2 OR hintLength%(hwPair%)>playSize% THEN hintValid%=0 : RETurn
+    hwPoint%=jsonNodes(hwCells%).first% : hwLast%=-1 : hwFirst%=-1
+    FOR hwJ%=1 TO hintLength%(hwPair%)
+      hwX%=hint_integer%(hwPoint%,"x",playWidth%-1) : hwY%=hint_integer%(hwPoint%,"y",playHeight%-1)
+      IF NOT hintValid% THEN RETurn
+      hwCell%=hwY%*playWidth%+hwX%
+      IF hintOwner%(hwCell%) THEN hintValid%=0 : RETurn
+      IF hwLast%>=0 THEN
+        IF NOT play_adjacent%(hwLast%,hwCell%) THEN hintValid%=0 : RETurn
+      END IF
+      IF playEndpoint%(hwCell%) THEN
+        IF playEndpoint%(hwCell%)<>hwPair% OR (hwJ%<>1 AND hwJ%<>hintLength%(hwPair%)) THEN hintValid%=0 : RETurn
+      END IF
+      IF hwJ%=1 THEN hwFirst%=hwCell%
+      hintOwner%(hwCell%)=hwPair% : hintOrder%(hwCell%)=hwJ% : hwLast%=hwCell% : hwUsed%=hwUsed%+1
+      hwPoint%=jsonNodes(hwPoint%).next%
+    END FOR hwJ%
+    IF NOT ((hwFirst%=playStart%(hwPair%) AND hwLast%=playEnd%(hwPair%)) OR (hwFirst%=playEnd%(hwPair%) AND hwLast%=playStart%(hwPair%))) THEN hintValid%=0 : RETurn
+    hwPath%=jsonNodes(hwPath%).next%
+  END FOR hwP%
+  IF playFull% AND hwUsed%<>playSize% THEN hintValid%=0 : RETurn
+  FOR hwI%=0 TO playSize%-1
+    IF hintOwner%(hwI%) THEN
+      FOR hwD%=1 TO 4
+        hwN%=hwI%-1 : IF hwD%=2 THEN hwN%=hwI%+1
+        IF hwD%=3 THEN hwN%=hwI%-playWidth%
+        IF hwD%=4 THEN hwN%=hwI%+playWidth%
+        IF hwN%>=0 AND hwN%<playSize% THEN
+          IF hintOwner%(hwN%)=hintOwner%(hwI%) AND play_adjacent%(hwN%,hwI%) THEN
+            IF ABS(hintOrder%(hwN%)-hintOrder%(hwI%))<>1 THEN hintValid%=0 : RETurn
+          END IF
+        END IF
+      END FOR hwD%
+    END IF
+  END FOR hwI%
+END DEFine
+
+DEFine FuNction hint_current%
+  LOCal hcP%
+  IF NOT hintAvailable% THEN RETurn 0
+  IF NOT playReady% OR hintWidth%<>playWidth% OR hintHeight%<>playHeight% OR hintPairCount%<>playPairCount% OR hintFull%<>playFull% THEN RETurn 0
+  IF NOT pack_equal%(hintId$,playId$) THEN RETurn 0
+  FOR hcP%=1 TO playPairCount%
+    IF hintStart%(hcP%)<>playStart%(hcP%) OR hintEnd%(hcP%)<>playEnd%(hcP%) THEN RETurn 0
+    IF NOT pack_equal%(hintLabels$(hcP%),playLabels$(hcP%)) THEN RETurn 0
+  END FOR hcP%
+  RETurn 1
+END DEFine
+
+## Candidate set matches Play.hintCandidates, including reversed correct paths.
+DEFine FuNction hint_choose%
+  LOCal hhP%,hhI%,hhCount%,hhChoice%,hhSame%,hhReverse%
+  IF NOT hint_current% OR playSolved% THEN RETurn 0
+  hhCount%=0
+  FOR hhP%=1 TO playPairCount%
+    hintClear%(hhP%)=0
+    IF playLength%(hhP%)<2 THEN
+      hintClear%(hhP%)=1
+    ELSE
+      IF NOT playEndpoint%(playTail%(hhP%)) THEN hintClear%(hhP%)=1
+    END IF
+    hhCount%=hhCount%+hintClear%(hhP%)
+  END FOR hhP%
+  IF hhCount%=0 THEN
+    FOR hhP%=1 TO playPairCount%
+      hhSame%=(playLength%(hhP%)=hintLength%(hhP%)) : hhReverse%=hhSame%
+      FOR hhI%=0 TO playSize%-1
+        IF hintOwner%(hhI%)=hhP% THEN
+          IF playOwner%(hhI%)<>hhP% OR playOrder%(hhI%)<>hintOrder%(hhI%) THEN hhSame%=0
+          IF playOwner%(hhI%)<>hhP% OR playOrder%(hhI%)<>hintLength%(hhP%)-hintOrder%(hhI%)+1 THEN hhReverse%=0
+        END IF
+      END FOR hhI%
+      hintClear%(hhP%)=(NOT hhSame% AND NOT hhReverse%) : hhCount%=hhCount%+hintClear%(hhP%)
+    END FOR hhP%
+  END IF
+  IF hhCount%=0 THEN RETurn 0
+  hhChoice%=RND(1 TO hhCount%)
+  FOR hhP%=1 TO playPairCount%
+    IF hintClear%(hhP%) THEN
+      hhChoice%=hhChoice%-1 : IF hhChoice%=0 THEN RETurn hhP%
+    END IF
+  END FOR hhP%
+  RETurn 0
+END DEFine
+
+DEFine FuNction hint_reveal%(VAL hrPair%)
+  LOCal hrI%,hrP%
+  IF NOT hint_current% OR hrPair%<1 OR hrPair%>playPairCount% THEN RETurn 0
+  play_finish : play_snapshot : hintCleared%=0 : hintLastPair%=hrPair% : hintClear%(0)=0
+  FOR hrP%=1 TO playPairCount%
+    hintClear%(hrP%)=0
+  END FOR hrP%
+  FOR hrI%=0 TO playSize%-1
+    IF hintOwner%(hrI%)=hrPair% THEN
+      hrP%=playOwner%(hrI%)
+      IF hrP% AND hrP%<>hrPair% THEN hintClear%(hrP%)=1
+    END IF
+  END FOR hrI%
+  FOR hrP%=1 TO playPairCount%
+    hintCleared%=hintCleared%+hintClear%(hrP%)
+  END FOR hrP%
+  FOR hrI%=0 TO playSize%-1
+    hrP%=playOwner%(hrI%)
+    IF hrP%=hrPair% OR hintClear%(hrP%) THEN playOwner%(hrI%)=0 : playOrder%(hrI%)=0
+    IF hintOwner%(hrI%)=hrPair% THEN playOwner%(hrI%)=hrPair% : playOrder%(hrI%)=hintOrder%(hrI%)
+  END FOR hrI%
+  play_finish : play_rebuild
+  playMessage$="Filled colour " & playLabels$(hrPair%) & ". Undo restores previous paths."
+  IF hintCleared% THEN playMessage$="Filled colour " & playLabels$(hrPair%) & "; cleared " & hintCleared% & " conflicting paths. Undo restores them."
+  RETurn 1
+END DEFine

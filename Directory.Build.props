@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <!-- Display 1.00; NuGet and assembly metadata use normalized numeric forms. -->
+    <Version>1.0.0</Version>
+    <InformationalVersion>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)VERSION').Trim())</InformationalVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+  </PropertyGroup>
+</Project>

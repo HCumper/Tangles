@@ -1,0 +1,8 @@
+Copyright (c) 2026 Tangles contributors.
+
+Tangles code, documentation and bundled puzzle packs are licensed under
+the MIT License. The full terms are in LICENSE in the source distribution,
+LICENSE.txt in the web download and licence_txt in the QL download.
+
+Third-party components have their own terms. See THIRD-PARTY-NOTICES.md
+and the original notices accompanying the release packages.

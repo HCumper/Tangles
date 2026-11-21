@@ -1,0 +1,96 @@
+TANGLES 1.00 - QL QUICK START
+
+Requirements
+  SMSQ/E with Pointer Environment/GD2 high colour, 800x600 or larger,
+  16 MiB RAM and a writable data directory. Tested with SMSQmulator.
+  Configure the screen before launching. This package does not include
+  an emulator, a Java runtime or an SMSQ/E ROM.
+
+SMSQmulator host-folder installation
+  1. Extract the ZIP on Windows into a new Tangles folder.
+  2. In SMSQmulator, map BOTH NFA1 and SFA1 to that same folder. Enable
+     both devices. Use 16 MiB RAM, 800x600 and high-colour mode 32.
+  3. At the QL prompt enter:
+
+       DATA_USE "nfa1_"
+       LRUN nfa1_boot
+
+  The launcher uses NFA1 for packs/saves and SFA1 for the executable
+  header. Keep tangles_sfa_exe intact. Do not execute tangles_exe through
+  NFA1: Windows extraction cannot restore its QDOS file attributes.
+
+Native QL file-system installation
+  Extract this ZIP using a QDOS-aware unzip into a NEW directory, for
+  example win1_tangles_. This restores tangles_exe's executable type
+  and reserved dataspace. Then enter:
+
+       DATA_USE "win1_tangles_"
+       LRUN win1_tangles_boot
+
+  Changing a filename to end in _exe does not restore executable metadata.
+  Preserve the ZIP until extraction has succeeded. QPC and other SMSQ/E
+  platforms have not yet received the release's hands-on compatibility test.
+
+Starting again in the same interpreter session
+  boot loads Turbo Toolkit and TurboPTR. Load them once per session.
+  After quitting the player, use:
+
+       LRUN nfa1_start
+
+  Substitute your installation prefix if different. DATA_USE must still
+  identify the directory containing tangles_catalog. Existing users who
+  have already loaded compatible versions of both extensions can use
+  start directly. The supplied ttk is the SMSQ/E-only version.
+
+Playing
+  Choose a pack with K. The starter collections and 3x3 quick start are
+  good places to begin. Drag between matching letters; paths cannot
+  overlap or touch their own sides. Different paths may run alongside
+  each other. Diagonal contact is allowed.
+
+  Connections only: join every pair; empty squares are allowed.
+  Full coverage: join every pair AND fill every square.
+  Any valid route counts, including alternatives to the stored solution.
+
+  H hint     U undo      C reset       P/N previous/next puzzle
+  J jump     K packs     L import      I instructions      Q save/quit
+  Arrows move the keyboard cursor; Space/Enter starts or ends drawing.
+  Esc ends a stroke. + and - zoom. R redraws. M moves the window.
+
+  Hint fills one random unfinished colour. It may clear intersecting
+  routes. One Undo restores the whole change. Hints need a valid stored
+  solution; imported packs without one can still be played normally.
+
+Saving and upgrades
+  Packs, tangles_session and tangles_<...> progress files use the data
+  directory. Keep it writable. The game saves when you release a stroke,
+  navigate or quit. Two alternating progress files provide recovery if
+  a later save is incomplete. Undo history lasts for the current session.
+
+  Back up the complete directory before upgrading. Replace program files
+  and supplied packs; preserve tangles_session, tangles_config, your
+  imported packs and tangles_<...> saves. Run only one player against a
+  given save directory at a time.
+
+Package contents
+  boot / start           Portable launch/restart BASIC files
+  tangles_exe            Native executable, with QDOS ZIP metadata
+  tangles_sfa_exe        Same executable with a Qemu/SFA file header
+  ttk / tptr_ext         Unmodified runtime extensions
+  tangles_catalog        The 12-pack, 641-puzzle catalogue
+  pack00_json ...        Matching generator JSON packs
+  readme_txt             This guide
+  release_notes_txt      Features, known limits and release details
+  copyright_txt          Tangles copyright and licence scope
+  licence_txt            Full MIT License for Tangles
+  notices_txt            Third-party credits and distribution sources
+  turbo_toolkit_zip      Complete original Turbo Toolkit distribution
+  turboptr_zip           Complete original TurboPTR distribution
+
+Large packs can take time to load; wait for "Loading JSON pack..." to
+finish. If launch fails, check the screen mode, free RAM, device mappings
+and executable attributes first. The development compiler is not needed.
+
+Report problems: https://github.com/HCumper/Tangles/issues
+Include the displayed version, emulator/SMSQ/E version, pack, puzzle
+number and steps to reproduce. Your imported packs are never uploaded.

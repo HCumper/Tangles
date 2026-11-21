@@ -199,11 +199,9 @@ DEFine PROCedure json_difficulty
   json_end "]"
   IF reasoning_primary% THEN
     jdBase%=80 : jdBonus$="searchNodeBonus"
-    SELect ON sr.tier$
-      ="local": jdBase%=10 : jdBonus$="localDeductionBonus"
-      ="routes": jdBase%=30 : jdBonus$="routeDeductionBonus"
-      ="trial": jdBase%=55 : jdBonus$="trialStepBonus"
-    END SELect
+    IF sr.tier$="local" THEN jdBase%=10 : jdBonus$="localDeductionBonus"
+    IF sr.tier$="routes" THEN jdBase%=30 : jdBonus$="routeDeductionBonus"
+    IF sr.tier$="trial" THEN jdBase%=55 : jdBonus$="trialStepBonus"
     json_array "components"
     json_object "" : json_string "name","reasoningTier" : json_integer "value",1 : json_integer "weight",jdBase% : json_integer "points",jdBase% : json_end "}"
     json_object "" : json_string "name",jdBonus$ : json_integer "value",sr.score%-jdBase% : json_integer "weight",1 : json_integer "points",sr.score%-jdBase% : json_end "}"

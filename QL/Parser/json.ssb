@@ -70,6 +70,9 @@ MANIFEST : JSON_ROLE_PAIRS% = 5
 MANIFEST : JSON_ROLE_PAIR% = 6
 MANIFEST : JSON_ROLE_POINT% = 7
 MANIFEST : JSON_ROLE_VALUE% = 8
+MANIFEST : JSON_ROLE_SOLUTION% = 9
+MANIFEST : JSON_ROLE_PATH% = 10
+MANIFEST : JSON_ROLE_CELLS% = 11
 
 ## Storage and conversion limits. Values above 32767 must not have a % suffix.
 MANIFEST : JSON_CHUNK_SIZE% = 512
@@ -220,7 +223,7 @@ DIM jsonFrames(0) AS JsonFrame
 DIM jsonChunks$(0,JSON_CHUNK_SIZE%)
 jsonArena% = 0 : jsonStack% = 0 : jsonSlots% = 0
 ## Opt-in projection used only by pack_load_player. The generic API is unchanged.
-jsonCluesOnly%=0 : jsonKeepValue%=1
+jsonCluesOnly%=0 : jsonKeepValue%=1 : jsonHintOnly%=0
 
 ## INTERNAL: invalidate the old document, check limits, and size the arena.
 ## Record declarations reset fields; clearing the document first prevents a bad
@@ -749,11 +752,17 @@ DEFine FuNction json_player_role%(VAL jzFrame%)
   IF jsonFrames(jzFrame%).kind%=JSON_KIND_ARRAY% THEN
     IF jzRole%=JSON_ROLE_PUZZLES% THEN RETurn JSON_ROLE_PUZZLE%
     IF jzRole%=JSON_ROLE_PAIRS% THEN RETurn JSON_ROLE_PAIR%
+    IF jzRole%=JSON_ROLE_SOLUTION% THEN RETurn JSON_ROLE_PATH%
+    IF jzRole%=JSON_ROLE_CELLS% THEN RETurn JSON_ROLE_POINT%
     RETurn JSON_ROLE_DROP%
   END IF
   jzStart=jsonFrames(jzFrame%).keyStart : jzLength=jsonFrames(jzFrame%).keyLength
   SELect ON jzRole%
     =JSON_ROLE_ROOT%
+      IF jsonHintOnly% THEN
+        IF json_keyis%(jzStart,jzLength,"solution") THEN RETurn JSON_ROLE_SOLUTION%
+        RETurn JSON_ROLE_DROP%
+      END IF
       IF json_keyis%(jzStart,jzLength,"formatVersion") THEN RETurn JSON_ROLE_VALUE%
       IF json_keyis%(jzStart,jzLength,"rules") THEN RETurn JSON_ROLE_RULES%
       IF json_keyis%(jzStart,jzLength,"puzzles") THEN RETurn JSON_ROLE_PUZZLES%
@@ -771,6 +780,9 @@ DEFine FuNction json_player_role%(VAL jzFrame%)
       IF json_keyis%(jzStart,jzLength,"start") OR json_keyis%(jzStart,jzLength,"finish") THEN RETurn JSON_ROLE_POINT%
     =JSON_ROLE_POINT%
       IF json_keyis%(jzStart,jzLength,"x") OR json_keyis%(jzStart,jzLength,"y") THEN RETurn JSON_ROLE_VALUE%
+    =JSON_ROLE_PATH%
+      IF json_keyis%(jzStart,jzLength,"label") THEN RETurn JSON_ROLE_VALUE%
+      IF json_keyis%(jzStart,jzLength,"cells") THEN RETurn JSON_ROLE_CELLS%
   END SELect
   RETurn JSON_ROLE_DROP%
 END DEFine

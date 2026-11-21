@@ -1,25 +1,27 @@
 {
-  "validatedAt": "2026-11-18T13:11:49.804053+00:00",
+  "validatedAt": "2026-11-21T21:27:38.763262+00:00",
   "passed": true,
   "toolchain": "SSB 2.8.0 / Turbo 5.09 / SMSQmulator SMSQ/E",
   "target": "SMSQmulator 68000, SMSQ/E, 16 MiB RAM, GD2 mode 32, 800x600",
   "sourceSha256": {
-    "GUI/tangles.ssb": "554dfa3981222ca01ae9b9bc6a6f0428e35712175b37b8ddb2c58012b3b99ce3",
+    "GUI/tangles.ssb": "67849d9de3839c36f28de5586b483087b93e54090c1bbfd072741ad745b34921",
     "GUI/play.ssb": "6c6a0f27309bccdf26f00e07affe63cb05176ca6f0c802ba57ce835b0bab87f5",
     "GUI/progress.ssb": "2aa796a57f386d721402520e2f6358f7d5ca14ae729a9b5d736567a8c12aba27",
+    "GUI/hints.ssb": "f0e91cedfed5372c4ccf4108df11636750fc22e1f7e32e8380dd21113394b547",
+    "GUI/version.ssb": "f0494b936526cf09c1582cb72a1b59dce20cf3872337a90f626fd47ac5d156a3",
     "GUI/build.ssb": "95c58dab55003f2a388b6c08ba9aa5bc297c1764aa6b23fcf21bab57aebd77e2",
-    "Parser/pack.ssb": "7f44359e6350611f67d66eb45f0ca39ee977c46735c03e07c4d01c364f7fc0d5",
-    "Parser/json.ssb": "0260d582e671c59f95ea0e3948a6212ded38719fffcc5a1b8009bb40682b56c1"
+    "Parser/pack.ssb": "59d7b299e3e64fe61a3904995e8b88b1aeb2ad105ba723b0ea23653414675fa5",
+    "Parser/json.ssb": "bde2005368f68f332059a32daf4157877cb3cb7836ca5e0124601890f613dd69"
   },
-  "executableSha256": "50c68af6fc132558dd6af601b434f1a56e89bf75c4aca3d90e5dbfac3cb4a7b4",
+  "executableSha256": "ee07e63f1e2270a6547a30de578694b45f252190422130c2183f98add27935f1",
   "compilerErrors": 0,
-  "compilerWarnings": 57,
+  "compilerWarnings": 62,
   "checkedFiles": {
-    "GuiCheck.java": "63b14ee59a3d97b7bb7a8d6f54a46df97a473d7d6976711860de75950fbe4631",
-    "PlayerOracle.fsx": "1fd159dda68dd9c70483bd9df6bdae09e1ef752e60470158fc168abb30b491eb",
-    "test_player.py": "acd570ab2c570a9a412f5fe6b66f41b587ad252faf90de9b85167e76459fa543",
-    "build.py": "de9932118eacdc9ac668655ecf25562f64c4654d409f4c67645f2a7ff7586335",
-    "run.ps1": "cdb6a9d99fd298076d482d34f01136e784e7b67a7687003bccb06c1378bb86fe"
+    "GuiCheck.java": "e3c31301702bd1efab91af1ed11e0ef7f820316407bb37a5b3fc554acf13daaa",
+    "PlayerOracle.fsx": "acb07b530069f97f0320390783228ce58e05cd3baea4e162ae6ec5b0ae9c9da3",
+    "test_player.py": "018db6d227b3634bf09c8ec877f35d2015733fc7583875aa11e78013602d5123",
+    "build.py": "39997225383610720c4a51fb78479d31a2659c6c9039fa7eec3b2ffa4a5ea66f",
+    "run.ps1": "2887a3d454e41505e2e11f6e128257c500d9d5979538217e244a6407f1733325"
   },
   "runtimeDependencies": {
     "ttk": "f83ab612cdd63f872fcd40631b5be00f78a76dcfb2e4b4cc58f68a5ef66976ef",
@@ -29,11 +31,11 @@
     "passed": true,
     "compiled": true,
     "reference": "Tangles.Core.Play",
-    "transitions": 2333,
-    "cases": 8,
+    "transitions": 2438,
+    "cases": 21,
     "largePackBytes": 2460329,
     "errors": [],
-    "folder": "player-tests-1795005459875529400"
+    "folder": "C:\\Source\\codex-workspace\\.scratch\\tangles-generator-fixes\\ql-player-tests"
   },
   "pointerIntegration": {
     "passed": true,
@@ -41,11 +43,9 @@
     "mode": 32,
     "colours": 16,
     "compiled": true,
-    "assertions": 47,
-    "folder": "C:/Source/Tangles/QL/GUI/build/latest/gui-check-1795006934468",
-    "screenUpdateIntervalMs": 16,
-    "harnessSha256": "88a7262b213f57b94e2b3aeaa96d9750422f3c741b9d89df669d542e6e6881b8",
-    "scope": "Full 47-check regression run at the previous 16 ms display interval; game executable unchanged."
+    "assertions": 57,
+    "folder": "C:/Source/codex-workspace/.scratch/tangles-generator-fixes/ql-gui-build/gui-check",
+    "executableSha256": "ee07e63f1e2270a6547a30de578694b45f252190422130c2183f98add27935f1"
   },
   "jsonRegression": {
     "passed": true,
@@ -64,12 +64,12 @@
       "quickstart_json": "5011abbeb6fe94bb280c64fd374b9cf98df54c1741c7c697b0074136fe683cc8",
       "starter_json": "5363ab7b933aff7cde018c0ce267e7351533bd425c8adf0addea156ae06e58b5"
     },
-    "librarySha256": "0260d582e671c59f95ea0e3948a6212ded38719fffcc5a1b8009bb40682b56c1",
-    "manifestCount": 105,
+    "librarySha256": "bde2005368f68f332059a32daf4157877cb3cb7836ca5e0124601890f613dd69",
+    "manifestCount": 108,
     "manifestsPreserved": true,
     "errors": [],
-    "folder": "1794970787281942600",
-    "testedAt": "2026-11-18T03:00:47.569833+00:00"
+    "folder": "C:\\Source\\codex-workspace\\.scratch\\tangles-generator-fixes\\ql-json-parity",
+    "testedAt": "2026-11-21T01:51:33.998102+00:00"
   },
   "packRegression": {
     "passed": true,
@@ -77,89 +77,141 @@
     "runtimeOnly": false,
     "ramMiB": 8,
     "caseCount": 114,
-    "loaderSha256": "7f44359e6350611f67d66eb45f0ca39ee977c46735c03e07c4d01c364f7fc0d5",
-    "parserSha256": "0260d582e671c59f95ea0e3948a6212ded38719fffcc5a1b8009bb40682b56c1",
+    "loaderSha256": "59d7b299e3e64fe61a3904995e8b88b1aeb2ad105ba723b0ea23653414675fa5",
+    "parserSha256": "bde2005368f68f332059a32daf4157877cb3cb7836ca5e0124601890f613dd69",
     "suiteSha256": "07e3d6aef1f29d523a9eafa8fa90c0c84f2c2ac105f570f3cb324a8f02f98167",
     "driverSha256": "6c063f718eb755b7962d9f1aaa2a4b461cc3d5baa131e7c213809a24a4c1388c",
     "errors": [],
-    "folder": "1794970785853158100",
-    "testedAt": "2026-11-18T03:00:56.836171+00:00"
+    "folder": "C:\\Source\\codex-workspace\\.scratch\\tangles-generator-fixes\\ql-pack-parity",
+    "testedAt": "2026-11-21T01:52:13.754949+00:00"
   },
-  "limits": "5 MiB JSON bytes, depth 32, 32766 retained clue nodes/pairs, sides 1..64, 128-byte UTF-8 IDs/labels. Native labels use numeric aliases when not displayable. Other emulator/display backends and overlapping QL jobs are not tested.",
+  "currentPackRegression": {
+    "passed": true,
+    "compiled": true,
+    "pack": "full-coverage-12x12-hard-100-20261120.json",
+    "sha256": "bf0fde03ee9444951300b4c12e0a9f4ed392c9ad6a975d52a3a0d36a3cf92db6",
+    "puzzles": 100,
+    "pairs": 800,
+    "transitions": 2438,
+    "lastPuzzleHints": true,
+    "errors": []
+  },
+  "catalogue": {
+    "passed": true,
+    "packs": [
+      {
+        "name": "Starter collection - beginner",
+        "file": "pack00_json",
+        "puzzles": 8,
+        "sha256": "5363ab7b933aff7cde018c0ce267e7351533bd425c8adf0addea156ae06e58b5"
+      },
+      {
+        "name": "Full coverage collection - beginner",
+        "file": "pack01_json",
+        "puzzles": 8,
+        "sha256": "ee0bd963ab545d634f6cf8e40ec50bca9bcd8dc109dfae32fd2fad9a5d8c4636"
+      },
+      {
+        "name": "Quick start - beginner",
+        "file": "pack02_json",
+        "puzzles": 1,
+        "sha256": "5011abbeb6fe94bb280c64fd374b9cf98df54c1741c7c697b0074136fe683cc8"
+      },
+      {
+        "name": "Easy connections (8 pairs)",
+        "file": "pack03_json",
+        "puzzles": 100,
+        "sha256": "77d1915fc13cbbd7aa458df36f6184ea09e61a7342a164d2cb4a30aa232bc83a"
+      },
+      {
+        "name": "Medium connections (10 pairs)",
+        "file": "pack04_json",
+        "puzzles": 100,
+        "sha256": "6e298b796664ee03c900e351f573e174974a7355528b149f14d09d9134731047"
+      },
+      {
+        "name": "Hard connections (10 pairs)",
+        "file": "pack05_json",
+        "puzzles": 100,
+        "sha256": "f03b237ed056e782c8ebd69911a486855bba48dba8af8069b3678036f212f70d"
+      },
+      {
+        "name": "Easy full coverage (12 pairs)",
+        "file": "pack06_json",
+        "puzzles": 100,
+        "sha256": "8d2d319199841b737100920e5e31dbb98f3080bbe47f77f5fe7b2ae2ad76c0da"
+      },
+      {
+        "name": "Medium full coverage (8 pairs)",
+        "file": "pack07_json",
+        "puzzles": 100,
+        "sha256": "c156e0e6a027f82163eaefc972b8a05de763616ae0c116fcc19f611f095f62b5"
+      },
+      {
+        "name": "Hard full coverage (8 pairs)",
+        "file": "pack08_json",
+        "puzzles": 100,
+        "sha256": "bf0fde03ee9444951300b4c12e0a9f4ed392c9ad6a975d52a3a0d36a3cf92db6"
+      },
+      {
+        "name": "Earlier ramp sample - 8x8",
+        "file": "pack09_json",
+        "puzzles": 12,
+        "sha256": "6ff97bd1c8ca1e3a18de59edf5d819678f57abac9e000c9e312f98166d596fba"
+      },
+      {
+        "name": "Earlier ramp sample - 12x12",
+        "file": "pack10_json",
+        "puzzles": 6,
+        "sha256": "577f7b304ee667b04caaad4229234e1bdcb6b5f0744639dfd085eb463f90230c"
+      },
+      {
+        "name": "Earlier ramp sample - 16x16",
+        "file": "pack11_json",
+        "puzzles": 6,
+        "sha256": "ed7a6d219daa487fd78e59f25232271aacb6480854962555afb1ad89ba791f42"
+      }
+    ],
+    "puzzleCount": 641
+  },
+  "sessionMigration": {
+    "passed": true,
+    "sourceSha256": "2887a3d454e41505e2e11f6e128257c500d9d5979538217e244a6407f1733325",
+    "checks": [
+      "Resume reordered catalogue pack by content",
+      "Preserve a removed pack unchanged",
+      "Keep selected puzzle number",
+      "Respect explicit launch selection"
+    ],
+    "scope": "Actual launcher migration block invoked against an isolated scratch desktop; no user saves touched."
+  },
   "rendering": {
-    "scenario": "Press A at (0,0), extend to (1,0), jitter within that square and release; 3x3 board, 60-pixel squares.",
-    "baseline": {
-      "screenFills": 34,
-      "filledPixels": 216469,
-      "unchangedLegendWrites": 4,
-      "endpointEraseEvents": 7,
-      "moveLatencyMs": 15.7342
-    },
-    "baselineSourceSha256": "b6ec9d6a1fc73ffb9cd037ccbe5429b3619c4ed3e148b4d2d03a4f9a9df69fcd",
+    "scenario": "Press A at (0,0), extend to (1,0), jitter within the square and release; 3x3 board, 64-pixel squares.",
     "current": {
       "screenFills": 3,
-      "filledPixels": 600,
+      "filledPixels": 672,
       "unchangedLegendWrites": 0,
       "endpointEraseEvents": 0,
-      "moveLatencyMs": 21.5639
+      "moveLatencyMs": 46.8271
     },
-    "checks": "Endpoint colour remains present after every native block fill; unchanged legend is untouched; incremental images match full redraws after extension, corner, reset/undo, retracing and 16x16 drawing.",
-    "scope": "Screen block-fill work for this fixed test; elapsed move timing is host-dependent, not a guaranteed frame rate."
+    "checks": "No endpoint erase events or unchanged legend writes; incremental images equal full redraws after extensions, corners, reset/undo, retracing and 16x16 drawing.",
+    "scope": "Block-fill work and host-dependent event latency for this fixed test, not a guaranteed frame rate."
   },
   "display": {
     "setting": "SCREEN-UPDATE-RATE",
-    "previousIntervalMs": 16,
     "intervalMs": 8,
     "idleThrottling": true,
-    "scope": "SMSQmulator presentation timer, not SMSQ/E pointer sampling or a guaranteed frame rate.",
-    "desktopVerified": true
+    "scope": "SMSQmulator presentation timer; native GUI tests are isolated from the user desktop."
   },
-  "pointerRenderCheck": {
+  "limits": "5 MiB pack JSON, depth 32, 32766 retained clue nodes/pairs, sides 1..64, 128-byte UTF-8 IDs/labels. Optional hints: selected object <=1 MiB /32766 retained nodes. Other emulator/display backends and overlapping QL jobs are not tested.",
+  "previousValidatedAt": "2026-11-21T16:32:38.613607+00:00",
+  "verificationScope": "Versioned 1.00 GUI rebuilt and passed 57 pointer checks. Unchanged engine/parser hashes retain the prior differential checks. Extracted release boot/hints/save/resume and browser package checks are recorded separately.",
+  "releaseVersion": "1.00",
+  "releasePackageCheck": {
     "passed": true,
-    "compiled": true,
-    "assertions": 7,
-    "screenUpdateIntervalMs": 8,
-    "folder": "C:\\Source\\Tangles\\QL\\GUI\\build\\latest\\gui-check-1795007323779",
-    "harnessSha256": "63b14ee59a3d97b7bb7a8d6f54a46df97a473d7d6976711860de75950fbe4631",
-    "invocation": "GuiCheck -Dql.renderProbeOnly=true",
-    "scope": "Startup, rapid partial stroke and release, untouched legend, endpoint preservation, small-area painting and full-redraw image comparison."
-  },
-  "pointerTiming": {
-    "samplesPerProfile": 90,
-    "baseline16ms": {
-      "samples": 90,
-      "intervalMs": 16,
-      "idleSleep": 1,
-      "rasterMedianMs": 14.0049,
-      "rasterP95Ms": 23.4774,
-      "presentationMedianMs": 22.0185,
-      "presentationP95Ms": 35.9834,
-      "presentationMaxMs": 53.0093,
-      "processCpuCores": 0.04898035057235303
-    },
-    "current8ms": {
-      "samples": 90,
-      "intervalMs": 8,
-      "idleSleep": 1,
-      "rasterMedianMs": 9.5746,
-      "rasterP95Ms": 24.3035,
-      "presentationMedianMs": 16.0766,
-      "presentationP95Ms": 28.924,
-      "presentationMaxMs": 43.9441,
-      "processCpuCores": 0.05549903533796737
-    },
-    "comparison8msWithoutIdleThrottling": {
-      "samples": 90,
-      "intervalMs": 8,
-      "idleSleep": 0,
-      "rasterMedianMs": 11.0002,
-      "rasterP95Ms": 23.5115,
-      "presentationMedianMs": 16.0721,
-      "presentationP95Ms": 28.9481,
-      "presentationMaxMs": 33.678,
-      "processCpuCores": 0.04635216473212261
-    },
-    "probeSha256": "5fa7306d12fc24839d1d1ab3bdec3a510c2bb6acfcf57b08b632228ae8a758c9",
-    "scope": "Isolated native-emulator pointer raster and scheduled presentation-request timing; excludes Swing/Windows compositor and physical monitor latency. Each fixed-seed move waits for both observations; timings are host-dependent."
+    "assertions": 5,
+    "boot": true,
+    "hints": true,
+    "saveAndResume": true
   }
 }

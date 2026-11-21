@@ -62,12 +62,42 @@ quote it inside the option string (use single quotes around the BASIC string).
 An output directory/device must already exist. The program opens its own standard 512x256 console. Escape or Ctrl+C requests
 cancellation. A nonzero portable exit code is returned to the owner as the
 corresponding **negative QDOS job error**: success 0, failure -1, argument/output
-conflict -2, cancellation -130.
+conflict -2, cancellation -130. `EW` displays QDOS error -1 as
+**incomplete**; it means the generator reported failure, not that the BAS file
+was cut short. The generator's detailed diagnostic is printed in its own
+console, which closes when the child exits.
+
+### Run with the interpreter
+
+Under SMSQ/E, the translated `generator.bas` can also run directly in SBASIC.
+Copy it to the mounted drive as `generator_bas`, and load Turbo Toolkit once in
+the main interpreter, as above. All generator options use the same syntax:
+
+```basic
+EW win1_generator_bas;"--help"
+EW win1_generator_bas;"--seed 42 --count 10 --output win1_interpreted_pack_json"
+```
+
+SMSQ/E starts a separate interpreter job and passes the option string in `CMD$`.
+The program uses native SBASIC error trapping and `QUIT` to return the same exit
+codes to `EW`; the Turbo build uses `OPTION_CMD$` and its compiled error handlers.
+The source may also be loaded for inspection in the main interpreter. A manual
+run in job 0 returns to its prompt rather than removing the main interpreter.
+Interpretation is slower, so start with a small board or a short pack.
+The interpreted default 8x8, seed-42, ten-puzzle command has also been checked
+in Q-emuLator with SMSQ/E 3.13. Signed-word conversion normalises results from
+`INT` before bitwise operations to avoid that interpreter's -32768 boundary
+failure while calculating puzzle identity hashes.
+
+The supplied `ttk` release is the SMSQ/E-specific Turbo Toolkit. A classic QDOS
+session needs a compatible generic Turbo Toolkit for the compiled executable;
+the interpreted command-line launch described here requires SMSQ/E.
 
 For an isolated headless development run:
 
 ```powershell
 python QL/Generator/run.py -- --seed 42 --output nfa1_pack_json
+python QL/Generator/run.py --interpreted -- --seed 42 --output nfa1_interpreted_pack_json
 ```
 
 Only the selected `--work` directory is mounted as `nfa1_`/`sfa1_`; by default
@@ -168,7 +198,7 @@ the retained backup. It is not an atomic filesystem replacement.
 
 ## Verification
 
-The tests execute real compiled 68000 code under SMSQ/E. Reference reports come
+The tests execute real compiled 68000 code or SBASIC source under SMSQ/E. Reference reports come
 from the actual F# solver/grader; exported packs are checked by the shared F#
 loader, rules, player hints, identities and difficulty logic.
 
@@ -181,6 +211,7 @@ python QL/Generator/build.py
 python QL/Generator/test_policy.py
 python QL/Generator/build.py --entry QL/Generator/tests/construction.ssb --work "$qlScratch/construction" --run
 python QL/Generator/test_generator.py
+python QL/Generator/test_generator.py --interpreted --work "$qlScratch/interpreted"
 ```
 
 `test_core.py --quick` uses a smaller cross-section, including high domain bits

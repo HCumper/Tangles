@@ -10,6 +10,29 @@ if (-not (Test-Path -LiteralPath (Join-Path $qlArtifact 'tangles_exe'))) {
 }
 $qlDesktop = Join-Path $PSScriptRoot 'build\desktop'
 New-Item -ItemType Directory -Path $qlDesktop -Force | Out-Null
+# Catalogue order follows the web player and can change. Preserve the selected
+# pack by content before replacing packNN files; progress itself uses the clues.
+$qlSessionFile = Join-Path $qlDesktop 'tangles_session'
+if (-not $Pack -and (Test-Path -LiteralPath $qlSessionFile)) {
+    $qlSessionLines = [IO.File]::ReadAllLines($qlSessionFile)
+    if ($qlSessionLines.Length -ge 2 -and $qlSessionLines[0] -match '^nfa1_(pack[0-9]{2}_json)$') {
+        $qlPreviousPack = Join-Path $qlDesktop $Matches[1]
+        if (Test-Path -LiteralPath $qlPreviousPack) {
+            $qlPreviousHash = (Get-FileHash -LiteralPath $qlPreviousPack -Algorithm SHA256).Hash
+            $qlReplacement = Get-ChildItem -LiteralPath $qlArtifact -File -Filter 'pack??_json' |
+                Where-Object { (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash -eq $qlPreviousHash } |
+                Select-Object -First 1
+            if ($qlReplacement) {
+                $qlSessionLines[0] = 'nfa1_' + $qlReplacement.Name
+            } else {
+                $qlPreservedName = 'savedpack_' + $qlPreviousHash.Substring(0,16).ToLowerInvariant() + '_json'
+                Copy-Item -LiteralPath $qlPreviousPack -Destination (Join-Path $qlDesktop $qlPreservedName) -Force
+                $qlSessionLines[0] = 'nfa1_' + $qlPreservedName
+            }
+            [IO.File]::WriteAllLines($qlSessionFile, $qlSessionLines, [Text.UTF8Encoding]::new($false))
+        }
+    }
+}
 foreach ($qlName in @('tangles_exe','ttk','tptr_ext','boot','tangles_catalog')) {
     Copy-Item -LiteralPath (Join-Path $qlArtifact $qlName) -Destination (Join-Path $qlDesktop $qlName) -Force
 }

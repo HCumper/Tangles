@@ -1,9 +1,11 @@
-"""Exercise the real compiled CLI, preserve existing outputs and validate packs in F#."""
+"""Exercise compiled or interpreted CLI execution and validate packs in F#."""
 import argparse
 import json
 from pathlib import Path
 import subprocess
 import hashlib
+import re
+import shutil
 from build import ROOT,SCRATCH
 from run import run
 
@@ -14,12 +16,13 @@ def main():
     p.add_argument('--work',type=Path,default=SCRATCH/'integration')
     p.add_argument('--artifacts',type=Path,default=SCRATCH/'artifacts')
     p.add_argument('--timeout',type=int,default=600)
+    p.add_argument('--interpreted',action='store_true',help='Run every CLI case through SBASIC rather than the Turbo executable')
     args=p.parse_args();args.work.mkdir(parents=True,exist_ok=True)
     checks=[];packs=[]
     def case(name,argv,want=0,pack=None,cancel=False):
         print('Native CLI: '+name,flush=True)
         if pack:(args.work/pack).unlink(missing_ok=True)
-        code=abs(run(args.ssb_root,args.work,argv,args.timeout,cancel=cancel))
+        code=abs(run(args.ssb_root,args.work,argv,args.timeout,cancel=cancel,interpreted=args.interpreted))
         if code!=want:raise AssertionError(f'{name}: exit {code}, expected {want}')
         if pack:
             path=args.work/pack
@@ -38,6 +41,9 @@ def main():
     assert collision.read_bytes()==b'PREEXISTING FILE MUST SURVIVE\n'
     collision.unlink()
     checks.append('temporary filename collision preserves existing file')
+    # The default 8x8 identities exercise the signed-word boundary that failed
+    # in SMSQ/E 3.13, unlike the smaller connection fixtures above.
+    case('default 8x8 ten-puzzle batch',['--seed','42','--count','10','--output','nfa1_default_json'],pack='default_json')
     case('deterministic replay',common+['--output','nfa1_replay_json'],pack='replay_json')
     assert (args.work/'connect_json').read_bytes()==(args.work/'replay_json').read_bytes()
     checks.append('identical native replay bytes')
@@ -67,13 +73,31 @@ def main():
     assert (args.work/'protected_json').read_bytes()==sentinel
     case('successful force replacement',full+['--output','nfa1_protected_json','--force'])
     packs.append(args.work/'protected_json')
+    if args.interpreted:
+        # An invalid channel exercises the actual native WHEN ERRor handler,
+        # rather than the CLI's ordinary validation/error-return paths.
+        fault_release=args.work/'runtime-fault'
+        fault_release.mkdir(exist_ok=True)
+        shutil.copy2(ROOT/'build/latest/ttk',fault_release/'ttk')
+        source=(ROOT/'build/latest/output_bas').read_text('ascii')
+        source,replacements=re.subn(r'(?m)^\d+ gInput% = 0$',
+            '6000 PRINT #32767,"Injected invalid channel"',source)
+        if replacements!=1:raise AssertionError('Runtime fault injection did not match the driver')
+        # Preserve increasing source line numbers for the SBASIC loader.
+        source='\n'.join(str(n)+' '+line.split(' ',1)[1]
+                         for n,line in enumerate(source.splitlines(),1))+'\n'
+        (fault_release/'output_bas').write_text(source,encoding='ascii',newline='\n')
+        code=abs(run(args.ssb_root,args.work,['--help'],args.timeout,
+                     release=fault_release,interpreted=True))
+        if code!=1:raise AssertionError(f'Interpreted runtime error: exit {code}, expected 1')
+        checks.append('native interpreter error trap returns failure to EXEC_W')
     if list(args.work.glob('*_spool_*')) or list(args.work.glob('*_console_*')) or list(args.work.glob('*_previous_*')):
         raise AssertionError('Successful/failed batches left disposable files')
     core=args.artifacts/'bin/Tangles.Core/release/Tangles.Core.dll'
     generator=args.artifacts/'bin/Tangles.Generator/release/Tangles.Generator.dll'
     subprocess.run(['dotnet','fsi','--reference:'+str(core),'--reference:'+str(generator),str(ROOT/'Validate.fsx'),'--',*[str(x) for x in packs]],check=True)
     manifest=json.loads((ROOT/'build/latest/build.json').read_text())
-    report={'passed':True,'compiled':True,'checks':checks,'packs':[{'name':p.name,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in packs],
+    report={'passed':True,'compiled':not args.interpreted,'checks':checks,'packs':[{'name':p.name,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in packs],
             'executableSha256':manifest['executableSha256'],'reference':'Actual shared F# loader, rules, hints, solver and grader'}
     (args.work/'verification.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
 

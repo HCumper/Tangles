@@ -47,6 +47,8 @@ TYPE TanglesPuzzle
   requireFullCoverage%
   firstPair%
   pairCount%
+  sourceStart
+  sourceLength
 END TYPE
 TYPE TanglesPack
   formatVersion%
@@ -265,6 +267,8 @@ DEFine PROCedure pack_read
     packPuzzles(prPuzzle%).width% = pack_integer%(prEntry%,"width",1,PACK_MAX_SIDE%)
     packPuzzles(prPuzzle%).height% = pack_integer%(prEntry%,"height",1,PACK_MAX_SIDE%)
     packPuzzles(prPuzzle%).requireFullCoverage% = packDoc.requireFullCoverage%
+    packPuzzles(prPuzzle%).sourceStart = jsonNodes(prEntry%).start
+    packPuzzles(prPuzzle%).sourceLength = jsonNodes(prEntry%).length
     prPairArray% = pack_member%(prEntry%,"pairs",JSON_KIND_ARRAY%)
     IF packDoc.error% THEN RETurn
     packPuzzles(prPuzzle%).pairCount% = jsonNodes(prPairArray%).count%

@@ -1,5 +1,36 @@
 # Tangles
 
+## Release 1.00
+
+[Play in your browser](https://hcumper.github.io/Tangles/) ·
+[Download the QL player](https://github.com/HCumper/Tangles/releases/download/v1.00/tangles-1.00-ql.zip) ·
+[All release downloads](https://github.com/HCumper/Tangles/releases/tag/v1.00)
+
+The current release version is **1.00**. See the
+[release notes](docs/releases/1.00.md),
+[QL installation guide](docs/QL-Install.txt) and
+[static web installation guide](docs/Web-Install.txt).
+
+`python tools/prepare-release.py` tests, builds and packages both players.
+It uses the existing local QL toolchain and writes versioned web, QL and
+source ZIPs, checksums and a build manifest to `artifacts/release/<version>/`.
+`--skip-build` packages already verified matching builds. Temporary .NET
+outputs reuse `C:/Source/codex-workspace/.scratch/tangles-release/`.
+Packaging never commits, tags, pushes or publishes. The manifest identifies
+the source bytes and whether the working tree contains uncommitted changes.
+
+Verify the generated downloads with `python tools/verify-release.py` and
+`python tools/test-web-release.py`. The latter starts a temporary loopback
+preview under `/Tangles/` and uses an isolated headless Chrome profile at
+desktop and 390-pixel mobile widths; `--browser` selects another installed
+Chromium executable. It does not touch existing browser windows or saves.
+
+The QL-aware ZIP includes native executable attributes and an SFA-header
+copy for SMSQmulator host-folder extraction, portable boot/restart files,
+runtime extensions and the same 641-puzzle catalogue as the web edition.
+Tangles code, documentation and bundled puzzle packs use the [MIT License](LICENSE).
+Bundled third-party components retain their own [terms and notices](THIRD-PARTY-NOTICES.md).
+
 A .NET 11 / F# puzzle generator and Bolero WebAssembly player. The generator constructs
 non-overlapping paths, hides their interiors, and retains an independently
 validated solution. Choose connect-only puzzles, which allow unused cells,
@@ -324,7 +355,8 @@ interpreted/Turbo emulator checks.
 [`QL/GUI`](QL/GUI/README.md) is the native SMSQ/E player: pack selection/import,
 variable boards including 16x16, mouse and keyboard drawing with the same game
 rules as the F# player, undo/reset, puzzle navigation, completion and validated
-local progress. The compiled engine is checked against reference traces from
+local progress. Its larger board, sixteen pastel colours, pack catalogue and
+undoable random-colour hints match the web player. The compiled engine is checked against reference traces from
 `Tangles.Core.Play`. The player import validates up to 5 MiB of original JSON
 while retaining only clue/rule nodes; the 100-puzzle 12x12 pack is tested unchanged.
 Use SMSQ/E GD2 at 800x600 with 16 MiB RAM; see the GUI guide for the real Turbo

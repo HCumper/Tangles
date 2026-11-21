@@ -1,0 +1,38 @@
+TANGLES 1.00 - WEB EDITION
+
+Play online: https://hcumper.github.io/Tangles/
+
+This ZIP contains the complete static site. Extract it and serve the
+contents using an HTTP/HTTPS static web server. Keep _framework, packs,
+third-party and .nojekyll alongside index.html. Use a trailing slash
+for a subdirectory URL. Do not open index.html directly using file://.
+
+No application server, database, desktop .NET installation, account or
+generator is needed. Puzzles are pre-generated JSON files in packs/.
+The host must serve WebAssembly (.wasm) as application/wasm and allow
+the generated .NET framework files. GitHub Pages is already configured
+by the repository's pages.yml workflow.
+
+For a local preview, if Python is installed:
+  python -m http.server 5094 --bind 127.0.0.1 --directory PATH_TO_EXTRACTED_SITE
+Then open http://localhost:5094/.
+
+Use a modern browser with JavaScript and WebAssembly enabled. Mouse,
+touch and keyboard play are supported. Progress is stored locally in
+the browser and does not sync between devices. Clearing browser storage
+can erase it. Imported packs stay on your device and must be selected
+again after reloading. The site is not installed for offline play.
+
+Use the pack chooser to select a starter collection. Each choice states
+the board size and whether full coverage is required. Hint completes
+one random unfinished colour; one Undo reverses the entire hint.
+See release-notes.txt for the rules, features and known limitations.
+
+Deploy a complete build together. After upgrading, reload the page if
+the displayed version does not match the release you installed.
+LICENSE.txt contains the MIT License for Tangles code, documentation and
+puzzle packs. COPYRIGHT.txt explains the scope. Credits and full third-party
+licences are in third-party/ and linked from the player.
+
+Report problems: https://github.com/HCumper/Tangles/issues
+Include version, browser/device, pack and puzzle number.

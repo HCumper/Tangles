@@ -196,12 +196,11 @@ END DEFine
 
 ## Grade ranks are ordered easy..expert; zero represents an unrestricted target.
 DEFine FuNction gen_rank%(VAL grText$)
-  SELect ON grText$
-    ="easy": RETurn 1
-    ="medium": RETurn 2
-    ="hard": RETurn 3
-    ="expert": RETurn 4
-  END SELect
+  ## String SELECT is a Turbo extension; plain IFs also precompile in SBASIC.
+  IF grText$="easy" THEN RETurn 1
+  IF grText$="medium" THEN RETurn 2
+  IF grText$="hard" THEN RETurn 3
+  IF grText$="expert" THEN RETurn 4
   RETurn 0
 END DEFine
 

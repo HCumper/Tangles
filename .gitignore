@@ -485,3 +485,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Release-note source is documentation, not generated release output.
+!docs/releases/
+!docs/releases/*.md

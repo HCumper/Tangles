@@ -1,0 +1,264 @@
+[
+  {
+    "package": "Bolero/0.25.65",
+    "authors": "Loic Denuziere",
+    "copyright": null,
+    "licence": "Apache-2.0 (Bolero project licence)",
+    "project": "https://github.com/fsbolero/bolero",
+    "notices": []
+  },
+  {
+    "package": "Elmish/4.0.1",
+    "authors": "Eugene Tolmachev",
+    "copyright": null,
+    "licence": "Apache-2.0",
+    "project": "https://github.com/elmish/elmish",
+    "notices": []
+  },
+  {
+    "package": "FSharp.Core/11.0.101",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://github.com/dotnet/fsharp",
+    "notices": []
+  },
+  {
+    "package": "FSharp.SystemTextJson/0.19.13",
+    "authors": "Loic Denuziere",
+    "copyright": null,
+    "licence": "MIT",
+    "project": "https://github.com/tarmil/FSharp.SystemTextJson",
+    "notices": []
+  },
+  {
+    "package": "Microsoft.AspNetCore.Authorization/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://asp.net/",
+    "notices": [
+      "microsoft.aspnetcore.authorization-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.AspNetCore.Components/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://asp.net/",
+    "notices": [
+      "microsoft.aspnetcore.components-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.AspNetCore.Components.Analyzers/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://asp.net/",
+    "notices": [
+      "microsoft.aspnetcore.components.analyzers-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.AspNetCore.Components.Forms/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://asp.net/",
+    "notices": [
+      "microsoft.aspnetcore.components.forms-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.AspNetCore.Components.Web/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://asp.net/",
+    "notices": [
+      "microsoft.aspnetcore.components.web-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.AspNetCore.Components.WebAssembly/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://asp.net/",
+    "notices": [
+      "microsoft.aspnetcore.components.webassembly-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.AspNetCore.Metadata/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://asp.net/",
+    "notices": [
+      "microsoft.aspnetcore.metadata-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.Extensions.Configuration/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://dot.net/",
+    "notices": [
+      "microsoft.extensions.configuration-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.Extensions.Configuration.Binder/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://dot.net/",
+    "notices": [
+      "microsoft.extensions.configuration.binder-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.Extensions.Configuration.EnvironmentVariables/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://dot.net/",
+    "notices": [
+      "microsoft.extensions.configuration.environmentvariables-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.Extensions.Configuration.FileExtensions/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://dot.net/",
+    "notices": [
+      "microsoft.extensions.configuration.fileextensions-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.Extensions.Configuration.Json/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://dot.net/",
+    "notices": [
+      "microsoft.extensions.configuration.json-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.Extensions.DependencyInjection/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://dot.net/",
+    "notices": [
+      "microsoft.extensions.dependencyinjection-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.Extensions.Diagnostics/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://dot.net/",
+    "notices": [
+      "microsoft.extensions.diagnostics-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.Extensions.FileProviders.Physical/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://dot.net/",
+    "notices": [
+      "microsoft.extensions.fileproviders.physical-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.Extensions.FileSystemGlobbing/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://dot.net/",
+    "notices": [
+      "microsoft.extensions.filesystemglobbing-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.Extensions.Http/10.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://dot.net/",
+    "notices": [
+      "microsoft.extensions.http-10.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.Extensions.Localization.Abstractions/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://asp.net/",
+    "notices": [
+      "microsoft.extensions.localization.abstractions-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.Extensions.Logging/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://dot.net/",
+    "notices": [
+      "microsoft.extensions.logging-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.Extensions.Options.ConfigurationExtensions/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://dot.net/",
+    "notices": [
+      "microsoft.extensions.options.configurationextensions-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.Extensions.Validation/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://asp.net/",
+    "notices": [
+      "microsoft.extensions.validation-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.JSInterop/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://asp.net/",
+    "notices": [
+      "microsoft.jsinterop-11.0.0-third-party-notices.txt"
+    ]
+  },
+  {
+    "package": "Microsoft.JSInterop.WebAssembly/11.0.0",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved.",
+    "licence": "MIT",
+    "project": "https://asp.net/",
+    "notices": [
+      "microsoft.jsinterop.webassembly-11.0.0-third-party-notices.txt"
+    ]
+  }
+]

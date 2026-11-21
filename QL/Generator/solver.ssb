@@ -384,11 +384,11 @@ DEFine PROCedure solver_analyse(VAL saBudget,VAL saSearchLimit)
     END IF
   END IF
   IF opt.full% AND sr.status$="complete" AND sr.uniqueness$="unique" THEN
-    SELect ON sr.tier$
-      ="local": sr.grade$="easy" : sr.score%=10+gen_min(19,INT(sr.localDeductions/gN%))
-      ="routes": sr.grade$="medium" : sr.score%=30+gen_min(24,sr.routeDeductions)
-      ="trial": sr.grade$="hard" : sr.score%=55+gen_min(24,sr.trialSteps)
-      =REMAINDER: sr.grade$="expert" : sr.score%=80+gen_min(20,INT(2*gen_log2(sr.searchNodes+1)))
-    END SELect
+    ## SBASIC has numeric SELECT only. Start with the search tier and replace
+    ## it for each of the mutually exclusive deduction/trial tiers.
+    sr.grade$="expert" : sr.score%=80+gen_min(20,INT(2*gen_log2(sr.searchNodes+1)))
+    IF sr.tier$="local" THEN sr.grade$="easy" : sr.score%=10+gen_min(19,INT(sr.localDeductions/gN%))
+    IF sr.tier$="routes" THEN sr.grade$="medium" : sr.score%=30+gen_min(24,sr.routeDeductions)
+    IF sr.tier$="trial" THEN sr.grade$="hard" : sr.score%=55+gen_min(24,sr.trialSteps)
   END IF
 END DEFine

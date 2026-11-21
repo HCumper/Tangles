@@ -117,8 +117,14 @@ END DEFine
 ## Keep the bit pattern while converting an unsigned word to a signed integer.
 ## This avoids overflow when the top bit is set in a heap mask or hash limb.
 DEFine FuNction word16%(VAL wiV)
-  IF wiV>=32768 THEN RETurn wiV-65536
-  RETurn wiV
+  LOCal wiWord
+  ## Older SBASIC can retain a noncanonical -32768 from INT. Convert via
+  ## the unsigned range before returning it to a % value or bitwise operand.
+  ## Keep the caller's value intact even when it is a by-reference temporary.
+  wiWord=wiV
+  IF wiWord<0 THEN wiWord=wiWord+65536
+  IF wiWord>=32768 THEN wiWord=wiWord-65536
+  RETurn wiWord
 END DEFine
 
 ## Apply XOR to two signed 16-bit halves, then reassemble a signed 32-bit word.

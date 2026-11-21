@@ -2,6 +2,10 @@
 #INCLUDE maths_ssb
 OPEN_NEW #9,"nfa1_result"
 PRINT #9,"BITS|";xor32(-1,305419896);"|";and32(-1,305419896)
+## INT's negative word boundary must remain usable as a % and bitwise input
+## in older SBASIC as well as Turbo. These are -32768, -1056964608, -2147483648.
+probeWord%=word16%(INT(-2147483648/65536))
+PRINT #9,"BOUNDARY|";probeWord%;"|";xor32(1090519040,-2147483648);"|";and32(-1,-2147483648)
 hash_reset : hash_text "abc" : PRINT #9,"SHA|";hash_finish$
 FOR probeI%=0 TO 6
   PRINT #9,"SEED|";probeI%;"|";gen_int$(batch_seed(42,probeI%))

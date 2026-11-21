@@ -1,0 +1,178 @@
+Tangles 1.00 - web edition credits and licences
+
+Tangles code, documentation and puzzle packs are licensed under MIT.
+The complete Tangles licence is in ../LICENSE.txt; copyright scope is in ../COPYRIGHT.txt.
+Third-party libraries and the bundled browser runtime have separate terms.
+The files in this directory retain their original notices and full licence texts.
+
+.NET 11 browser WebAssembly runtime: Microsoft and .NET contributors.
+See dotnet-LICENSE.TXT and dotnet-THIRD-PARTY-NOTICES.TXT.
+
+Resolved NuGet dependencies (including supporting build-time packages):
+
+Bolero/0.25.65
+Loic Denuziere
+
+Apache-2.0 (Bolero project licence)
+https://github.com/fsbolero/bolero
+
+Elmish/4.0.1
+Eugene Tolmachev
+
+Apache-2.0
+https://github.com/elmish/elmish
+
+FSharp.Core/11.0.101
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://github.com/dotnet/fsharp
+
+FSharp.SystemTextJson/0.19.13
+Loic Denuziere
+
+MIT
+https://github.com/tarmil/FSharp.SystemTextJson
+
+Microsoft.AspNetCore.Authorization/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://asp.net/
+
+Microsoft.AspNetCore.Components/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://asp.net/
+
+Microsoft.AspNetCore.Components.Analyzers/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://asp.net/
+
+Microsoft.AspNetCore.Components.Forms/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://asp.net/
+
+Microsoft.AspNetCore.Components.Web/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://asp.net/
+
+Microsoft.AspNetCore.Components.WebAssembly/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://asp.net/
+
+Microsoft.AspNetCore.Metadata/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://asp.net/
+
+Microsoft.Extensions.Configuration/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://dot.net/
+
+Microsoft.Extensions.Configuration.Binder/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://dot.net/
+
+Microsoft.Extensions.Configuration.EnvironmentVariables/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://dot.net/
+
+Microsoft.Extensions.Configuration.FileExtensions/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://dot.net/
+
+Microsoft.Extensions.Configuration.Json/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://dot.net/
+
+Microsoft.Extensions.DependencyInjection/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://dot.net/
+
+Microsoft.Extensions.Diagnostics/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://dot.net/
+
+Microsoft.Extensions.FileProviders.Physical/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://dot.net/
+
+Microsoft.Extensions.FileSystemGlobbing/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://dot.net/
+
+Microsoft.Extensions.Http/10.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://dot.net/
+
+Microsoft.Extensions.Localization.Abstractions/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://asp.net/
+
+Microsoft.Extensions.Logging/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://dot.net/
+
+Microsoft.Extensions.Options.ConfigurationExtensions/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://dot.net/
+
+Microsoft.Extensions.Validation/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://asp.net/
+
+Microsoft.JSInterop/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://asp.net/
+
+Microsoft.JSInterop.WebAssembly/11.0.0
+Microsoft
+© Microsoft Corporation. All rights reserved.
+MIT
+https://asp.net/
+
+Full project licences: Bolero-LICENSE.txt, Elmish-LICENSE.txt,
+FSharp-SystemTextJson-LICENSE.txt, FSharp-Core-LICENSE.txt.
+Microsoft MIT terms and runtime component notices are included separately.
+packages.json records resolved versions and associated notice files.

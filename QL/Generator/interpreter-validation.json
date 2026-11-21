@@ -1,0 +1,82 @@
+{
+  "verifiedAtUtc": "2026-11-21T15:45:02.602060+00:00",
+  "passed": true,
+  "basicSha256": "8ce5e09a917443e773f6ba45745cd6eaefa78ba91deb248aae379a9cf1be491e",
+  "executableSha256": "03376466f86a5fa4160ba0bad39ed92016d02b4e9ac085971a5780cd1bce393e",
+  "sourceSha256": {
+    "batch.ssb": "079800f1ce38a911e1fdefa4cc4c0141d6771330122261df31161311f78d7b34",
+    "cli.ssb": "73780487cb2bd50291ee8427b6c497c4d65ad9510d741461157234f7e5464943",
+    "construction.ssb": "ed24270c434b56e8aebf25d3c7f119e4d41458f6e00a2ba822403376a3c155ae",
+    "difficulty.ssb": "5dfb852f9c2114371ca22af9ff1391fb06a698130113deaca9faa44ace790e45",
+    "export.ssb": "9dd898bd31fec73546669f3255beecf06c7010738a9eb01bcce688a0a4f7b2f5",
+    "generator.ssb": "9886be9e88906147ee316e30a3718d6595cefb3362ca7bbdb2fa1e20f9749d66",
+    "identity.ssb": "9aacd93f57797156e0b3025d1a62f59ac94b5c38d493fbfbd3c86564ecd26d93",
+    "maths.ssb": "4fd239db3e07fc1dec2f6955ffc1f526015ac219f3024ddf60d5a44533943d10",
+    "model.ssb": "4ea73ddb7d4d4906a0518e49099d03aac33418b6ca7b23a33b4aa31f08968d07",
+    "selection.ssb": "816e23941c762b14b1727eaac86a2947bbbbf15a3ebe6cccfddee2ffb07040f9",
+    "solver.ssb": "fc8b4d071a70f38398369c546ab30ac189691dd617eaa035a2529b9b3ccd533e"
+  },
+  "build": {
+    "toolchain": "SSB 2.8 / Turbo 5.09",
+    "errors": 0,
+    "warnings": 54
+  },
+  "fix": "Normalise signed word inputs through their unsigned representation before integer/bitwise conversion. SMSQ/E 3.13 returned a problematic -32768 from INT while hashing the default 8x8 puzzle.",
+  "qemulator": {
+    "environment": "Q-emuLator 3.5.1 / SMSQ/E 3.13",
+    "interpreted": true,
+    "command": "EW win1_generator_bas;\"--seed 42 --count 10 --output win1_test2_json --force\"",
+    "exit": 0,
+    "puzzles": 10,
+    "sha256": "a98860d015eb6039287a79981a991ebfe287504441e45765aa54340f033ce28d",
+    "validation": "Shared F# loader, path rules, reveal/hints, SHA identities and difficulty measurements; identical bytes to compiled reference"
+  },
+  "smsqmulator": {
+    "environment": "SMSQ/E 3.42 / 16 MiB RAM",
+    "compiled": [
+      {
+        "name": "default",
+        "seconds": 21.06,
+        "exit": 0,
+        "puzzles": 10,
+        "path": "C:\\Source\\codex-workspace\\.scratch\\tangles-ql-generator\\integration\\compat_default_json",
+        "sha256": "a98860d015eb6039287a79981a991ebfe287504441e45765aa54340f033ce28d"
+      },
+      {
+        "name": "full",
+        "seconds": 14.54,
+        "exit": 0,
+        "puzzles": 2,
+        "path": "C:\\Source\\codex-workspace\\.scratch\\tangles-ql-generator\\integration\\compat_full_json",
+        "sha256": "a913b92b1efe3a66a71889afe2e10ade7a8e048c5e520ad7b0fe9b92b7f8d76f"
+      }
+    ],
+    "interpreted": [
+      {
+        "name": "default",
+        "seconds": 38.07,
+        "exit": 0,
+        "puzzles": 10,
+        "path": "C:\\Source\\codex-workspace\\.scratch\\tangles-ql-generator\\interpreted\\compat_default_json",
+        "sha256": "a98860d015eb6039287a79981a991ebfe287504441e45765aa54340f033ce28d"
+      },
+      {
+        "name": "full",
+        "seconds": 21.55,
+        "exit": 0,
+        "puzzles": 2,
+        "path": "C:\\Source\\codex-workspace\\.scratch\\tangles-ql-generator\\interpreted\\compat_full_json",
+        "sha256": "a913b92b1efe3a66a71889afe2e10ade7a8e048c5e520ad7b0fe9b92b7f8d76f"
+      }
+    ],
+    "validation": "All 24 generated puzzle executions validated against shared F# loader/rules/hints/IDs/grading"
+  },
+  "compiledAndInterpretedPackBytesIdentical": true,
+  "baseline": {
+    "verifiedAtUtc": "2026-11-21T14:38:51.607567+00:00",
+    "basicSha256": "7abe62030d24568ff2f9ce4a2ad7afec26d9d04ae1830811cc9474631383be27",
+    "interpretedChecks": 24,
+    "compiledChecks": 23,
+    "note": "Earlier full CLI validation before the signed-word compatibility fix; current build received the targeted checks above."
+  }
+}

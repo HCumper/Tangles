@@ -346,21 +346,16 @@ type App() as this =
             header {
                 attr.``class`` "masthead"
                 a { attr.href "./"; attr.``class`` "brand"; span { attr.``class`` "brand-mark"; "t" }; "tangles" }
-                span { attr.``class`` "masthead-note"; "A little room to think." }
+                p {
+                    attr.``class`` "lede"
+                    if game.IsNone then "Load a puzzle pack to begin."
+                    elif fullCoverage then "Connect each matching pair and fill every square."
+                    else "Connect each matching pair. Empty squares can stay empty."
+                }
             }
             main {
                 div {
-                    attr.``class`` "intro"
-                    div {
-                        p { attr.``class`` "eyebrow"; "THE CONNECTION GAME" }
-                        h1 { "Find a way through." }
-                        p {
-                            attr.``class`` "lede"
-                            if game.IsNone then "Load a puzzle pack to begin."
-                            elif fullCoverage then "Connect each matching pair and fill every square."
-                            else "Connect each matching pair. Empty squares can stay empty."
-                        }
-                    }
+                    attr.``class`` "play-layout"
                     div {
                         attr.``class`` "pack-picker"
                         label { attr.``class`` "pack-label"; attr.``for`` "pack-choice"; "Choose a pack" }
@@ -382,21 +377,24 @@ type App() as this =
                             | None -> "Choose a collection or open your own JSON pack."
                         }
                     }
-                }
-                div {
-                    attr.``class`` "play-layout"
                     section {
                         attr.``class`` "board-panel"
+                        attr.style (match game with
+                                    | Some state -> $"--board-columns:{state.Puzzle.Width};--board-rows:{state.Puzzle.Height}"
+                                    | None -> "--board-columns:1;--board-rows:1")
                         div {
                             attr.``class`` "board-heading"
                             div { span { attr.``class`` "eyebrow"; "PUZZLE" }; strong { if total > 0 then $"{current + 1:D2} / {total:D2}" else "—" } }
                             span { attr.``class`` "board-size"; match game with Some g -> $"{g.Puzzle.Width} × {g.Puzzle.Height}" | None -> "" }
                         }
                         div {
-                            attr.``class`` "board-frame"
-                            match game with
-                            | Some state -> this.Board state
-                            | None -> div { attr.``class`` "board-placeholder"; if busy then "Getting your puzzle ready…" else "Load a puzzle pack to play." }
+                            attr.``class`` "board-stage"
+                            div {
+                                attr.``class`` "board-frame"
+                                match game with
+                                | Some state -> this.Board state
+                                | None -> div { attr.``class`` "board-placeholder"; if busy then "Getting your puzzle ready…" else "Load a puzzle pack to play." }
+                            }
                         }
                         div {
                             attr.``class`` "board-toolbar"
@@ -417,6 +415,7 @@ type App() as this =
                     }
                     aside {
                         attr.``class`` "sidebar"
+                        div { attr.``class`` "notice"; "role" => "status"; "aria-live" => "polite"; if notice <> "" then notice elif solved then "Puzzle complete. Any valid route counts." else "" }
                         section {
                             attr.``class`` (if solved then "progress-card solved" else "progress-card")
                             p { attr.``class`` "eyebrow"; if solved then "NICELY UNTANGLED" else "YOUR CONNECTIONS" }
@@ -461,9 +460,9 @@ type App() as this =
                                     option { attr.value (string index); $"Puzzle {index + 1}" }
                             }
                         }
-                        section {
+                        elt "details" {
                             attr.``class`` "how-card"
-                            h2 { "Make the connection" }
+                            elt "summary" { "How to play" }
                             ol {
                                 li { "Drag from a letter to its matching partner." }
                                 li { "Keep paths apart. A path cannot touch its own sides." }
@@ -476,22 +475,21 @@ type App() as this =
                             }
                             p { attr.id "board-help"; attr.``class`` "keyboard-help"; "Keyboard: focus the board, use arrows to move, Space to start or stop drawing. Ctrl+Z undoes." }
                         }
-                        section {
+                        elt "details" {
                             attr.``class`` "pack-card"
-                            h2 { "Bring your own tangles" }
+                            elt "summary" { "Open your own puzzle pack" }
                             p { "Open a JSON puzzle pack from the Tangles generator." }
                             label { attr.``for`` "pack-file"; attr.``class`` "file-button"; "↑ Load puzzle pack" }
                             input { attr.id "pack-file"; attr.``type`` "file"; "accept" => ".json,application/json"; attr.disabled busy }
                             span { attr.``class`` "file-note"; "Stays on your device · up to 5 MB" }
                         }
+                        footer {
+                            if game.IsNone then "No timer. Just find your way."
+                            elif fullCoverage then "No timer. Connect every pair and fill the board."
+                            else "No timer. No need to fill the board. Just find your way."
+                        }
                     }
                 }
-                div { attr.``class`` "notice"; "role" => "status"; "aria-live" => "polite"; if notice <> "" then notice elif solved then "Puzzle complete. Any valid route counts." else "" }
-            }
-            footer {
-                if game.IsNone then "No timer. Just find your way."
-                elif fullCoverage then "No timer. Connect every pair and fill the board."
-                else "No timer. No need to fill the board. Just find your way."
             }
         }
 

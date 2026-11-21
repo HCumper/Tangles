@@ -1,0 +1,394 @@
+## Clue-only cell-domain solver. Domains are four packed signed 16-bit words;
+## no 64-bit floating-point arithmetic or generator solution is used.
+## Each frame has 12 bytes per cell: four domain words at offsets 0..7,
+## candidate count at 8, and fixed colour at 10 (-1 means not yet fixed).
+## Frame 0 is the main state; trials and branches copy it into child frames.
+DIM sRequired%(0),sDiscovery%(0),sLow%(0),sMandatory%(0)
+DIM sA%(0),sB%(0),sColourMap%(0),sPathSeen%(0)
+DIM sWord%(63),sBit%(63)
+DIM sAddress(256)
+sMemory=0 : solverFrameBytes=0
+sBad%=0 : sLimit%=0 : sColours%=0 : sClock%=0 : sRouteColour%=0 : sSearchLimit=20000
+
+## Turbo limits the total size of a numeric array. Heap-backed frames keep
+## 16x16/256-level domains valid without relying on oversized DIM arrays.
+## Normalise PEEK_W results before using them as signed masks or the -1 sentinel.
+DEFine FuNction solver_signed%(VAL swValue)
+  IF swValue>32767 THEN RETurn swValue-65536
+  RETurn swValue
+END DEFine
+
+DEFine FuNction solver_word%(VAL swLevel%,VAL swCell%,VAL swWord%)
+  RETurn solver_signed%(PEEK_W(sAddress(swLevel%)+12*swCell%+2*swWord%))
+END DEFine
+
+DEFine PROCedure solver_put(VAL swLevel%,VAL swCell%,VAL swWord%,VAL swValue%)
+  POKE_W sAddress(swLevel%)+12*swCell%+2*swWord%,swValue%
+END DEFine
+
+DEFine FuNction solver_count%(VAL swLevel%,VAL swCell%)
+  RETurn PEEK_W(sAddress(swLevel%)+12*swCell%+8)
+END DEFine
+
+DEFine PROCedure solver_set_count(VAL swLevel%,VAL swCell%,VAL swCount%)
+  POKE_W sAddress(swLevel%)+12*swCell%+8,swCount%
+END DEFine
+
+DEFine FuNction solver_fixed%(VAL swLevel%,VAL swCell%)
+  RETurn solver_signed%(PEEK_W(sAddress(swLevel%)+12*swCell%+10))
+END DEFine
+
+DEFine PROCedure solver_set_fixed(VAL swLevel%,VAL swCell%,VAL swFixed%)
+  POKE_W sAddress(swLevel%)+12*swCell%+10,swFixed%
+END DEFine
+
+## Charge deterministic work units and poll cancellation. Exhausting a budget
+## marks the report incomplete; it must never establish uniqueness or a hard grade.
+DEFine PROCedure solver_spend
+  gen_poll
+  IF sLimit% OR gCancel% THEN RETurn
+  IF sr.work>=sr.workLimit THEN
+    sLimit%=1 : sr.status$="budgetExceeded" : sr.limitReason$="work" : RETurn
+  END IF
+  sr.work=sr.work+1
+END DEFine
+
+DEFine FuNction solver_has%(VAL shLevel%,VAL shCell%,VAL shColour%)
+  RETurn (solver_word%(shLevel%,shCell%,sWord%(shColour%)) && sBit%(shColour%))<>0
+END DEFine
+
+## Remove a candidate colour and maintain the cached count and singleton colour.
+## Dropping the sole remaining candidate is a contradiction. Only committed
+## reasoning passes add local/route deductions to the published counters.
+DEFine FuNction solver_drop%(VAL sxLevel%,VAL sxCell%,VAL sxColour%,VAL sxLocal%,VAL sxRoute%)
+  LOCal sxV,sxWord%,sxC%
+  IF NOT solver_has%(sxLevel%,sxCell%,sxColour%) THEN RETurn 0
+  IF solver_count%(sxLevel%,sxCell%)=1 THEN sBad%=1 : RETurn 0
+  sxWord%=sWord%(sxColour%)
+  solver_put sxLevel%,sxCell%,sxWord%,(solver_word%(sxLevel%,sxCell%,sxWord%) ^^ sBit%(sxColour%))
+  solver_set_count sxLevel%,sxCell%,solver_count%(sxLevel%,sxCell%)-1
+  IF solver_count%(sxLevel%,sxCell%)=1 THEN
+    FOR sxC%=0 TO sColours%-1
+      IF solver_has%(sxLevel%,sxCell%,sxC%) THEN solver_set_fixed sxLevel%,sxCell%,sxC% : EXIT sxC%
+    END FOR sxC%
+  END IF
+  IF sxLocal% THEN sr.localDeductions=sr.localDeductions+1
+  IF sxRoute% THEN sr.routeDeductions=sr.routeDeductions+1
+  RETurn 1
+END DEFine
+
+## Replace a cell's domain with one colour, counting the alternatives removed.
+## Forcing a colour already excluded by the domain is a contradiction.
+DEFine FuNction solver_force%(VAL ssLevel%,VAL ssCell%,VAL ssColour%,VAL ssLocal%,VAL ssRoute%)
+  LOCal ssI%,ssRemoved%
+  IF NOT solver_has%(ssLevel%,ssCell%,ssColour%) THEN sBad%=1 : RETurn 0
+  IF solver_count%(ssLevel%,ssCell%)=1 THEN RETurn 0
+  ssRemoved%=solver_count%(ssLevel%,ssCell%)-1
+  FOR ssI%=0 TO 3
+    solver_put ssLevel%,ssCell%,ssI%,0
+  END FOR ssI%
+  solver_put ssLevel%,ssCell%,sWord%(ssColour%),sBit%(ssColour%)
+  solver_set_count ssLevel%,ssCell%,1 : solver_set_fixed ssLevel%,ssCell%,ssColour%
+  IF ssLocal% THEN sr.localDeductions=sr.localDeductions+ssRemoved%
+  IF ssRoute% THEN sr.routeDeductions=sr.routeDeductions+ssRemoved%
+  RETurn 1
+END DEFine
+
+## Copy an entire frame before a trial or branch, preserving its parent state.
+DEFine PROCedure solver_copy(VAL syFrom%,VAL syTo%)
+  LOCal syOffset
+  FOR syOffset=0 TO solverFrameBytes-2 STEP 2
+    POKE_W sAddress(syTo%)+syOffset,solver_signed%(PEEK_W(sAddress(syFrom%)+syOffset))
+  END FOR syOffset
+END DEFine
+
+## Propagate degree constraints to a fixed point: endpoints need one same-colour
+## neighbour, interiors need two. Too few possible or too many fixed neighbours
+## exclude a colour; a satisfied fixed cell constrains its remaining neighbours.
+DEFine PROCedure solver_local(VAL slLevel%,VAL slRecord%)
+  LOCal slChanged%,slCell%,slColour%,slD%,slN%,slPossible%,slFixed%,slOK%,slFirst%,slLast%
+  REPeat slAgain
+    slChanged%=0
+    FOR slCell%=0 TO gN%-1
+      slFirst%=0 : slLast%=opt.pairs%-1
+      IF solver_fixed%(slLevel%,slCell%)>=0 THEN
+        slFirst%=solver_fixed%(slLevel%,slCell%) : slLast%=gen_min(slFirst%,opt.pairs%-1)
+      END IF
+      FOR slColour%=slFirst% TO slLast%
+        IF solver_has%(slLevel%,slCell%,slColour%) THEN
+          solver_spend : IF sLimit% OR gCancel% THEN RETurn
+          slPossible%=0 : slFixed%=0
+          FOR slD%=0 TO gDegree%(slCell%)-1
+            slN%=gNb%(slCell%,slD%)
+            IF solver_has%(slLevel%,slN%,slColour%) THEN slPossible%=slPossible%+1
+            IF solver_fixed%(slLevel%,slN%)=slColour% THEN slFixed%=slFixed%+1
+          END FOR slD%
+          IF slPossible%<sRequired%(slCell%) OR slFixed%>sRequired%(slCell%) THEN
+            IF solver_drop%(slLevel%,slCell%,slColour%,slRecord%,0) THEN slChanged%=1
+          ELSE
+            IF solver_fixed%(slLevel%,slCell%)=slColour% THEN
+              FOR slD%=0 TO gDegree%(slCell%)-1
+                slN%=gNb%(slCell%,slD%)
+                IF solver_has%(slLevel%,slN%,slColour%) AND solver_fixed%(slLevel%,slN%)<>slColour% THEN
+                  IF slPossible%=sRequired%(slCell%) THEN
+                    IF solver_force%(slLevel%,slN%,slColour%,slRecord%,0) THEN slChanged%=1
+                  ELSE
+                    IF slFixed%=sRequired%(slCell%) THEN
+                      IF solver_drop%(slLevel%,slN%,slColour%,slRecord%,0) THEN slChanged%=1
+                    END IF
+                  END IF
+                END IF
+                IF sBad% THEN RETurn
+              END FOR slD%
+            END IF
+          END IF
+          IF sBad% THEN RETurn
+        END IF
+      END FOR slColour%
+    END FOR slCell%
+    IF NOT slChanged% THEN EXIT slAgain
+  END REPeat slAgain
+END DEFine
+
+## Tarjan DFS records discovery times and the lowest reachable ancestor.
+## A child containing the far endpoint makes this cell mandatory when that child
+## has no route around it. Return whether the subtree contains the far endpoint.
+DEFine FuNction solver_visit%(VAL svLevel%,VAL svCell%,VAL svParent%)
+  LOCal svD%,svNext%,svContains%,svChild%
+  solver_spend : IF sLimit% OR gCancel% THEN RETurn 0
+  sDiscovery%(svCell%)=sClock% : sLow%(svCell%)=sClock% : sClock%=sClock%+1
+  svContains%=(svCell%=sB%(sRouteColour%))
+  FOR svD%=0 TO gDegree%(svCell%)-1
+    solver_spend : IF sLimit% OR gCancel% THEN RETurn 0
+    svNext%=gNb%(svCell%,svD%)
+    IF solver_has%(svLevel%,svNext%,sRouteColour%) THEN
+      IF sDiscovery%(svNext%)<0 THEN
+        svChild%=solver_visit%(svLevel%,svNext%,svCell%)
+        sLow%(svCell%)=gen_min(sLow%(svCell%),sLow%(svNext%))
+        IF svChild% AND sLow%(svNext%)>=sDiscovery%(svCell%) THEN sMandatory%(svCell%)=1
+        svContains%=(svContains% OR svChild%)
+      ELSE
+        IF svNext%<>svParent% THEN sLow%(svCell%)=gen_min(sLow%(svCell%),sDiscovery%(svNext%))
+      END IF
+    END IF
+    IF sLimit% OR gCancel% THEN RETurn 0
+  END FOR svD%
+  RETurn svContains%
+END DEFine
+
+## For each pair, exclude disconnected cells and force mandatory connection cells.
+## A missing endpoint-to-endpoint route is a contradiction; routePasses counts
+## only recorded passes that actually removed candidates.
+DEFine FuNction solver_routes%(VAL spLevel%,VAL spRecord%)
+  LOCal spColour%,spCell%,spChanged%,spReach%
+  spChanged%=0
+  FOR spColour%=0 TO opt.pairs%-1
+    solver_spend : IF sLimit% OR gCancel% THEN RETurn 0
+    sRouteColour%=spColour% : sClock%=0
+    FOR spCell%=0 TO gN%-1
+      sDiscovery%(spCell%)=-1 : sLow%(spCell%)=0 : sMandatory%(spCell%)=0
+    END FOR spCell%
+    spReach%=solver_visit%(spLevel%,sA%(spColour%),-1)
+    IF sLimit% OR gCancel% THEN RETurn 0
+    IF NOT spReach% THEN sBad%=1 : RETurn 0
+    FOR spCell%=0 TO gN%-1
+      IF solver_has%(spLevel%,spCell%,spColour%) THEN
+        IF sDiscovery%(spCell%)<0 THEN
+          IF solver_drop%(spLevel%,spCell%,spColour%,0,spRecord%) THEN spChanged%=1
+        ELSE
+          IF sMandatory%(spCell%) THEN
+            IF solver_force%(spLevel%,spCell%,spColour%,0,spRecord%) THEN spChanged%=1
+          END IF
+        END IF
+      END IF
+      IF sBad% THEN RETurn 0
+    END FOR spCell%
+  END FOR spColour%
+  IF spChanged% AND spRecord% THEN sr.routePasses=sr.routePasses+1
+  RETurn spChanged%
+END DEFine
+
+## Alternate local and connectivity deductions until neither changes the frame.
+## Trial/branch propagation does not inflate the committed reasoning counters.
+DEFine PROCedure solver_propagate(VAL suLevel%)
+  LOCal suChanged%
+  REPeat suAgain
+    solver_local suLevel%,0 : IF sBad% OR sLimit% OR gCancel% THEN RETurn
+    suChanged%=solver_routes%(suLevel%,0)
+    IF NOT suChanged% OR sBad% OR sLimit% OR gCancel% THEN EXIT suAgain
+  END REPeat suAgain
+END DEFine
+
+## A singleton assignment is not sufficient on its own: walk each pair
+## end-to-end and require that it accounts for every cell assigned that colour.
+## This rejects disconnected loops that local degree checks alone could allow.
+DEFine FuNction solver_materialise%(VAL smLevel%)
+  LOCal smC%,smI%,smAt%,smPrevious%,smNext%,smFound%,smLength%,smTotal%,smD%
+  FOR smC%=0 TO opt.pairs%-1
+    smTotal%=0
+    FOR smI%=0 TO gN%-1
+      IF solver_fixed%(smLevel%,smI%)=smC% THEN smTotal%=smTotal%+1
+    END FOR smI%
+    smAt%=sA%(smC%) : smPrevious%=-1 : smLength%=0
+    REPeat smWalk
+      solver_spend : IF sLimit% OR gCancel% THEN RETurn 0
+      smLength%=smLength%+1
+      IF smAt%=sB%(smC%) THEN EXIT smWalk
+      smFound%=0 : smNext%=-1
+      FOR smD%=0 TO gDegree%(smAt%)-1
+        smI%=gNb%(smAt%,smD%)
+        IF smI%<>smPrevious% AND solver_fixed%(smLevel%,smI%)=smC% THEN smFound%=smFound%+1 : smNext%=smI%
+      END FOR smD%
+      IF smFound%<>1 OR smLength%>gN% THEN sBad%=1 : RETurn 0
+      smPrevious%=smAt% : smAt%=smNext%
+    END REPeat smWalk
+    IF smLength%<>smTotal% THEN sBad%=1 : RETurn 0
+  END FOR smC%
+  RETurn 1
+END DEFine
+
+## Branch on the smallest non-singleton domain, trying colours in fixed order.
+## Return whether this subtree was exhausted, not whether it has a solution.
+## Two answers establish ambiguity; uniqueness needs an exhaustive one-answer search.
+DEFine FuNction solver_search%(VAL seLevel%,VAL seDepth%)
+  LOCal seBest%,seSize%,seI%,seC%,seComplete%,seChild%,seOK%
+  IF sr.solutionCount%>=2 THEN RETurn 0
+  solver_spend : IF sLimit% OR gCancel% THEN RETurn 0
+  IF sr.searchNodes>=sSearchLimit THEN sLimit%=1 : sr.status$="budgetExceeded" : sr.limitReason$="searchNodes" : RETurn 0
+  sr.searchNodes=sr.searchNodes+1 : sr.maxDepth%=gen_max(sr.maxDepth%,seDepth%)
+  sBad%=0 : solver_propagate seLevel%
+  IF sLimit% OR gCancel% THEN RETurn 0
+  IF sBad% THEN sBad%=0 : RETurn 1
+  seBest%=-1 : seSize%=65
+  FOR seI%=0 TO gN%-1
+    IF solver_count%(seLevel%,seI%)>1 AND solver_count%(seLevel%,seI%)<seSize% THEN seBest%=seI% : seSize%=solver_count%(seLevel%,seI%)
+  END FOR seI%
+  IF seBest%<0 THEN
+    seOK%=solver_materialise%(seLevel%)
+    IF sLimit% OR gCancel% THEN RETurn 0
+    IF sBad% THEN sBad%=0 : RETurn 1
+    IF sr.solutionCount%=0 THEN sr.firstNodes=sr.searchNodes : sr.firstDepth%=seDepth%
+    sr.solutionCount%=sr.solutionCount%+1 : RETurn 1
+  END IF
+  seComplete%=1
+  FOR seC%=0 TO sColours%-1
+    IF solver_has%(seLevel%,seBest%,seC%) THEN
+      IF sr.solutionCount%>=2 THEN RETurn 0
+      solver_copy seLevel%,seLevel%+1
+      seOK%=solver_force%(seLevel%+1,seBest%,seC%,0,0)
+      seChild%=solver_search%(seLevel%+1,seDepth%+1) : seComplete%=(seComplete% AND seChild%)
+      IF sLimit% OR gCancel% THEN RETurn 0
+    END IF
+  END FOR seC%
+  RETurn seComplete%
+END DEFine
+
+## Assess clues without reading the stored generator solution. Try local rules,
+## route deductions and contradiction trials before branching. Grade only a
+## complete, uniquely solved full-coverage board; incomplete evidence stays unrated.
+DEFine PROCedure solver_analyse(VAL saBudget,VAL saSearchLimit)
+  LOCal saI%,saJ%,saC%,saWord%,saOK%,saSingle%,saRoutes%,saEliminated%,saGrading%
+  DIM sr AS SolverReport
+  sr.status$="complete" : sr.tier$="local" : sr.grade$="unrated" : sr.workLimit=saBudget
+  sr.uniqueness$="notEstablished" : sr.boardKey$=identity_board$
+  sBad%=0 : sLimit%=0 : sSearchLimit=saSearchLimit : gHasReason%=1
+  IF opt.width%>16 OR opt.height%>16 OR opt.pairs%>64-(NOT opt.full%) THEN
+    sr.status$="unsupported" : sr.tier$="unknown"
+    sr.limitReason$="Solver supports dimensions up to 16x16 and at most 64 full-coverage or 63 connect-only pairs." : RETurn
+  END IF
+  ## Connections-only domains include an extra unused-cell value. It has no
+  ## path-degree requirement; full coverage has no unused value at all.
+  sColours%=opt.pairs%+(NOT opt.full%)
+  FOR saC%=0 TO 63
+    sWord%(saC%)=INT(saC%/16) : sBit%(saC%)=word16%(gPower(saC% MOD 16))
+  END FOR saC%
+  IF sMemory THEN RECHP sMemory
+  sMemory=0
+  solverFrameBytes=12*gN% : sMemory=ALCHP((gN%+1)*solverFrameBytes)
+  IF NOT sMemory THEN gExit%=1 : gError$="Not enough memory for solver frames." : RETurn
+  FOR saI%=0 TO gN%
+    sAddress(saI%)=sMemory+saI%*solverFrameBytes
+  END FOR saI%
+  DIM sRequired%(gN%-1),sDiscovery%(gN%-1),sLow%(gN%-1),sMandatory%(gN%-1)
+  DIM sA%(opt.pairs%-1),sB%(opt.pairs%-1),sColourMap%(opt.pairs%-1)
+  FOR saC%=0 TO opt.pairs%-1
+    sA%(saC%)=gA%(saC%+1) : sB%(saC%)=gB%(saC%+1) : sColourMap%(saC%)=gCanonical%(saC%+1)
+  END FOR saC%
+  FOR saI%=0 TO gN%-1
+    solver_set_count 0,saI%,sColours% : solver_set_fixed 0,saI%,-1 : sRequired%(saI%)=2
+    IF sColours%=1 THEN solver_set_fixed 0,saI%,0
+    FOR saWord%=0 TO 3
+      saJ%=gen_max(0,gen_min(16,sColours%-16*saWord%))
+      solver_put 0,saI%,saWord%,word16%(gPower(saJ%)-1)
+    END FOR saWord%
+  END FOR saI%
+  FOR saC%=0 TO opt.pairs%-1
+    saOK%=solver_force%(0,sA%(saC%),saC%,0,0) : saOK%=solver_force%(0,sB%(saC%),saC%,0,0)
+    sRequired%(sA%(saC%))=1 : sRequired%(sB%(saC%))=1
+  END FOR saC%
+  ## First record deductions that a player-style reasoning process can make.
+  ## Trial assumptions run on copies; only an assumption proved contradictory
+  ## removes a candidate from the main frame and counts as a trial step.
+  saGrading%=1
+  REPeat saGrade
+    solver_local 0,1 : IF sBad% OR sLimit% OR gCancel% THEN EXIT saGrade
+    saSingle%=1
+    FOR saI%=0 TO gN%-1
+      IF solver_count%(0,saI%)<>1 THEN saSingle%=0 : EXIT saI%
+    END FOR saI%
+    IF saSingle% THEN
+      saOK%=solver_materialise%(0)
+      IF NOT sBad% AND NOT sLimit% AND NOT gCancel% THEN sr.solutionCount%=1 : sr.logical%=1 : sr.exhaustive%=1
+      EXIT saGrade
+    END IF
+    saRoutes%=solver_routes%(0,1) : IF sBad% OR sLimit% OR gCancel% THEN EXIT saGrade
+    IF saRoutes% THEN
+      IF sr.tier$="local" THEN sr.tier$="routes"
+    ELSE
+      saEliminated%=0
+      FOR saI%=0 TO gN%-1
+        IF solver_count%(0,saI%)>1 THEN
+          FOR saC%=0 TO sColours%-1
+            IF solver_has%(0,saI%,saC%) THEN
+              sr.trialAssumptions=sr.trialAssumptions+1 : solver_copy 0,1
+              saOK%=solver_force%(1,saI%,saC%,0,0) : solver_propagate 1
+              IF sLimit% OR gCancel% THEN EXIT saC%
+              IF sBad% THEN
+                sBad%=0 : saOK%=solver_drop%(0,saI%,saC%,0,0)
+                sr.trialSteps=sr.trialSteps+1 : sr.tier$="trial" : saEliminated%=1 : EXIT saC%
+              END IF
+            END IF
+          END FOR saC%
+        END IF
+        IF saEliminated% OR sBad% OR sLimit% OR gCancel% THEN EXIT saI%
+      END FOR saI%
+      IF sBad% OR sLimit% OR gCancel% THEN EXIT saGrade
+      IF NOT saEliminated% THEN sr.tier$="search" : EXIT saGrade
+    END IF
+  END REPeat saGrade
+  ## If reasoning stalled, branch to count answers up to two. A budget stop
+  ## leaves completeness false, even when a first solution has been found.
+  IF sBad% THEN
+    sr.tier$="unsatisfiable" : sr.exhaustive%=1 : sBad%=0
+  ELSE
+    IF NOT sr.logical% AND NOT sLimit% AND NOT gCancel% THEN
+      sr.exhaustive%=solver_search%(0,0)
+      IF sr.exhaustive% AND sr.solutionCount%=0 THEN sr.tier$="unsatisfiable"
+    END IF
+  END IF
+  IF sr.solutionCount%>=2 THEN
+    sr.uniqueness$="multiple"
+  ELSE
+    IF sr.exhaustive% THEN
+      sr.uniqueness$="none" : IF sr.solutionCount%=1 THEN sr.uniqueness$="unique"
+    END IF
+  END IF
+  IF opt.full% AND sr.status$="complete" AND sr.uniqueness$="unique" THEN
+    SELect ON sr.tier$
+      ="local": sr.grade$="easy" : sr.score%=10+gen_min(19,INT(sr.localDeductions/gN%))
+      ="routes": sr.grade$="medium" : sr.score%=30+gen_min(24,sr.routeDeductions)
+      ="trial": sr.grade$="hard" : sr.score%=55+gen_min(24,sr.trialSteps)
+      =REMAINDER: sr.grade$="expert" : sr.score%=80+gen_min(20,INT(2*gen_log2(sr.searchNodes+1)))
+    END SELect
+  END IF
+END DEFine

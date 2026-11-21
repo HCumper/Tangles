@@ -1,0 +1,20 @@
+DIM ioA$(128),ioB$(128)
+OPEN #0,con
+OPEN_NEW #9,"nfa1_result"
+WHEN ERRor
+  PRINT #9,"ERROR|";ERNUM%
+  CLOSE #9
+  OPEN_NEW #8,"nfa1_done":PRINT #8,"ERROR":CLOSE #8
+  RJOB -1,-1
+END WHEN
+ioA$="nfa1_io_a" : ioB$="nfa1_io_b"
+PRINT #9,"MISSING|";FTEST(ioA$)
+ioCh%=FOP_NEW(ioA$) : PRINT #9,"NEW|";ioCh%
+PRINT #ioCh%,"ORIGINAL" : CLOSE #ioCh%
+PRINT #9,"PRESENT|";FTEST(ioA$)
+## Collision reservation is checked independently.
+RENAME ioA$,ioB$
+PRINT #9,"RENAMED|";FTEST(ioB$);"|";FTEST(ioA$)
+CLOSE #9
+OPEN_NEW #8,"nfa1_done":PRINT #8,"OK":CLOSE #8
+RJOB -1,0

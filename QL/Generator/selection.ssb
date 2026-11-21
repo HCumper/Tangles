@@ -1,0 +1,283 @@
+## Solver-guided proposals, exact grade/effort policies and candidate budgets.
+## Score row 0 is the proposal, row 1 the retained walk, and row 2 the best
+## qualifying board. Steering state and exportable state are deliberately separate.
+DIM chosenReason AS SolverReport
+DIM selWalk%(0),selScore(2,4)
+selConsidered%=0 : selEvaluated%=0 : selDuplicates%=0 : selBudgetRejected%=0
+selAssessments%=0 : selAccepted%=0 : selFirst%=-1 : selSeen%=0
+DIM selStartingTier$(20),selKey$(64),selAlgorithm$(64)
+selStartingTrials=0 : selChosenReason%=0 : selChosenShortest%=0
+selShortSolved%=0 : selShortTrials%=0 : selShortLimit%=0 : selShortFirst%=0
+
+## Plain generation avoids solver/search overhead unless evidence or a filter is requested.
+DEFine FuNction selection_active%
+  RETurn (opt.assess% OR opt.target%>0 OR opt.unique% OR opt.shortest%)
+END DEFine
+
+DEFine FuNction selection_strengthened%
+  RETurn (opt.minTrials>0 OR opt.maxTrials>=0 OR opt.minDepth%>0 OR opt.minNodes%>0)
+END DEFine
+
+## Accept effort bounds only with a complete assessment. The upper trial bound
+## lets a pack reject excessive trial work as well as insufficient effort.
+DEFine FuNction selection_minimums%
+  IF sr.status$<>"complete" THEN RETurn 0
+  IF sr.trialSteps<opt.minTrials OR sr.firstDepth%<opt.minDepth% OR sr.firstNodes<opt.minNodes% THEN RETurn 0
+  IF opt.maxTrials>=0 AND sr.trialSteps>opt.maxTrials THEN RETurn 0
+  RETurn 1
+END DEFine
+
+## Compare proposal row 0 lexicographically with the current walk or saved best.
+## Earlier columns take precedence; this search score does not replace acceptance.
+DEFine FuNction selection_compare%(VAL scRow%)
+  LOCal scI%
+  FOR scI%=0 TO 4
+    IF selScore(0,scI%)>selScore(scRow%,scI%) THEN RETurn 1
+    IF selScore(0,scI%)<selScore(scRow%,scI%) THEN RETurn -1
+  END FOR scI%
+  RETurn 0
+END DEFine
+
+## Snapshot the witness together with its solver and shortest-route evidence.
+## Later proposals overwrite shared arrays, so saving only a grade would attach
+## the wrong assessment or hint paths to the eventual exported puzzle.
+DEFine PROCedure selection_save
+  LOCal svI%
+  FOR svI%=0 TO gN%-1
+    gSavedOwner%(svI%)=gOwner%(svI%) : gSavedOrder%(svI%)=gOrder%(svI%)
+  END FOR svI%
+  selChosenReason%=gHasReason% : selChosenShortest%=gHasShortest%
+  selShortSolved%=shortSolved% : selShortTrials%=shortTrials% : selShortLimit%=shortLimit% : selShortFirst%=shortFirst%
+  chosenReason.status$=sr.status$
+  chosenReason.limitReason$=sr.limitReason$
+  chosenReason.tier$=sr.tier$
+  chosenReason.grade$=sr.grade$
+  chosenReason.score%=sr.score%
+  chosenReason.logical%=sr.logical%
+  chosenReason.localDeductions=sr.localDeductions
+  chosenReason.routeDeductions=sr.routeDeductions
+  chosenReason.routePasses=sr.routePasses
+  chosenReason.trialSteps=sr.trialSteps
+  chosenReason.trialAssumptions=sr.trialAssumptions
+  chosenReason.searchNodes=sr.searchNodes
+  chosenReason.firstNodes=sr.firstNodes
+  chosenReason.firstDepth%=sr.firstDepth%
+  chosenReason.maxDepth%=sr.maxDepth%
+  chosenReason.solutionCount%=sr.solutionCount%
+  chosenReason.exhaustive%=sr.exhaustive%
+  chosenReason.uniqueness$=sr.uniqueness$
+  chosenReason.work=sr.work
+  chosenReason.workLimit=sr.workLimit
+  chosenReason.boardKey$=sr.boardKey$
+END DEFine
+
+## Restore the chosen board and rebuild lengths/endpoints from its cell orders.
+## Restore the matching evidence as well, before final validation and export.
+DEFine PROCedure selection_restore
+  LOCal svI%,svP%
+  FOR svP%=1 TO opt.pairs%
+    gLength%(svP%)=0
+  END FOR svP%
+  FOR svI%=0 TO gN%-1
+    gOwner%(svI%)=gSavedOwner%(svI%) : gOrder%(svI%)=gSavedOrder%(svI%) : svP%=gOwner%(svI%)
+    IF svP% THEN
+      gLength%(svP%)=gen_max(gLength%(svP%),gOrder%(svI%))
+      IF gOrder%(svI%)=1 THEN gStart%(svP%)=svI%
+    END IF
+  END FOR svI%
+  FOR svI%=0 TO gN%-1
+    svP%=gOwner%(svI%)
+    IF svP% THEN
+      IF gOrder%(svI%)=gLength%(svP%) THEN gFinish%(svP%)=svI%
+    END IF
+  END FOR svI%
+  gen_endpoints
+  gHasReason%=selChosenReason% : gHasShortest%=selChosenShortest%
+  shortSolved%=selShortSolved% : shortTrials%=selShortTrials% : shortLimit%=selShortLimit% : shortFirst%=selShortFirst%
+  sr.status$=chosenReason.status$
+  sr.limitReason$=chosenReason.limitReason$
+  sr.tier$=chosenReason.tier$
+  sr.grade$=chosenReason.grade$
+  sr.score%=chosenReason.score%
+  sr.logical%=chosenReason.logical%
+  sr.localDeductions=chosenReason.localDeductions
+  sr.routeDeductions=chosenReason.routeDeductions
+  sr.routePasses=chosenReason.routePasses
+  sr.trialSteps=chosenReason.trialSteps
+  sr.trialAssumptions=chosenReason.trialAssumptions
+  sr.searchNodes=chosenReason.searchNodes
+  sr.firstNodes=chosenReason.firstNodes
+  sr.firstDepth%=chosenReason.firstDepth%
+  sr.maxDepth%=chosenReason.maxDepth%
+  sr.solutionCount%=chosenReason.solutionCount%
+  sr.exhaustive%=chosenReason.exhaustive%
+  sr.uniqueness$=chosenReason.uniqueness$
+  sr.work=chosenReason.work
+  sr.workLimit=chosenReason.workLimit
+  sr.boardKey$=chosenReason.boardKey$
+END DEFine
+
+## Reject symmetric repeats before doing expensive assessment. Enforce the
+## exact target, optional uniqueness proof and effort bounds separately from
+## the heuristic score used to steer the next proposal.
+DEFine PROCedure selection_consider
+  LOCal skI%,skMatches%,skRank%,skDesired%,skPriority%,skDistance
+  gHasReason%=0 : gHasShortest%=0 : selKey$=identity_symmetry$
+  FOR skI%=1 TO selSeen%
+    IF cli_equal%(gSeen$(skI%),selKey$) THEN selDuplicates%=selDuplicates%+1 : selDistinct%=0 : RETurn
+  END FOR skI%
+  selSeen%=selSeen%+1 : gSeen$(selSeen%)=selKey$ : selDistinct%=1 : selEvaluated%=selEvaluated%+1
+  IF opt.shortest% THEN
+    shortest_screen 32
+    IF shortSolved% THEN selDistinct%=0 : RETurn
+  END IF
+  IF opt.assess% OR opt.target%>0 OR opt.unique% THEN
+    selAssessments%=selAssessments%+1 : solver_analyse opt.solverWork,20000
+    IF sr.uniqueness$="none" THEN gExit%=1 : gError$="Internal solver contradiction for a validated witness." : RETurn
+    IF selStartingTier$="notAssessed" THEN selStartingTier$=sr.tier$ : selStartingTrials=sr.trialSteps
+  END IF
+  IF gCancel% THEN RETurn
+  IF (opt.target%>0 OR opt.unique%) AND gHasReason% AND sr.status$<>"complete" THEN selBudgetRejected%=selBudgetRejected%+1
+  ## Acceptance is exact. A nearby grade may help steer the search, but it
+  ## cannot satisfy a different requested target or an unfinished proof.
+  skMatches%=1
+  IF opt.target%>0 THEN skMatches%=(sr.status$="complete" AND sr.grade$=gen_grade$(opt.target%))
+  IF opt.unique% AND sr.uniqueness$<>"unique" THEN skMatches%=0
+  IF selection_strengthened% THEN
+    IF NOT gHasReason% OR NOT selection_minimums% THEN skMatches%=0
+  END IF
+  FOR skI%=0 TO 4
+    selScore(0,skI%)=0
+  END FOR skI%
+  selScore(0,0)=-100
+  IF gHasReason% AND sr.status$="complete" AND sr.grade$<>"unrated" THEN
+    skRank%=gen_rank%(sr.grade$) : skDesired%=opt.target% : IF skDesired%=0 THEN skDesired%=3
+    ## Prefer progress toward the requested tier, but penalise overshooting it.
+    ## With a trial ceiling, distance from the effort band comes before bonuses.
+    skPriority%=skRank% : IF skRank%>skDesired% THEN skPriority%=-9-skRank%
+    skDistance=0
+    IF opt.maxTrials>=0 THEN skDistance=gen_max(0,gen_max(opt.minTrials-sr.trialSteps,sr.trialSteps-opt.maxTrials))
+    selScore(0,0)=skPriority% : selScore(0,1)=-skDistance
+    IF opt.minDepth%>0 OR opt.minNodes%>0 THEN
+      selScore(0,2)=sr.firstDepth% : selScore(0,3)=sr.firstNodes : selScore(0,4)=sr.trialSteps
+    ELSE
+      selScore(0,2)=sr.trialSteps : selScore(0,3)=sr.routeDeductions
+    END IF
+  END IF
+  IF skMatches% AND (NOT selAccepted% OR selection_compare%(2)>=0) THEN
+    selection_save : selAccepted%=1
+    IF selFirst%<0 THEN selFirst%=selConsidered%
+    FOR skI%=0 TO 4
+      selScore(2,skI%)=selScore(0,skI%)
+    END FOR skI%
+  END IF
+END DEFine
+
+## Dispatch a single unfiltered construction. Full coverage reserves a late
+## structured fallback when the attempt allowance is large enough.
+DEFine PROCedure generation_base(VAL gbSeed)
+  LOCal gbFallback%
+  gSuccess%=0 : gRngStream%=0
+  IF NOT opt.full% THEN grow_generate gbSeed : RETurn
+  rng_seed 0,gbSeed : cover_init
+  gbFallback%=-1 : IF opt.attempts%>=128 THEN gbFallback%=gen_max(64,opt.attempts%-128)
+  cover_find 128,gen_max(64,gN%),gbFallback%,1
+  IF covFound% THEN gen_validate : gSuccess%=gValid%
+END DEFine
+
+## For an explicit full-coverage target, improve a retained traversal by small
+## backbite changes and restart after stagnation. Other filters retry independent
+## boards. Keep the best qualifying snapshot and never substitute an easier grade.
+DEFine PROCedure selection_generate(VAL sgSeed)
+  LOCal sgI%,sgMove%,sgMoves%,sgCurrent%,sgStagnant%,sgStructured%,sgTight%,sgRestart%,sgCompare%,sgProposal%,sgCandidateSeed
+  DIM work AS WorkCounters
+  DIM sr AS SolverReport
+  gSuccess%=0 : gHasReason%=0 : gHasShortest%=0
+  selConsidered%=0 : selEvaluated%=0 : selDuplicates%=0 : selBudgetRejected%=0 : selAssessments%=0
+  selAccepted%=0 : selFirst%=-1 : selSeen%=0 : selStartingTier$="notAssessed" : selStartingTrials=0
+  gSelected%=selection_active%
+  selAlgorithm$="ql-random-path-growth-v1"
+  IF opt.full% THEN selAlgorithm$="ql-hamiltonian-path-partition-v3"
+  IF opt.full% AND opt.varied% THEN selAlgorithm$="ql-hamiltonian-path-partition-varied-v1"
+  IF NOT gSelected% THEN generation_base sgSeed : RETurn
+  DIM gSeen$(opt.candidates%,64),gSavedOwner%(gN%-1),gSavedOrder%(gN%-1),selWalk%(gN%-1)
+  gRngStream%=0 : rng_seed 0,sgSeed : rng_seed 2,sgSeed
+  sgCurrent%=0 : sgStagnant%=0
+  IF opt.full% AND opt.target%>0 THEN
+    selAlgorithm$="ql-solver-guided-hamiltonian-partition-v6"
+    IF opt.varied% THEN selAlgorithm$="ql-solver-guided-varied-cuts-v2"
+    cover_init
+    REPeat sgGuided
+      IF selConsidered%>=opt.candidates% OR gExit% OR gCancel% THEN EXIT sgGuided
+      IF selFirst%>=0 AND selConsidered%-selFirst%>=opt.improve% THEN EXIT sgGuided
+      selConsidered%=selConsidered%+1 : sgProposal%=0 : sgStructured%=0
+      ## Repeated equal/worse proposals trigger a fresh traversal instead of
+      ## spending the entire candidate budget around one unproductive layout.
+      IF sgStagnant%>=32 THEN sgCurrent%=0 : sgStagnant%=0
+      IF NOT sgCurrent% THEN
+        sgRestart%=128 : IF gN%>64 THEN sgRestart%=16*gN%
+        sgTight%=(gen_product(opt.minimum%,opt.pairs%)=gN% OR gen_product(opt.maximum%,opt.pairs%)=gN%)
+        sgStructured%=((sgTight% AND selConsidered%=1) OR (selEvaluated%=0 AND selConsidered%=opt.candidates%))
+        sgCompare%=-1 : IF sgStructured% THEN sgCompare%=0
+        cover_find sgRestart%,0,sgCompare%,0
+        IF covFound% THEN
+          sgProposal%=1
+          FOR sgI%=0 TO gN%-1
+            gWalk%(sgI%)=gBestWalk%(sgI%) : gWalkPos%(gWalk%(sgI%))=sgI%
+          END FOR sgI%
+        END IF
+      ELSE
+        FOR sgI%=0 TO gN%-1
+          gWalk%(sgI%)=selWalk%(sgI%) : gWalkPos%(gWalk%(sgI%))=sgI%
+        END FOR sgI%
+        sgMoves%=1+rng_next%(4)
+        FOR sgMove%=1 TO sgMoves%
+          cover_backbite
+        END FOR sgMove%
+        cover_analyse
+        IF covScore%<=opt.pairs% THEN cover_partition : sgProposal%=covFeasible%
+      END IF
+      IF sgProposal% THEN
+        gen_validate
+        IF NOT gValid% THEN gExit%=1 : gError$="Internal full-coverage witness validation failed." : EXIT sgGuided
+        selection_consider
+        IF selDistinct% AND (NOT sgCurrent% OR selection_compare%(1)>=0) THEN
+          sgCompare%=selection_compare%(1)
+          IF sgCurrent% AND sgCompare%>0 THEN
+            sgStagnant%=0
+          ELSE
+            sgStagnant%=sgStagnant%+1
+          END IF
+          IF NOT sgStructured% OR selScore(0,0)=opt.target% THEN
+            sgCurrent%=1
+            FOR sgI%=0 TO gN%-1
+              selWalk%(sgI%)=gWalk%(sgI%)
+            END FOR sgI%
+            FOR sgI%=0 TO 4
+              selScore(1,sgI%)=selScore(0,sgI%)
+            END FOR sgI%
+          END IF
+        ELSE
+          sgStagnant%=sgStagnant%+1
+        END IF
+      ELSE
+        sgStagnant%=sgStagnant%+1
+      END IF
+      gen_poll
+    END REPeat sgGuided
+  ELSE
+    REPeat sgUnguided
+      IF selAccepted% OR selConsidered%>=opt.candidates% OR gExit% OR gCancel% THEN EXIT sgUnguided
+      sgCandidateSeed=sgSeed
+      IF selConsidered% THEN gRngStream%=2 : sgCandidateSeed=rng_raw : gRngStream%=0
+      selConsidered%=selConsidered%+1 : generation_base sgCandidateSeed
+      IF gSuccess% THEN selection_consider
+    END REPeat sgUnguided
+  END IF
+  IF selAccepted% AND NOT gCancel% AND NOT gExit% THEN
+    selection_restore : gen_validate : gSuccess%=gValid%
+    IF NOT gValid% THEN gExit%=1 : gError$="Internal selected witness validation failed."
+  ELSE
+    gSuccess%=0
+  END IF
+END DEFine

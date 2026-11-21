@@ -1,0 +1,16 @@
+#INCLUDE model_ssb
+#INCLUDE maths_ssb
+#INCLUDE cli_ssb
+OPEN_NEW #9,"nfa1_result"
+cli_parse "--seed -1"
+PRINT #9,"NEGATIVE|";gExit%;"|";opt.seed;"|";cliCount%;"|";cliHelp%
+FOR optionI%=0 TO cliCount%-1
+  PRINT #9,"ARG|";cliArgs$(optionI%)
+END FOR optionI%
+cli_parse "--bogus"
+PRINT #9,"UNKNOWN|";gExit%;"|";cliCount%;"|";cliHelp%
+cli_parse "--width 4 --height 4 --pairs 3 --seed 42"
+PRINT #9,"VALID|";gExit%;"|";opt.width%;"|";opt.height%;"|";opt.pairs%;"|";opt.seed
+CLOSE #9
+OPEN_NEW #9,"nfa1_done":PRINT #9,"OK":CLOSE #9
+STOP

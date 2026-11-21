@@ -1,0 +1,92 @@
+## Exact F# SHA-256 identities: labels/order for progress, canonical pairs for
+## assessments, and the least oriented hash for D4 batch deduplication.
+## Sort endpoint pairs numerically, moving their original-label mapping with them.
+DEFine PROCedure identity_sort
+  LOCal isI%,isJ%,isA%,isB%,isMap%
+  FOR isI%=2 TO opt.pairs%
+    isA%=gA%(isI%) : isB%=gB%(isI%) : isMap%=gCanonical%(isI%) : isJ%=isI%-1
+    REPeat isInsert
+      IF isJ%<1 THEN EXIT isInsert
+      IF gA%(isJ%)<isA% OR (gA%(isJ%)=isA% AND gB%(isJ%)<=isB%) THEN EXIT isInsert
+      gA%(isJ%+1)=gA%(isJ%) : gB%(isJ%+1)=gB%(isJ%) : gCanonical%(isJ%+1)=gCanonical%(isJ%) : isJ%=isJ%-1
+    END REPeat isInsert
+    gA%(isJ%+1)=isA% : gB%(isJ%+1)=isB% : gCanonical%(isJ%+1)=isMap%
+  END FOR isI%
+END DEFine
+
+## Ignore path direction and label order for solver identity. The original
+## start/finish arrays remain untouched; only the canonical workspace is reordered.
+DEFine PROCedure identity_canonical
+  LOCal icP%
+  FOR icP%=1 TO opt.pairs%
+    gA%(icP%)=gen_min(gStart%(icP%),gFinish%(icP%)) : gB%(icP%)=gen_max(gStart%(icP%),gFinish%(icP%))
+    gCanonical%(icP%)=icP%
+  END FOR icP%
+  identity_sort
+END DEFine
+
+## Hash the canonical dimensions, coverage rule and endpoint pairs using the
+## exact text spelling used by the F# solver, including True/False capitalisation.
+DEFine FuNction identity_pairs$
+  LOCal ipP%,ipFlag$(5)
+  ipFlag$="False" : IF opt.full% THEN ipFlag$="True"
+  hash_reset : hash_text gen_int$(opt.width%) & "x" & gen_int$(opt.height%) & ":" & ipFlag$ & ":"
+  FOR ipP%=1 TO opt.pairs%
+    IF ipP%>1 THEN hash_text ";"
+    hash_text gen_int$(gA%(ipP%)) & ":" & gen_int$(gB%(ipP%))
+  END FOR ipP%
+  RETurn hash_finish$
+END DEFine
+
+## Bind a solver assessment to its exact clues, independent of colour names.
+DEFine FuNction identity_board$
+  identity_canonical : RETurn identity_pairs$
+END DEFine
+
+## Player progress IDs retain labels, pair order and endpoint direction.
+## Use the separate canonical board key when those distinctions should be ignored.
+DEFine FuNction identity_puzzle$
+  LOCal iiP%,iiCell%,iiHash$(64),iiOut$(72),iiC%,iiI%
+  hash_reset : hash_text "tangles-v1"
+  IF opt.full% THEN hash_text ":full-coverage"
+  hash_text ":" & gen_int$(opt.width%) & "x" & gen_int$(opt.height%) & ":"
+  FOR iiP%=1 TO opt.pairs%
+    IF iiP%>1 THEN hash_text ";"
+    iiCell%=gStart%(iiP%) : hash_text gen_label$(iiP%) & ":" & gen_int$(iiCell% MOD opt.width%) & "," & gen_int$(INT(iiCell%/opt.width%)) & ":"
+    iiCell%=gFinish%(iiP%) : hash_text gen_int$(iiCell% MOD opt.width%) & "," & gen_int$(INT(iiCell%/opt.width%))
+  END FOR iiP%
+  iiHash$=hash_finish$ : iiOut$="tangles-"
+  FOR iiI%=1 TO 64
+    iiC%=CODE(iiHash$(iiI%)) : IF iiC%>=65 THEN iiC%=iiC%+32
+    iiOut$=iiOut$ & CHR$(iiC%)
+  END FOR iiI%
+  RETurn iiOut$
+END DEFine
+
+## Reflect either axis; square boards also allow transposition. Rectangular
+## boards use only the four transformations that preserve their dimensions.
+DEFine FuNction identity_transform%(VAL itCell%,VAL itMode%)
+  LOCal itX%,itY%,itSwap%
+  itX%=itCell% MOD opt.width% : itY%=INT(itCell%/opt.width%)
+  IF itMode%>=4 THEN itSwap%=itX% : itX%=itY% : itY%=itSwap%
+  IF itMode% MOD 2 THEN itX%=opt.width%-1-itX%
+  IF INT(itMode%/2) MOD 2 THEN itY%=opt.height%-1-itY%
+  RETurn itY%*opt.width%+itX%
+END DEFine
+
+## Use the least canonical hash over all allowed orientations as the batch key.
+## Thus rotations, reflections, relabelling and reversed endpoints count as repeats.
+DEFine FuNction identity_symmetry$
+  LOCal iyMode%,iyCount%,iyP%,iyA%,iyB%,iyHash$(64),iyBest$(64)
+  iyCount%=4 : IF opt.width%=opt.height% THEN iyCount%=8
+  iyBest$=""
+  FOR iyMode%=0 TO iyCount%-1
+    FOR iyP%=1 TO opt.pairs%
+      iyA%=identity_transform%(gStart%(iyP%),iyMode%) : iyB%=identity_transform%(gFinish%(iyP%),iyMode%)
+      gA%(iyP%)=gen_min(iyA%,iyB%) : gB%(iyP%)=gen_max(iyA%,iyB%) : gCanonical%(iyP%)=iyP%
+    END FOR iyP%
+    identity_sort : iyHash$=identity_pairs$
+    IF iyBest$="" OR gen_less%(iyHash$,iyBest$) THEN iyBest$=iyHash$
+  END FOR iyMode%
+  RETurn iyBest$
+END DEFine

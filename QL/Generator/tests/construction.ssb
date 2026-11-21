@@ -1,0 +1,38 @@
+TURBO_diags 2
+#INCLUDE model_ssb
+#INCLUDE maths_ssb
+#INCLUDE construction_ssb
+OPEN_NEW #9,"nfa1_result"
+WHEN_ERROR 0
+  PRINT #9,"ERROR|";ERNUM%;"|";ERLIN%
+  PRINT #9,"STATE|";covScore%;"|";covFound%;"|";work.traversalEvaluations
+  CLOSE #9
+  OPEN_NEW #8,"nfa1_done":PRINT #8,"ERROR":CLOSE #8
+  RJOB -1,-1
+END_WHEN
+gen_defaults
+opt.width%=16 : opt.height%=16 : opt.pairs%=2 : gen_board : cover_init
+FOR ctorBit%=0 TO 15
+  cover_set 1,ctorBit%,1
+END FOR ctorBit%
+ctorSum%=0
+FOR ctorBit%=0 TO 15
+  ctorSum%=ctorSum%+cover_dp%(1,ctorBit%)
+END FOR ctorBit%
+PRINT #9,"FULL_WORD|";ctorSum%
+IF ctorSum%<>16 THEN ctorFailure=1/0
+PRINT #9,"CAPACITY|";gen_int$(gen_product(48,4096))
+FOR ctorSize%=8 TO 12 STEP 4
+  opt.width%=ctorSize% : opt.height%=ctorSize%
+  opt.pairs%=6 : opt.minimum%=4 : opt.maximum%=16
+  IF ctorSize%=12 THEN opt.pairs%=12 : opt.maximum%=24
+  opt.full%=1 : opt.varied%=1 : opt.attempts%=500
+  gen_board : rng_seed 0,42 : cover_init
+  cover_find 128,gN%,372,1
+  gen_validate
+  IF NOT covFound% OR NOT gValid% THEN ctorFailure=1/0
+  PRINT #9,"COVER|";ctorSize%;"|";covFound%;"|";gValid%;"|";work.traversalEvaluations;"|";work.structuredStarts
+END FOR ctorSize%
+CLOSE #9
+OPEN_NEW #8,"nfa1_done":PRINT #8,"OK":CLOSE #8
+RJOB -1,0

@@ -1,0 +1,317 @@
+## Streaming v1 JSON export. A batch is published only after every entry is
+## generated, assessed and validated. Named fields match the F# export layer.
+## The writer keeps only nesting/comma state in memory. gJ% selects the
+## current spool or staging channel; each puzzle is written incrementally.
+DIM jsonFirst%(16),jsonEscaped$(1024)
+gJ%=-1 : jsonLevel%=0
+
+## Write without a newline so large puzzles can be streamed in small pieces.
+DEFine PROCedure json_out(VAL joText$)
+  PRINT #gJ%,joText$;
+END DEFine
+
+## Escape quotes, backslashes and control characters rather than trusting labels
+## or metadata to be safe JSON string literals.
+DEFine FuNction json_quote$(VAL jqText$)
+  LOCal jqI%,jqC%,jqOut$(1024),jqHex$(16)
+  jqOut$=CHR$(34) : jqHex$="0123456789ABCDEF"
+  FOR jqI%=1 TO LEN(jqText$)
+    jqC%=CODE(jqText$(jqI%))
+    IF jqC%=34 OR jqC%=92 THEN
+      jqOut$=jqOut$ & CHR$(92) & CHR$(jqC%)
+    ELSE
+      IF jqC%<32 THEN
+        jqOut$=jqOut$ & CHR$(92) & "u00" & jqHex$(1+INT(jqC%/16)) & jqHex$(1+jqC% MOD 16)
+      ELSE
+        jqOut$=jqOut$ & CHR$(jqC%)
+      END IF
+    END IF
+  END FOR jqI%
+  RETurn jqOut$ & CHR$(34)
+END DEFine
+
+## Maintain comma placement at the current nesting level. An empty key denotes
+## an array element; level zero starts a root object without a comma or name.
+DEFine PROCedure json_key(VAL jkKey$)
+  IF jsonLevel%=0 THEN RETurn
+  IF NOT jsonFirst%(jsonLevel%) THEN json_out ","
+  jsonFirst%(jsonLevel%)=0
+  IF LEN(jkKey$) THEN json_out json_quote$(jkKey$) & ":"
+END DEFine
+
+## Push a fresh container whose first member must not have a leading comma.
+DEFine PROCedure json_object(VAL jaKey$)
+  json_key jaKey$ : json_out "{" : jsonLevel%=jsonLevel%+1 : jsonFirst%(jsonLevel%)=1
+END DEFine
+
+DEFine PROCedure json_array(VAL jaKey$)
+  json_key jaKey$ : json_out "[" : jsonLevel%=jsonLevel%+1 : jsonFirst%(jsonLevel%)=1
+END DEFine
+
+## Close the caller-specified container and restore its parent nesting level.
+DEFine PROCedure json_end(VAL jeClose$)
+  json_out jeClose$ : jsonLevel%=jsonLevel%-1
+END DEFine
+
+DEFine PROCedure json_string(VAL jsKey$,VAL jsText$)
+  json_key jsKey$ : json_out json_quote$(jsText$)
+END DEFine
+
+## Decimal integer output avoids BASIC's exponent form for large seeds/counters.
+DEFine PROCedure json_integer(VAL jiKey$,VAL jiNumber)
+  json_key jiKey$ : json_out gen_int$(jiNumber)
+END DEFine
+
+DEFine PROCedure json_number(VAL jnKey$,VAL jnNumber)
+  json_key jnKey$ : json_out gen_number$(jnNumber)
+END DEFine
+
+DEFine PROCedure json_boolean(VAL jbKey$,VAL jbValue%)
+  json_key jbKey$ : json_out gen_bool$(jbValue%)
+END DEFine
+
+DEFine PROCedure json_null(VAL jzKey$)
+  json_key jzKey$ : json_out "null"
+END DEFine
+
+## Convert an internal row-major cell index to the shared zero-based x/y schema.
+DEFine PROCedure json_point(VAL jpKey$,VAL jpCell%)
+  json_object jpKey$ : json_integer "x",jpCell% MOD opt.width% : json_integer "y",INT(jpCell%/opt.width%) : json_end "}"
+END DEFine
+
+## Record construction bounds for replay; path lengths are not extra player clues.
+DEFine PROCedure json_recipe
+  json_integer "pairCount",opt.pairs% : json_integer "minPathLength",opt.minimum%
+  json_integer "maxPathLength",gRawMaximum : json_integer "maxAttempts",opt.attempts% : json_string "cutStyle",gen_cut$
+END DEFine
+
+## Export proof status and limits alongside effort counts. A stored solution
+## proves existence, while the clue-only solver report supplies uniqueness evidence.
+DEFine PROCedure json_reasoning
+  json_string "method","cell-domain-reasoning-v1" : json_string "boardKey",sr.boardKey$
+  json_string "mode",gen_mode$ : json_string "status",sr.status$ : json_string "limitReason",sr.limitReason$
+  json_string "tier",sr.tier$ : json_string "grade",sr.grade$ : json_integer "score",sr.score% : json_boolean "provisional",1
+  json_boolean "solvedByReasoning",sr.logical%
+  json_integer "localDeductions",sr.localDeductions
+  json_integer "routeDeductions",sr.routeDeductions
+  json_integer "routePasses",sr.routePasses
+  json_integer "trialSteps",sr.trialSteps
+  json_integer "trialAssumptions",sr.trialAssumptions
+  json_integer "searchNodes",sr.searchNodes
+  json_integer "firstSolutionSearchNodes",sr.firstNodes
+  json_integer "firstSolutionBranchDepth",sr.firstDepth%
+  json_integer "maxSearchDepth",sr.maxDepth%
+  json_integer "solutionCount",sr.solutionCount%
+  json_integer "work",sr.work
+  json_integer "workLimit",sr.workLimit
+  json_integer "solutionCountLimit",2 : json_boolean "solutionCountComplete",sr.exhaustive% : json_string "uniqueness",sr.uniqueness$
+END DEFine
+
+DEFine PROCedure json_geometry_components
+  LOCal jgI%
+  json_array "components"
+  FOR jgI%=0 TO geoCount%-1
+    json_object "" : json_string "name",geoNames$(jgI%) : json_number "value",geoValues(jgI%)
+    json_integer "weight",geoWeights%(jgI%) : json_number "points",geoPoints(jgI%) : json_end "}"
+  END FOR jgI%
+  json_end "]"
+END DEFine
+
+## Keep reasoning-tier score boundaries separate from mode-specific geometry boundaries.
+DEFine PROCedure json_thresholds(VAL jtReason%)
+  json_object "thresholds"
+  IF jtReason% THEN
+    json_integer "easyBelow",30 : json_integer "hardAtLeast",55
+  ELSE
+    json_integer "easyBelow",geoEasy% : json_integer "hardAtLeast",geoHard%
+  END IF
+  json_end "}"
+END DEFine
+
+DEFine FuNction geometry_grade$
+  IF geoScore%<geoEasy% THEN RETurn "easy"
+  IF geoScore%<geoHard% THEN RETurn "medium"
+  RETurn "hard"
+END DEFine
+
+## Use reasoning as the displayed grade only when a full-coverage assessment
+## is complete and rated. Otherwise retain the provisional geometric estimate.
+DEFine FuNction reasoning_primary%
+  RETurn (gHasReason% AND opt.full% AND sr.status$="complete" AND sr.grade$<>"unrated")
+END DEFine
+
+## Emit the primary grade together with raw clue measurements and components.
+## When reasoning supplies the grade, preserve geometry as a secondary estimate
+## and retain the full reasoning report so the result remains inspectable.
+DEFine PROCedure json_difficulty
+  LOCal jdI%,jdP%,jdBase%,jdBonus$(32)
+  json_object "difficulty"
+  IF reasoning_primary% THEN
+    json_string "method","cell-domain-reasoning-v1" : json_string "profile","full-coverage-reasoning-v1"
+    json_string "grade",sr.grade$ : json_integer "score",sr.score% : json_integer "rawScore",sr.score%
+  ELSE
+    json_string "method","geometric-heuristic-v1" : json_string "profile",gen_mode$ & "-v1"
+    json_string "grade",geometry_grade$ : json_integer "score",geoScore% : json_number "rawScore",geoRaw
+  END IF
+  json_string "mode",gen_mode$ : json_boolean "provisional",1 : json_thresholds reasoning_primary%
+  json_object "measurements"
+  json_number "boardCellCount",gm.boardCellCount
+  json_number "pairCount",gm.pairCount
+  json_number "endpointCount",gm.endpointCount
+  json_number "cornerEndpointCount",gm.cornerEndpointCount
+  json_number "edgeEndpointCount",gm.edgeEndpointCount
+  json_number "meanCornerDistance",gm.meanCornerDistance
+  json_number "meanEdgeDistance",gm.meanEdgeDistance
+  json_number "meanAvailableExits",gm.meanAvailableExits
+  json_number "singleExitEndpointCount",gm.singleExitEndpointCount
+  json_number "adjacentPairCount",gm.adjacentPairCount
+  json_number "alignedPairCount",gm.alignedPairCount
+  json_number "meanManhattanDistance",gm.meanManhattanDistance
+  json_number "meanShortestDistance",gm.meanShortestDistance
+  json_number "minimumRequiredCells",gm.minimumRequiredCells
+  json_number "minimumCoverageRatio",gm.minimumCoverageRatio
+  json_number "coverageSlackCells",gm.coverageSlackCells
+  json_number "requiredExtraCoverageCells",gm.requiredExtraCoverageCells
+  json_number "forcedCornerTurnCount",gm.forcedCornerTurnCount
+  json_number "meanLog2ShortestRouteCount",gm.meanLog2ShortestRouteCount
+  json_number "shortestRouteCountLimit",gm.shortestRouteCountLimit
+  json_number "cappedRoutePairCount",gm.cappedRoutePairCount
+  json_number "routeInteriorOccurrences",gm.routeInteriorOccurrences
+  json_number "sharedRouteInteriorOccurrences",gm.sharedRouteInteriorOccurrences
+  json_number "routeOverlapRatio",gm.routeOverlapRatio
+  json_number "maxRouteOverlap",gm.maxRouteOverlap
+  json_number "crossLabelEndpointAdjacencies",gm.crossLabelEndpointAdjacencies
+  json_number "clueCrowdingRatio",gm.clueCrowdingRatio
+  json_end "}"
+  json_array "pairMeasurements"
+  FOR jdP%=1 TO opt.pairs%
+    json_object "" : json_string "label",gen_label$(geoMap%(jdP%))
+    json_integer "manhattanDistance",geoPair(jdP%).manhattanDistance%
+    json_integer "shortestDistance",geoPair(jdP%).shortestDistance%
+    json_integer "shortestRouteCount",geoPair(jdP%).shortestRouteCount%
+    json_boolean "shortestRouteCountCapped",geoPair(jdP%).shortestRouteCountCapped%
+    json_integer "minEndpointExits",geoPair(jdP%).minEndpointExits%
+    json_integer "maxEndpointExits",geoPair(jdP%).maxEndpointExits%
+    json_integer "shortestRouteInteriorCells",geoPair(jdP%).shortestRouteInteriorCells%
+    json_integer "sharedRouteInteriorCells",geoPair(jdP%).sharedRouteInteriorCells%
+    json_end "}"
+  END FOR jdP%
+  json_end "]"
+  IF reasoning_primary% THEN
+    jdBase%=80 : jdBonus$="searchNodeBonus"
+    SELect ON sr.tier$
+      ="local": jdBase%=10 : jdBonus$="localDeductionBonus"
+      ="routes": jdBase%=30 : jdBonus$="routeDeductionBonus"
+      ="trial": jdBase%=55 : jdBonus$="trialStepBonus"
+    END SELect
+    json_array "components"
+    json_object "" : json_string "name","reasoningTier" : json_integer "value",1 : json_integer "weight",jdBase% : json_integer "points",jdBase% : json_end "}"
+    json_object "" : json_string "name",jdBonus$ : json_integer "value",sr.score%-jdBase% : json_integer "weight",1 : json_integer "points",sr.score%-jdBase% : json_end "}"
+    json_end "]"
+    json_object "geometricEstimate"
+    json_string "method","geometric-heuristic-v1" : json_string "profile",gen_mode$ & "-v1" : json_string "grade",geometry_grade$
+    json_integer "score",geoScore% : json_number "rawScore",geoRaw : json_thresholds 0 : json_geometry_components : json_end "}"
+  ELSE
+    json_geometry_components : json_null "geometricEstimate"
+  END IF
+  IF gHasReason% THEN
+    json_object "reasoning" : json_reasoning : json_end "}"
+  ELSE
+    json_null "reasoning"
+  END IF
+  json_end "}"
+END DEFine
+
+## Distinguish an unrun screen (null) from a completed screen with no success.
+DEFine PROCedure json_shortest
+  IF NOT gHasShortest% THEN json_null "shortestRoutes" : RETurn
+  json_object "shortestRoutes" : json_string "method","greedy-shortest-routes-v1"
+  json_integer "trials",shortTrials% : json_integer "trialLimit",shortLimit% : json_boolean "solved",shortSolved%
+  IF shortFirst% THEN
+    json_integer "firstSuccessTrial",shortFirst%
+  ELSE
+    json_null "firstSuccessTrial"
+  END IF
+  json_end "}"
+END DEFine
+
+## Describe the requested target and effort bounds independently of search results.
+DEFine PROCedure json_policy
+  json_string "policyVersion","symmetry-effort-v1" : json_string "target",gen_grade$(opt.target%)
+  json_integer "candidateLimit",opt.candidates% : json_integer "improvementLimit",opt.improve%
+  json_integer "solverWorkLimit",opt.solverWork : json_integer "minTrials",opt.minTrials
+  IF opt.maxTrials<0 THEN
+    json_null "maxTrials"
+  ELSE
+    json_integer "maxTrials",opt.maxTrials
+  END IF
+  json_integer "minBranchDepth",opt.minDepth% : json_integer "minFirstSolutionNodes",opt.minNodes%
+  json_boolean "assess",opt.assess% : json_boolean "requireUnique",opt.unique% : json_boolean "avoidShortest",opt.shortest%
+END DEFine
+
+## Record actual proposals, duplicate rejections and assessments as well as limits.
+DEFine PROCedure json_selection
+  IF NOT gSelected% THEN json_null "selection" : RETurn
+  json_object "selection" : json_string "algorithm",selAlgorithm$ : json_policy
+  json_integer "candidatesConsidered",selConsidered% : json_integer "candidatesEvaluated",selEvaluated%
+  json_integer "traversalEvaluations",work.traversalEvaluations : json_integer "solverAssessments",selAssessments%
+  json_integer "duplicatesRejected",selDuplicates% : json_integer "budgetRejections",selBudgetRejected%
+  json_string "startingTier",selStartingTier$ : json_integer "startingTrialSteps",selStartingTrials : json_end "}"
+END DEFine
+
+## Revalidate the witness and bind any assessment to the current clue hash before
+## writing. Export endpoints as the puzzle, with ordered solution cells separately
+## for hints; players remain free to accept any route satisfying the rules.
+DEFine PROCedure json_puzzle(VAL jpSeed)
+  LOCal jpP%,jpI%,jpJ%,jpFound%,jpIdentity$(72),jpVerify$(20)
+  gen_validate
+  IF NOT gValid% THEN gExit%=1 : gError$="Export refused an invalid solution." : RETurn
+  IF gHasReason% THEN
+    IF NOT cli_equal%(sr.boardKey$,identity_board$) THEN gExit%=1 : gError$="Solver assessment belongs to different clues." : RETurn
+  END IF
+  IF opt.target%>0 THEN
+    IF NOT gHasReason% OR sr.grade$<>gen_grade$(opt.target%) OR NOT selection_minimums% THEN gExit%=1 : gError$="Selected puzzle did not meet its exact grade and effort bounds." : RETurn
+  END IF
+  IF opt.unique% THEN
+    IF NOT gHasReason% OR sr.uniqueness$<>"unique" THEN gExit%=1 : gError$="Selected puzzle has no uniqueness proof." : RETurn
+  END IF
+  geo_assess : IF gExit% OR gCancel% THEN RETurn
+  jpIdentity$=identity_puzzle$ : jsonLevel%=0 : json_object ""
+  json_string "id",jpIdentity$ : json_integer "width",opt.width% : json_integer "height",opt.height%
+  json_integer "seed",jpSeed : json_integer "attempts",work.boardAttempts+work.traversalEvaluations
+  json_object "work"
+  json_integer "boardAttempts",work.boardAttempts : json_integer "traversalEvaluations",work.traversalEvaluations
+  json_integer "refinementEvaluations",work.refinementEvaluations : json_integer "structuredStarts",work.structuredStarts : json_end "}"
+  IF opt.rampFirst% THEN
+    json_object "recipe" : json_recipe : json_end "}"
+  ELSE
+    json_null "recipe"
+  END IF
+  json_array "pairs"
+  FOR jpP%=1 TO opt.pairs%
+    json_object "" : json_string "label",gen_label$(jpP%)
+    json_point "start",gStart%(jpP%) : json_point "finish",gFinish%(jpP%) : json_end "}"
+  END FOR jpP%
+  json_end "]"
+  ## Stored paths support hints. Their order comes from the witness, not a
+  ## solver search result or a restriction on alternative player solutions.
+  json_array "solution"
+  FOR jpP%=1 TO opt.pairs%
+    json_object "" : json_string "label",gen_label$(jpP%) : json_array "cells"
+    FOR jpJ%=1 TO gLength%(jpP%)
+      jpFound%=-1
+      FOR jpI%=0 TO gN%-1
+        IF gOwner%(jpI%)=jpP% AND gOrder%(jpI%)=jpJ% THEN jpFound%=jpI% : EXIT jpI%
+      END FOR jpI%
+      json_point "",jpFound%
+    END FOR jpJ%
+    json_end "]" : json_end "}"
+  END FOR jpP%
+  json_end "]"
+  json_difficulty : json_selection : json_shortest
+  json_object "verification" : json_boolean "solutionValid",1
+  jpVerify$="notChecked" : IF gHasReason% THEN jpVerify$=sr.uniqueness$
+  json_string "uniqueness",jpVerify$ : jpVerify$="heuristicEstimate"
+  IF reasoning_primary% THEN jpVerify$="reasoningEstimate"
+  json_string "difficulty",jpVerify$ : json_end "}" : json_end "}"
+END DEFine

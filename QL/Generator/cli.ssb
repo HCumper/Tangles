@@ -1,0 +1,326 @@
+## Native option-string parser; same flags, defaults and policy checks as F#.
+## cliNames indices match the parse dispatch below. cliSeen distinguishes
+## explicit overrides from defaults when building automatic ramp recipes.
+DIM cliArgs$(63,4096),cliNames$(24,32),cliSeen%(24)
+DIM rampPairs%(4),rampMax%(4),rampAttempts%(4),rampCounts%(4),rampBudget(4),rampRawMax(4)
+cliCount%=0 : cliHelp%=0 : cliNumber=0 : gRawMaximum=16
+rampBaseTrials=0 : rampBaseDepth%=0 : rampBaseNodes%=0 : rampBaseMinimum%=4
+cliNames$(0)="--width"
+cliNames$(1)="--height"
+cliNames$(2)="--pairs"
+cliNames$(3)="--min-length"
+cliNames$(4)="--max-length"
+cliNames$(5)="--seed"
+cliNames$(6)="--count"
+cliNames$(7)="--max-attempts"
+cliNames$(8)="--candidates"
+cliNames$(9)="--improve-steps"
+cliNames$(10)="--solver-work"
+cliNames$(11)="--min-trials"
+cliNames$(12)="--max-trials"
+cliNames$(13)="--min-depth"
+cliNames$(14)="--min-search-nodes"
+cliNames$(15)="--mode"
+cliNames$(16)="--cut-style"
+cliNames$(17)="--difficulty"
+cliNames$(18)="--ramp"
+cliNames$(19)="--output"
+cliNames$(20)="--show-solution"
+cliNames$(21)="--force"
+cliNames$(22)="--assess"
+cliNames$(23)="--require-unique"
+cliNames$(24)="--avoid-shortest"
+
+## Option names are byte-exact; BASIC's usual string comparison can ignore case.
+DEFine FuNction cli_equal%(VAL ceA$,VAL ceB$)
+  LOCal ceI%
+  IF LEN(ceA$)<>LEN(ceB$) THEN RETurn 0
+  FOR ceI%=1 TO LEN(ceA$)
+    IF CODE(ceA$(ceI%))<>CODE(ceB$(ceI%)) THEN RETurn 0
+  END FOR ceI%
+  RETurn 1
+END DEFine
+
+## Record an argument error for the caller to report after normal cleanup.
+DEFine PROCedure cli_error(VAL ceMessage$)
+  gExit%=2 : gError$=ceMessage$
+END DEFine
+
+## Split the native option string on whitespace outside matching single/double
+## quotes. Quotes group filenames containing spaces; an unclosed quote is an error.
+DEFine PROCedure cli_tokens(VAL ctInput$)
+  LOCal ctAt%,ctCode%,ctQuote%,ctStarted%,ctText$(4096)
+  cliCount%=0 : ctText$="" : ctQuote%=0 : ctStarted%=0
+  FOR ctAt%=1 TO LEN(ctInput$)
+    ctCode%=CODE(ctInput$(ctAt%))
+    IF ctQuote% THEN
+      IF ctCode%=ctQuote% THEN
+        ctQuote%=0
+      ELSE
+        ctText$=ctText$ & CHR$(ctCode%)
+      END IF
+    ELSE
+      IF ctCode%=34 OR ctCode%=39 THEN
+        ctQuote%=ctCode% : ctStarted%=1
+      ELSE
+        IF ctCode%=32 OR ctCode%=9 OR ctCode%=10 OR ctCode%=13 THEN
+          IF ctStarted% THEN
+            IF cliCount%>=64 THEN cli_error "Too many arguments." : RETurn
+            cliArgs$(cliCount%)=ctText$ : cliCount%=cliCount%+1 : ctText$="" : ctStarted%=0
+          END IF
+        ELSE
+          ctText$=ctText$ & CHR$(ctCode%) : ctStarted%=1
+        END IF
+      END IF
+    END IF
+  END FOR ctAt%
+  IF ctQuote% THEN cli_error "Unclosed quote in option string." : RETurn
+  IF ctStarted% THEN
+    IF cliCount%>=64 THEN cli_error "Too many arguments." : RETurn
+    cliArgs$(cliCount%)=ctText$ : cliCount%=cliCount%+1
+  END IF
+END DEFine
+
+## Parse signed decimal text into a real temporary before assigning any % field.
+## Check overflow before each digit so invalid large input becomes an argument
+## error rather than a Turbo integer exception.
+DEFine FuNction cli_integer%(VAL ciText$)
+  LOCal ciAt%,ciSign%,ciCode%,ciLimit
+  cliNumber=0 : ciAt%=1 : ciSign%=1 : ciLimit=2147483647
+  IF LEN(ciText$)=0 THEN RETurn 0
+  IF ciText$(1)="-" THEN ciSign%=-1 : ciAt%=2 : ciLimit=2147483648
+  IF ciText$(1)="+" THEN ciAt%=2
+  IF ciAt%>LEN(ciText$) THEN RETurn 0
+  FOR ciAt%=ciAt% TO LEN(ciText$)
+    ciCode%=CODE(ciText$(ciAt%))-48
+    IF ciCode%<0 OR ciCode%>9 THEN RETurn 0
+    IF cliNumber>INT((ciLimit-ciCode%)/10) THEN RETurn 0
+    cliNumber=cliNumber*10+ciCode%
+  END FOR ciAt%
+  cliNumber=cliNumber*ciSign% : RETurn 1
+END DEFine
+
+## Map explicit grade names to ordered ranks; zero also serves the any target.
+DEFine FuNction cli_grade%(VAL cgText$)
+  LOCal cgI%
+  FOR cgI%=1 TO 4
+    IF cli_equal%(cgText$,gen_grade$(cgI%)) THEN RETurn cgI%
+  END FOR cgI%
+  RETurn 0
+END DEFine
+
+## Check relationships between options after individual values have been parsed.
+## Reject impossible capacity bounds and unsupported solver policies without
+## claiming that every accepted configuration is guaranteed to generate a board.
+DEFine PROCedure cli_validate
+  IF opt.maximum%<opt.minimum% THEN cli_error "Maximum length must not be less than minimum length." : RETurn
+  IF gen_product(opt.pairs%,opt.minimum%)>opt.width%*opt.height% THEN cli_error "Pairs and minimum lengths do not fit the board." : RETurn
+  IF opt.full% THEN
+    IF gen_product(opt.pairs%,opt.maximum%)<opt.width%*opt.height% THEN cli_error "Full coverage needs sufficient pairs and maximum length." : RETurn
+    IF opt.pairs%=1 AND opt.width%>1 AND opt.height%>1 THEN cli_error "One induced path cannot fill a two-dimensional rectangle." : RETurn
+  ELSE
+    IF opt.varied% THEN cli_error "--cut-style varied requires full-coverage." : RETurn
+    IF opt.target%>0 THEN cli_error "Reasoning targets require full-coverage; use --avoid-shortest for connections-only." : RETurn
+  END IF
+  IF opt.shortest% AND opt.full% THEN cli_error "--avoid-shortest requires connect-only." : RETurn
+  IF opt.maxTrials>=0 AND (opt.maxTrials<opt.minTrials OR opt.target%=0) THEN cli_error "--max-trials needs an explicit target and must be at least --min-trials." : RETurn
+  IF opt.minTrials>0 AND opt.target%<3 THEN cli_error "--min-trials requires hard or expert." : RETurn
+  IF (opt.minDepth%>0 OR opt.minNodes%>0) AND opt.target%<>4 THEN cli_error "Depth and node floors require expert." : RETurn
+  IF opt.target%>0 OR opt.unique% THEN
+    IF opt.width%>16 OR opt.height%>16 OR opt.pairs%>64-(NOT opt.full%) THEN cli_error "Solver selection supports up to 16x16 and 64 full/63 connect-only pairs."
+  END IF
+  IF opt.force% AND LEN(opt.output$)=0 THEN cli_error "--force requires --output."
+END DEFine
+
+## Plan balanced ascending grade sections, choosing pair counts and default
+## length/search budgets by board area. Explicit overrides survive the plan;
+## every resulting section must still pass ordinary option validation.
+DEFine PROCedure cli_ramp
+  LOCal crI%,crIndex%,crSections%,crArea,crP%,crSide,crPairs,crMaximum
+  IF NOT opt.full% OR opt.width%>16 OR opt.height%>16 THEN cli_error "--ramp requires full coverage on a board up to 16x16." : RETurn
+  IF cliSeen%(2) OR cliSeen%(17) THEN cli_error "--ramp chooses pairs and targets; do not specify --pairs or --difficulty." : RETurn
+  IF NOT cliSeen%(6) THEN opt.count%=12
+  crSections%=opt.rampLast%-opt.rampFirst%+1
+  IF opt.count%<crSections% THEN cli_error "Ramp count must include every requested grade." : RETurn
+  IF opt.minTrials>0 AND opt.rampLast%<3 THEN cli_error "Trial floor requires a hard/expert ramp section." : RETurn
+  IF (opt.minDepth%>0 OR opt.minNodes%>0) AND opt.rampLast%<4 THEN cli_error "Depth/node floors require an expert ramp section." : RETurn
+  crArea=opt.width%*opt.height% : crSide=SQRT(crArea)
+  rampBaseTrials=opt.minTrials : rampBaseDepth%=opt.minDepth% : rampBaseNodes%=opt.minNodes% : rampBaseMinimum%=opt.minimum%
+  FOR crI%=opt.rampFirst% TO opt.rampLast%
+    SELect ON crI%
+      =1
+        crPairs=crArea/6
+        IF crArea<=64 THEN crPairs=1.25*crSide
+      =2: crPairs=crArea/7.2
+      =3: crPairs=crArea/8
+      =4: crPairs=0.5*crSide
+    END SELect
+    crP%=gen_max(2,gen_min(INT(crArea/gen_max(2,opt.minimum%)),gen_round(crPairs)))
+    rampPairs%(crI%)=crP%
+    crMaximum=gen_max(16,2*(-INT(-crSide)))
+    IF crI%=4 THEN crMaximum=gen_max(16,2*(-INT(-crArea/crP%)))
+    IF cliSeen%(4) THEN crMaximum=gRawMaximum
+    rampRawMax(crI%)=crMaximum : rampMax%(crI%)=gen_min(4096,crMaximum)
+    rampAttempts%(crI%)=500 : rampBudget(crI%)=2000000
+    IF crArea>64 THEN rampAttempts%(crI%)=5000 : rampBudget(crI%)=20000000
+    IF crArea>144 THEN rampAttempts%(crI%)=10000 : rampBudget(crI%)=100000000
+    IF cliSeen%(7) THEN rampAttempts%(crI%)=opt.attempts%
+    IF cliSeen%(10) THEN rampBudget(crI%)=opt.solverWork
+    ## Distribute any remainder to earlier grades, keeping contiguous sections
+    ## balanced to within one puzzle.
+    crIndex%=crI%-opt.rampFirst% : rampCounts%(crI%)=INT(opt.count%/crSections%)
+    IF crIndex%<opt.count% MOD crSections% THEN rampCounts%(crI%)=rampCounts%(crI%)+1
+  END FOR crI%
+  FOR crI%=opt.rampFirst% TO opt.rampLast%
+    cli_section crI% : cli_validate : IF gExit% THEN RETurn
+  END FOR crI%
+END DEFine
+
+## Install one ramp recipe. Trial floors apply to hard/expert sections, while
+## branch-depth and node floors apply only to expert sections.
+DEFine PROCedure cli_section(VAL csGrade%)
+  opt.target%=csGrade% : opt.pairs%=rampPairs%(csGrade%) : opt.maximum%=rampMax%(csGrade%) : gRawMaximum=rampRawMax(csGrade%)
+  opt.attempts%=rampAttempts%(csGrade%) : opt.solverWork=rampBudget(csGrade%)
+  opt.minTrials=0 : opt.minDepth%=0 : opt.minNodes%=0
+  IF csGrade%>=3 THEN opt.minTrials=rampBaseTrials
+  IF csGrade%=4 THEN opt.minDepth%=rampBaseDepth% : opt.minNodes%=rampBaseNodes%
+END DEFine
+
+## Reset prior state, tokenise, reject duplicates and range-check before storing.
+## Option indices 0..19 take values, 20..24 are switches, and 0..14 are numeric.
+## Keep gRawMaximum for JSON while clipping the working maximum to board capacity.
+DEFine PROCedure cli_parse(VAL cpInput$)
+  LOCal cpI%,cpJ%,cpFound%,cpKey%,cpValue$(4096),cpRange%,cpFirst$(16),cpLast$(16)
+  rampBaseTrials=0 : rampBaseDepth%=0 : rampBaseNodes%=0
+  gen_defaults : gRawMaximum=16 : opt.seed=gen_mod(DATE,2147483647)
+  gExit%=0 : gError$="" : cliHelp%=0 : cli_tokens cpInput$ : IF gExit% THEN RETurn
+  FOR cpI%=0 TO cliCount%-1
+    IF cli_equal%(cliArgs$(cpI%),"--help") OR cli_equal%(cliArgs$(cpI%),"-h") THEN cliHelp%=1 : RETurn
+  END FOR cpI%
+  FOR cpI%=0 TO 24
+    cliSeen%(cpI%)=0
+  END FOR cpI%
+  cpI%=0
+  REPeat cpParse
+    IF cpI%>=cliCount% OR gExit% THEN EXIT cpParse
+    cpKey%=-1
+    FOR cpJ%=0 TO 24
+      IF cli_equal%(cliArgs$(cpI%),cliNames$(cpJ%)) THEN cpKey%=cpJ% : EXIT cpJ%
+    END FOR cpJ%
+    IF cpKey%<0 THEN cli_error "Unknown option. Use --help." : RETurn
+    IF cliSeen%(cpKey%) THEN cli_error "Option specified more than once." : RETurn
+    cliSeen%(cpKey%)=1
+    IF cpKey%<20 THEN
+      cpI%=cpI%+1
+      IF cpI%>=cliCount% THEN cli_error "Missing option value." : RETurn
+      cpValue$=cliArgs$(cpI%)
+    END IF
+    IF cpKey%<15 THEN
+      IF NOT cli_integer%(cpValue$) THEN cli_error "Expected a 32-bit integer option value." : RETurn
+    END IF
+    SELect ON cpKey%
+      =0
+        IF cliNumber<1 OR cliNumber>64 THEN cli_error "Out of range: --width (1..64)." : RETurn
+        opt.width%=cliNumber
+      =1
+        IF cliNumber<1 OR cliNumber>64 THEN cli_error "Out of range: --height (1..64)." : RETurn
+        opt.height%=cliNumber
+      =2
+        IF cliNumber<1 OR cliNumber>2048 THEN cli_error "Out of range: --pairs (1..2048)." : RETurn
+        opt.pairs%=cliNumber
+      =3
+        IF cliNumber<2 OR cliNumber>4096 THEN cli_error "Out of range: --min-length (2..4096)." : RETurn
+        opt.minimum%=cliNumber
+      =4
+        IF cliNumber<2 OR cliNumber>2147483647 THEN cli_error "Out of range: --max-length (2..2147483647)." : RETurn
+        gRawMaximum=cliNumber : opt.maximum%=gen_min(4096,cliNumber)
+      =5
+        IF cliNumber<0 OR cliNumber>2147483647 THEN cli_error "Out of range: --seed (0..2147483647)." : RETurn
+        opt.seed=cliNumber
+      =6
+        IF cliNumber<1 OR cliNumber>10000 THEN cli_error "Out of range: --count (1..10000)." : RETurn
+        opt.count%=cliNumber
+      =7
+        IF cliNumber<1 OR cliNumber>10000 THEN cli_error "Out of range: --max-attempts (1..10000)." : RETurn
+        opt.attempts%=cliNumber
+      =8
+        IF cliNumber<1 OR cliNumber>10000 THEN cli_error "Out of range: --candidates (1..10000)." : RETurn
+        opt.candidates%=cliNumber
+      =9
+        IF cliNumber<0 OR cliNumber>10000 THEN cli_error "Out of range: --improve-steps (0..10000)." : RETurn
+        opt.improve%=cliNumber
+      =10
+        IF cliNumber<1 OR cliNumber>100000000 THEN cli_error "Out of range: --solver-work (1..100000000)." : RETurn
+        opt.solverWork=cliNumber
+      =11
+        IF cliNumber<0 OR cliNumber>1000000 THEN cli_error "Out of range: --min-trials (0..1000000)." : RETurn
+        opt.minTrials=cliNumber
+      =12
+        IF cliNumber<0 OR cliNumber>1000000 THEN cli_error "Out of range: --max-trials (0..1000000)." : RETurn
+        opt.maxTrials=cliNumber
+      =13
+        IF cliNumber<0 OR cliNumber>256 THEN cli_error "Out of range: --min-depth (0..256)." : RETurn
+        opt.minDepth%=cliNumber
+      =14
+        IF cliNumber<0 OR cliNumber>20000 THEN cli_error "Out of range: --min-search-nodes (0..20000)." : RETurn
+        opt.minNodes%=cliNumber
+      =15
+        IF NOT cli_equal%(cpValue$,"connect-only") AND NOT cli_equal%(cpValue$,"full-coverage") THEN cli_error "Mode must be connect-only or full-coverage." : RETurn
+        opt.full%=cli_equal%(cpValue$,"full-coverage")
+      =16
+        IF NOT cli_equal%(cpValue$,"random") AND NOT cli_equal%(cpValue$,"varied") THEN cli_error "Cut style must be random or varied." : RETurn
+        opt.varied%=cli_equal%(cpValue$,"varied")
+      =17
+        opt.target%=cli_grade%(cpValue$)
+        IF NOT opt.target% AND NOT cli_equal%(cpValue$,"any") THEN cli_error "Difficulty must be any/easy/medium/hard/expert." : RETurn
+      =18
+        cpRange%=".." INSTR cpValue$
+        IF cpRange%<2 OR cpRange%+2>LEN(cpValue$) THEN cli_error "Ramp must ascend, e.g. easy..hard." : RETurn
+        cpFirst$=cpValue$(1 TO cpRange%-1) : cpLast$=cpValue$(cpRange%+2 TO)
+        opt.rampFirst%=cli_grade%(cpFirst$) : opt.rampLast%=cli_grade%(cpLast$)
+        IF opt.rampFirst%<1 OR opt.rampLast%<=opt.rampFirst% THEN cli_error "Ramp must ascend, e.g. easy..hard." : RETurn
+      =19
+        IF LEN(cpValue$)=0 OR LEN(cpValue$)>200 THEN cli_error "Output must be a nonempty QL filename of at most 200 bytes." : RETurn
+        opt.output$=cpValue$
+      =20
+        opt.show%=1
+      =21
+        opt.force%=1
+      =22
+        opt.assess%=1
+      =23
+        opt.unique%=1
+      =24
+        opt.shortest%=1
+    END SELect
+    cpI%=cpI%+1
+  END REPeat cpParse
+  IF gExit% THEN RETurn
+  IF opt.rampFirst% THEN
+    cli_ramp
+  ELSE
+    cli_validate
+  END IF
+END DEFine
+
+DEFine PROCedure cli_help
+  PRINT #0,"Tangles native generator / SSB 2.8 and Turbo 5.09"
+  PRINT #0,"EW win1_generator_exe;";CHR$(34);"--seed 42 --output win1_pack_json";CHR$(34)
+  PRINT #0,"--mode connect-only|full-coverage   --width N --height N (1..64)"
+  PRINT #0,"--pairs N --min-length N --max-length N --max-attempts N"
+  PRINT #0,"--seed N (0..2147483647) --count N (1..10000)"
+  PRINT #0,"--cut-style random|varied --difficulty any|easy|medium|hard|expert"
+  PRINT #0,"--ramp easy..hard (ascending grades; default count 12)"
+  PRINT #0,"--candidates N --improve-steps N --solver-work N"
+  PRINT #0,"--min-trials N --max-trials N --min-depth N --min-search-nodes N"
+  PRINT #0,"--assess --require-unique --avoid-shortest --show-solution"
+  PRINT #0,"--output QL_FILENAME --force --help|-h"
+  PRINT #0,"Defaults: 8x8, six pairs, connect-only, lengths 4..16, 500 attempts."
+  PRINT #0,"Orthogonal, disjoint induced paths. Full coverage fills every square."
+  PRINT #0,"Solver targets are exact, full-coverage only, and require a unique proof."
+  PRINT #0,"Easy=local, medium=routes, hard=trials, expert=branching."
+  PRINT #0,"Budgets are deterministic work units, not elapsed time."
+  PRINT #0,"A failed/budget-limited search never proves impossibility or difficulty."
+  PRINT #0,"All stored solutions are validated. Grades remain provisional."
+  PRINT #0,"Escape/Ctrl+C cancels. Native seed streams are versioned; see README."
+END DEFine

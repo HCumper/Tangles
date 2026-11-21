@@ -1,0 +1,325 @@
+## Geometry is deliberately clue-only and uses distinct coverage profiles.
+TYPE GeometryMeasurements
+  boardCellCount
+  pairCount
+  endpointCount
+  cornerEndpointCount
+  edgeEndpointCount
+  meanCornerDistance
+  meanEdgeDistance
+  meanAvailableExits
+  singleExitEndpointCount
+  adjacentPairCount
+  alignedPairCount
+  meanManhattanDistance
+  meanShortestDistance
+  minimumRequiredCells
+  minimumCoverageRatio
+  coverageSlackCells
+  requiredExtraCoverageCells
+  forcedCornerTurnCount
+  meanLog2ShortestRouteCount
+  shortestRouteCountLimit
+  cappedRoutePairCount
+  routeInteriorOccurrences
+  sharedRouteInteriorOccurrences
+  routeOverlapRatio
+  maxRouteOverlap
+  crossLabelEndpointAdjacencies
+  clueCrowdingRatio
+END TYPE
+TYPE PairMeasurements
+  manhattanDistance%
+  shortestDistance%
+  shortestRouteCount%
+  shortestRouteCountCapped%
+  minEndpointExits%
+  maxEndpointExits%
+  shortestRouteInteriorCells%
+  sharedRouteInteriorCells%
+END TYPE
+DIM gm AS GeometryMeasurements
+DIM geoPair(0) AS PairMeasurements
+DIM geoA%(0),geoB%(0),geoWays%(0),geoUsage%(0),geoMap%(0),geoLog(0)
+DIM geoNames$(9,32),geoValues(9),geoWeights%(9),geoPoints(9)
+DIM shortOwner%(0),shortOrder%(0),shortPrevious%(0),shortPairOrder%(0)
+geoCount%=0 : geoScore%=0 : geoRaw=0 : geoEasy%=30 : geoHard%=55
+shortSolved%=0 : shortTrials%=0 : shortLimit%=32 : shortFirst%=0
+
+## Breadth-first distances block foreign endpoints but ignore the hidden solution.
+## The first endpoint pass also counts shortest routes, capped at 1025 so the
+## public limit of 1024 can be reported together with an overflow flag.
+DEFine PROCedure geo_distances(VAL gdPair%,VAL gdSource%,VAL gdSecond%)
+  LOCal gdI%,gdHead%,gdTail%,gdAt%,gdN%,gdD%,gdNextDistance%
+  FOR gdI%=0 TO gN%-1
+    IF gdSecond% THEN geoB%(gdI%)=-1
+    IF NOT gdSecond% THEN geoA%(gdI%)=-1 : geoWays%(gdI%)=0
+  END FOR gdI%
+  IF gdSecond% THEN geoB%(gdSource%)=0
+  IF NOT gdSecond% THEN geoA%(gdSource%)=0 : geoWays%(gdSource%)=1
+  gdHead%=0 : gdTail%=1 : gQueue%(0)=gdSource%
+  REPeat gdBFS
+    IF gdHead%>=gdTail% THEN EXIT gdBFS
+    gdAt%=gQueue%(gdHead%) : gdHead%=gdHead%+1
+    gdNextDistance%=geoA%(gdAt%)+1 : IF gdSecond% THEN gdNextDistance%=geoB%(gdAt%)+1
+    FOR gdD%=0 TO gDegree%(gdAt%)-1
+      gdN%=gNb%(gdAt%,gdD%)
+      IF gEndpoint%(gdN%)=0 OR gEndpoint%(gdN%)=gdPair% THEN
+        IF gdSecond% THEN
+          IF geoB%(gdN%)<0 THEN geoB%(gdN%)=gdNextDistance% : gQueue%(gdTail%)=gdN% : gdTail%=gdTail%+1
+        ELSE
+          IF geoA%(gdN%)<0 THEN geoA%(gdN%)=gdNextDistance% : gQueue%(gdTail%)=gdN% : gdTail%=gdTail%+1
+          IF geoA%(gdN%)=gdNextDistance% THEN geoWays%(gdN%)=gen_min(1025,geoWays%(gdN%)+geoWays%(gdAt%))
+        END IF
+      END IF
+    END FOR gdD%
+  END REPeat gdBFS
+END DEFine
+
+## Count corner clues separately from other border clues in the geometry profile.
+DEFine FuNction geo_corner%(VAL gcCell%)
+  RETurn (gcCell%=0 OR gcCell%=opt.width%-1 OR gcCell%=gN%-opt.width% OR gcCell%=gN%-1)
+END DEFine
+
+DEFine FuNction geo_edge%(VAL geCell%)
+  RETurn (geCell% MOD opt.width%=0 OR geCell% MOD opt.width%=opt.width%-1 OR geCell%<opt.width% OR geCell%>=gN%-opt.width%)
+END DEFine
+
+## Count clue-legal first moves; adjacent partners already have a direct connection.
+DEFine FuNction geo_exits%(VAL gxCell%,VAL gxPair%,VAL gxDistance%)
+  LOCal gxD%,gxN%,gxCount%
+  IF gxDistance%=1 THEN RETurn 1
+  gxCount%=0
+  FOR gxD%=0 TO gDegree%(gxCell%)-1
+    gxN%=gNb%(gxCell%,gxD%)
+    IF gEndpoint%(gxN%)=0 OR gEndpoint%(gxN%)=gxPair% THEN gxCount%=gxCount%+1
+  END FOR gxD%
+  RETurn gxCount%
+END DEFine
+
+## Clamp a feature to 0..1 and retain its weight and points for explainable JSON.
+## Negative weights credit forced moves that tend to make a puzzle easier.
+DEFine PROCedure geo_component(VAL gcName$,VAL gcValue,VAL gcWeight%)
+  geoNames$(geoCount%)=gcName$ : geoValues(geoCount%)=gen_six(gen_max(0,gen_min(1,gcValue)))
+  geoWeights%(geoCount%)=gcWeight% : geoPoints(geoCount%)=gen_six(gcWeight%*geoValues(geoCount%))
+  geoRaw=geoRaw+geoPoints(geoCount%) : geoCount%=geoCount%+1
+END DEFine
+
+## Measure endpoint freedom, shortest-route ambiguity and competition for cells.
+## Use the appropriate coverage-mode weights, retaining each component as a
+## provisional estimate. No measurement is taken from the stored solution paths.
+DEFine PROCedure geo_assess
+  LOCal gaI%,gaJ%,gaP%,gaActual%,gaStart%,gaEnd%,gaM%,gaX%,gaY%,gaCorner%,gaEdge%,gaExA%,gaExB%,gaN%,gaD%,gaCorridor%,gaSwap%
+  LOCal gaCornerSum,gaEdgeSum,gaExits,gaDist,gaManhattan,gaLogSum,gaLogValue,gaDenom
+  DIM gm AS GeometryMeasurements
+  DIM geoPair(opt.pairs%) AS PairMeasurements
+  DIM geoA%(gN%-1),geoB%(gN%-1),geoWays%(gN%-1),geoUsage%(gN%-1),geoMap%(opt.pairs%),geoLog(opt.pairs%)
+  gm.boardCellCount=gN% : gm.pairCount=opt.pairs% : gm.endpointCount=2*opt.pairs% : gm.shortestRouteCountLimit=1024
+  gaCornerSum=0 : gaEdgeSum=0 : gaExits=0 : gaDist=0 : gaManhattan=0 : gaLogSum=0
+  FOR gaI%=0 TO gN%-1
+    geoUsage%(gaI%)=0
+    IF gEndpoint%(gaI%) THEN
+      gaX%=gen_min(gaI% MOD opt.width%,opt.width%-1-(gaI% MOD opt.width%))
+      gaY%=gen_min(INT(gaI%/opt.width%),opt.height%-1-INT(gaI%/opt.width%))
+      gaCornerSum=gaCornerSum+gaX%+gaY% : gaEdgeSum=gaEdgeSum+gen_min(gaX%,gaY%)
+      IF geo_corner%(gaI%) THEN
+        gm.cornerEndpointCount=gm.cornerEndpointCount+1
+      ELSE
+        IF geo_edge%(gaI%) THEN gm.edgeEndpointCount=gm.edgeEndpointCount+1
+      END IF
+      FOR gaD%=0 TO gDegree%(gaI%)-1
+        gaN%=gNb%(gaI%,gaD%)
+        IF gaN%>gaI% AND gEndpoint%(gaN%) AND gEndpoint%(gaN%)<>gEndpoint%(gaI%) THEN gm.crossLabelEndpointAdjacencies=gm.crossLabelEndpointAdjacencies+1
+      END FOR gaD%
+    ELSE
+      IF opt.full% AND opt.width%>1 AND opt.height%>1 AND geo_corner%(gaI%) THEN gm.forcedCornerTurnCount=gm.forcedCornerTurnCount+1
+    END IF
+  END FOR gaI%
+  FOR gaP%=1 TO opt.pairs%
+    geoMap%(gaP%)=gaP%
+  END FOR gaP%
+  FOR gaP%=2 TO opt.pairs%
+    gaActual%=geoMap%(gaP%) : gaJ%=gaP%-1
+    REPeat gaSort
+      IF gaJ%<1 THEN EXIT gaSort
+      IF NOT gen_less%(gen_label$(gaActual%),gen_label$(geoMap%(gaJ%))) THEN EXIT gaSort
+      geoMap%(gaJ%+1)=geoMap%(gaJ%) : gaJ%=gaJ%-1
+    END REPeat gaSort
+    geoMap%(gaJ%+1)=gaActual%
+  END FOR gaP%
+  FOR gaP%=1 TO opt.pairs%
+    gen_poll : IF gCancel% THEN RETurn
+    gaActual%=geoMap%(gaP%) : gaStart%=gStart%(gaActual%) : gaEnd%=gFinish%(gaActual%)
+    gaM%=ABS((gaStart% MOD opt.width%)-(gaEnd% MOD opt.width%))+ABS(INT(gaStart%/opt.width%)-INT(gaEnd%/opt.width%))
+    geo_distances gaActual%,gaStart%,0 : geo_distances gaActual%,gaEnd%,1
+    IF geoA%(gaEnd%)<0 THEN gExit%=1 : gError$="Internal error: clues have no connecting route." : RETurn
+    gaExA%=geo_exits%(gaStart%,gaActual%,gaM%) : gaExB%=geo_exits%(gaEnd%,gaActual%,gaM%)
+    geoPair(gaP%).manhattanDistance%=gaM% : geoPair(gaP%).shortestDistance%=geoA%(gaEnd%)
+    geoPair(gaP%).shortestRouteCount%=gen_min(1024,geoWays%(gaEnd%)) : geoPair(gaP%).shortestRouteCountCapped%=(geoWays%(gaEnd%)>1024)
+    geoPair(gaP%).minEndpointExits%=gen_min(gaExA%,gaExB%) : geoPair(gaP%).maxEndpointExits%=gen_max(gaExA%,gaExB%)
+    geoLog(gaP%)=gen_log2(geoPair(gaP%).shortestRouteCount%)
+    IF gaM%=1 THEN gm.adjacentPairCount=gm.adjacentPairCount+1
+    IF gaStart% MOD opt.width%=gaEnd% MOD opt.width% OR INT(gaStart%/opt.width%)=INT(gaEnd%/opt.width%) THEN gm.alignedPairCount=gm.alignedPairCount+1
+    IF gaExA%=1 THEN gm.singleExitEndpointCount=gm.singleExitEndpointCount+1
+    IF gaExB%=1 THEN gm.singleExitEndpointCount=gm.singleExitEndpointCount+1
+    IF geoPair(gaP%).shortestRouteCountCapped% THEN gm.cappedRoutePairCount=gm.cappedRoutePairCount+1
+    gaExits=gaExits+gaExA%+gaExB% : gaDist=gaDist+geoA%(gaEnd%) : gaManhattan=gaManhattan+gaM%
+    gm.minimumRequiredCells=gm.minimumRequiredCells+geoA%(gaEnd%)+1
+    gaCorridor%=0
+    FOR gaI%=0 TO gN%-1
+      IF NOT gEndpoint%(gaI%) AND geoA%(gaI%)>=0 AND geoB%(gaI%)>=0 AND geoA%(gaI%)+geoB%(gaI%)=geoA%(gaEnd%) THEN
+        gaCorridor%=gaCorridor%+1 : geoUsage%(gaI%)=geoUsage%(gaI%)+1
+      END IF
+    END FOR gaI%
+    geoPair(gaP%).shortestRouteInteriorCells%=gaCorridor% : gm.routeInteriorOccurrences=gm.routeInteriorOccurrences+gaCorridor%
+  END FOR gaP%
+  ## Recompute distances for shared-corridor counts instead of retaining a
+  ## board-sized corridor array for every pair. A cell is on a shortest route
+  ## when its distances from both endpoints sum to the pair's shortest distance.
+  FOR gaP%=1 TO opt.pairs%
+    gaActual%=geoMap%(gaP%) : gaEnd%=gFinish%(gaActual%)
+    geo_distances gaActual%,gStart%(gaActual%),0 : geo_distances gaActual%,gaEnd%,1
+    gaCorridor%=0
+    FOR gaI%=0 TO gN%-1
+      IF NOT gEndpoint%(gaI%) AND geoUsage%(gaI%)>1 AND geoA%(gaI%)>=0 AND geoB%(gaI%)>=0 AND geoA%(gaI%)+geoB%(gaI%)=geoA%(gaEnd%) THEN gaCorridor%=gaCorridor%+1
+    END FOR gaI%
+    geoPair(gaP%).sharedRouteInteriorCells%=gaCorridor% : gm.sharedRouteInteriorOccurrences=gm.sharedRouteInteriorOccurrences+gaCorridor%
+  END FOR gaP%
+  FOR gaI%=0 TO gN%-1
+    gm.maxRouteOverlap=gen_max(gm.maxRouteOverlap,geoUsage%(gaI%))
+  END FOR gaI%
+  ## Sort logarithms before summing, as in F#, to avoid order-dependent rounding.
+  FOR gaP%=2 TO opt.pairs%
+    gaLogValue=geoLog(gaP%) : gaJ%=gaP%-1
+    REPeat gaLogSort
+      IF gaJ%<1 THEN EXIT gaLogSort
+      IF geoLog(gaJ%)<=gaLogValue THEN EXIT gaLogSort
+      geoLog(gaJ%+1)=geoLog(gaJ%) : gaJ%=gaJ%-1
+    END REPeat gaLogSort
+    geoLog(gaJ%+1)=gaLogValue
+  END FOR gaP%
+  FOR gaP%=1 TO opt.pairs%
+    gaLogSum=gaLogSum+geoLog(gaP%)
+  END FOR gaP%
+  gm.meanCornerDistance=gen_six(gaCornerSum/gm.endpointCount) : gm.meanEdgeDistance=gen_six(gaEdgeSum/gm.endpointCount)
+  gm.meanAvailableExits=gen_six(gaExits/gm.endpointCount) : gm.meanManhattanDistance=gen_six(gaManhattan/opt.pairs%)
+  gm.meanShortestDistance=gen_six(gaDist/opt.pairs%) : gm.meanLog2ShortestRouteCount=gen_six(gaLogSum/opt.pairs%)
+  gm.minimumCoverageRatio=gen_six(gm.minimumRequiredCells/gN%) : gm.coverageSlackCells=gN%-gm.minimumRequiredCells
+  IF opt.full% THEN gm.requiredExtraCoverageCells=gen_max(0,gm.coverageSlackCells)
+  IF gm.routeInteriorOccurrences THEN gm.routeOverlapRatio=gen_six(gm.sharedRouteInteriorOccurrences/gm.routeInteriorOccurrences)
+  gm.clueCrowdingRatio=gen_six(gm.crossLabelEndpointAdjacencies/(2*gm.endpointCount))
+  ## Both profiles use clue geometry, but full coverage adds required detours
+  ## and forced empty-corner turns; connections-only uses minimum fill pressure.
+  geoCount%=0 : geoRaw=0 : geoEasy%=30 : geoHard%=55
+  geo_component "boardScale",gen_log2(gN%)/12,10
+  gaX%=10 : IF opt.full% THEN gaX%=8
+  gaLogValue=opt.pairs% : geo_component "pairLoad",gaLogValue/16,gaX%
+  gaX%=18 : IF opt.full% THEN gaX%=16
+  geo_component "endpointFreedom",(gm.meanAvailableExits-1)/3,gaX%
+  gaX%=12 : IF opt.full% THEN gaX%=8
+  geo_component "shortRouteAmbiguity",gm.meanLog2ShortestRouteCount/10,gaX%
+  gaX%=22 : IF opt.full% THEN gaX%=24
+  geo_component "routeOverlap",gm.routeOverlapRatio,gaX%
+  geo_component "clueCrowding",gm.clueCrowdingRatio,6
+  gaDenom=gen_max(1,INT((opt.width%-1)/2)+INT((opt.height%-1)/2))
+  geo_component "cornerDistance",gm.meanCornerDistance/gaDenom,6
+  IF opt.full% THEN
+    geoEasy%=35 : geoHard%=60
+    geo_component "requiredCoverageDetours",gm.requiredExtraCoverageCells/gN%,22
+    geo_component "forcedEndpointCredit",gm.singleExitEndpointCount/gm.endpointCount,-18
+    geo_component "forcedCornerCredit",gm.forcedCornerTurnCount/4,-6
+  ELSE
+    geo_component "minimumCoveragePressure",gm.minimumCoverageRatio,16
+    geo_component "forcedEndpointCredit",gm.singleExitEndpointCount/gm.endpointCount,-20
+  END IF
+  geoRaw=gen_six(geoRaw) : geoScore%=gen_max(0,gen_min(100,gen_round(geoRaw)))
+END DEFine
+
+## Try greedy shortest available routes in deterministic, varied pair orders.
+## A validated success identifies an easily solved candidate. Exhausting these
+## orders only means this screen failed, not that the puzzle is hard or unique.
+DEFine PROCedure shortest_screen(VAL sqTrials%)
+  LOCal sqT%,sqI%,sqJ%,sqSwap%,sqP%,sqActual%,sqA%,sqB%,sqHead%,sqTail%,sqAt%,sqD%,sqN%,sqCount%,sqFailed%,sqOrder%,sqOK%
+  shortSolved%=0 : shortTrials%=0 : shortFirst%=0 : shortLimit%=sqTrials%
+  DIM shortOwner%(gN%-1),shortOrder%(gN%-1),shortPrevious%(gN%-1),shortPairOrder%(opt.pairs%)
+  identity_canonical : rng_seed 1,1413566023 : gRngStream%=1
+  FOR sqT%=1 TO sqTrials%
+    gen_poll : IF gCancel% THEN EXIT sqT%
+    FOR sqI%=1 TO opt.pairs%
+      shortPairOrder%(sqI%)=sqI%
+    END FOR sqI%
+    ## Start with shorter pairs first; subsequent trials shuffle pair order.
+    ## Neighbour shuffling also varies equally short routes within each trial.
+    IF sqT%=1 THEN
+      FOR sqI%=2 TO opt.pairs%
+        sqP%=shortPairOrder%(sqI%) : sqActual%=gCanonical%(sqP%)
+        sqA%=gStart%(sqActual%) : sqB%=gFinish%(sqActual%)
+        sqCount%=ABS((sqA% MOD opt.width%)-(sqB% MOD opt.width%))+ABS(INT(sqA%/opt.width%)-INT(sqB%/opt.width%))
+        sqJ%=sqI%-1
+        REPeat sqSort
+          IF sqJ%<1 THEN EXIT sqSort
+          sqActual%=gCanonical%(shortPairOrder%(sqJ%)) : sqA%=gStart%(sqActual%) : sqB%=gFinish%(sqActual%)
+          sqD%=ABS((sqA% MOD opt.width%)-(sqB% MOD opt.width%))+ABS(INT(sqA%/opt.width%)-INT(sqB%/opt.width%))
+          IF sqD%<sqCount% OR (sqD%=sqCount% AND shortPairOrder%(sqJ%)<sqP%) THEN EXIT sqSort
+          shortPairOrder%(sqJ%+1)=shortPairOrder%(sqJ%) : sqJ%=sqJ%-1
+        END REPeat sqSort
+        shortPairOrder%(sqJ%+1)=sqP%
+      END FOR sqI%
+    ELSE
+      FOR sqI%=opt.pairs% TO 2 STEP -1
+        sqJ%=1+rng_next%(sqI%) : sqSwap%=shortPairOrder%(sqI%)
+        shortPairOrder%(sqI%)=shortPairOrder%(sqJ%) : shortPairOrder%(sqJ%)=sqSwap%
+      END FOR sqI%
+    END IF
+    FOR sqI%=0 TO gN%-1
+      shortOwner%(sqI%)=0 : shortOrder%(sqI%)=0
+    END FOR sqI%
+    sqFailed%=0
+    FOR sqP%=1 TO opt.pairs%
+      sqActual%=gCanonical%(shortPairOrder%(sqP%)) : sqA%=gA%(shortPairOrder%(sqP%)) : sqB%=gB%(shortPairOrder%(sqP%))
+      FOR sqI%=0 TO gN%-1
+        shortPrevious%(sqI%)=-1
+      END FOR sqI%
+      shortPrevious%(sqA%)=sqA% : sqHead%=0 : sqTail%=1 : gQueue%(0)=sqA%
+      REPeat sqBFS
+        IF sqHead%>=sqTail% OR shortPrevious%(sqB%)>=0 THEN EXIT sqBFS
+        sqAt%=gQueue%(sqHead%) : sqHead%=sqHead%+1 : sqCount%=gDegree%(sqAt%)
+        FOR sqD%=0 TO sqCount%-1
+          gScratch%(sqD%)=gNb%(sqAt%,sqD%)
+        END FOR sqD%
+        FOR sqD%=sqCount%-1 TO 1 STEP -1
+          sqJ%=rng_next%(sqD%+1) : sqSwap%=gScratch%(sqD%)
+          gScratch%(sqD%)=gScratch%(sqJ%) : gScratch%(sqJ%)=sqSwap%
+        END FOR sqD%
+        FOR sqD%=0 TO sqCount%-1
+          sqN%=gScratch%(sqD%)
+          IF shortPrevious%(sqN%)<0 AND NOT shortOwner%(sqN%) AND (gEndpoint%(sqN%)=0 OR gEndpoint%(sqN%)=sqActual%) THEN
+            shortPrevious%(sqN%)=sqAt% : gQueue%(sqTail%)=sqN% : sqTail%=sqTail%+1
+          END IF
+        END FOR sqD%
+      END REPeat sqBFS
+      IF shortPrevious%(sqB%)<0 THEN sqFailed%=1 : EXIT sqP%
+      sqAt%=sqB% : sqOrder%=1
+      REPeat sqTrace
+        shortOwner%(sqAt%)=sqActual% : shortOrder%(sqAt%)=sqOrder%
+        IF sqAt%=sqA% THEN EXIT sqTrace
+        sqOrder%=sqOrder%+1 : sqAt%=shortPrevious%(sqAt%)
+      END REPeat sqTrace
+    END FOR sqP%
+    shortTrials%=sqT%
+    IF NOT sqFailed% THEN
+      ## Check self-touching in the independently constructed shortest routes.
+      sqOK%=1
+      FOR sqI%=0 TO gN%-1
+        IF shortOwner%(sqI%) THEN
+          FOR sqD%=0 TO gDegree%(sqI%)-1
+            sqN%=gNb%(sqI%,sqD%)
+            IF shortOwner%(sqN%)=shortOwner%(sqI%) AND ABS(shortOrder%(sqN%)-shortOrder%(sqI%))<>1 THEN sqOK%=0
+          END FOR sqD%
+        END IF
+      END FOR sqI%
+      IF sqOK% THEN shortSolved%=1 : shortFirst%=sqT% : EXIT sqT%
+    END IF
+  END FOR sqT%
+  gRngStream%=0 : gHasShortest%=1
+END DEFine

@@ -329,3 +329,11 @@ local progress. The compiled engine is checked against reference traces from
 while retaining only clue/rule nodes; the 100-puzzle 12x12 pack is tested unchanged.
 Use SMSQ/E GD2 at 800x600 with 16 MiB RAM; see the GUI guide for the real Turbo
 build, launcher, controls and QL-specific limits.
+
+## Native QL generator
+
+[`QL/Generator`](QL/Generator/README.md) implements the generator in SSB,
+compiled with Turbo for an expanded QDOS/SMSQ/E machine. It provides both
+coverage modes, clue-only solving and difficulty selection, ramps, deterministic
+batches and version-1 JSON packs for either player. See its guide for the native
+build, command-line options, verification and platform differences.

@@ -1,0 +1,373 @@
+## Bounded induced-path growth and mixed Hamiltonian traversal partitions.
+DIM covTurn%(0),covBorder%(0),covSaved%(0)
+covMemory=0 : covStride=0
+covScore%=0 : covFeasible%=0 : covFound%=0 : growBudget%=0
+
+## Prepare a shuffled list of legal extensions at this DFS depth. A new cell
+## must touch exactly one cell of the current path, preventing self-touching.
+DEFine PROCedure grow_enter(VAL gdDepth%)
+  LOCal gdI%,gdJ%,gdNext%,gdTouches%,gdCurrent%,gdCount%,gdSwap%
+  growBudget%=growBudget%-1 : gdCurrent%=gGrowthPath%(gdDepth%)
+  gdCount%=0 : gGrowthAt%(gdDepth%)=0
+  FOR gdI%=0 TO gDegree%(gdCurrent%)-1
+    gdNext%=gNb%(gdCurrent%,gdI%)
+    IF NOT gOwner%(gdNext%) AND NOT gLocal%(gdNext%) THEN
+      gdTouches%=0
+      FOR gdJ%=0 TO gDegree%(gdNext%)-1
+        gdTouches%=gdTouches%+gLocal%(gNb%(gdNext%,gdJ%))
+      END FOR gdJ%
+      IF gdTouches%=1 THEN gGrowthCandidates%(gdDepth%,gdCount%)=gdNext% : gdCount%=gdCount%+1
+    END IF
+  END FOR gdI%
+  FOR gdI%=gdCount%-1 TO 1 STEP -1
+    gdJ%=rng_next%(gdI%+1) : gdSwap%=gGrowthCandidates%(gdDepth%,gdI%)
+    gGrowthCandidates%(gdDepth%,gdI%)=gGrowthCandidates%(gdDepth%,gdJ%) : gGrowthCandidates%(gdDepth%,gdJ%)=gdSwap%
+  END FOR gdI%
+  gGrowthCount%(gdDepth%)=gdCount%
+END DEFine
+
+## Try shuffled free starting cells, extending and backtracking without recursion.
+## The shared 2048-step allowance bounds the whole attempt to grow this one path.
+## Only a complete path is later copied into the board's owner/order arrays.
+DEFine FuNction grow_path%(VAL gpTarget%)
+  LOCal gpI%,gpJ%,gpCount%,gpSwap%,gpStart%,gpDepth%,gpNext%,gpOK%
+  gpCount%=0 : growBudget%=2048 : gpOK%=0
+  FOR gpI%=0 TO gN%-1
+    gLocal%(gpI%)=0
+    IF NOT gOwner%(gpI%) THEN gScratch%(gpCount%)=gpI% : gpCount%=gpCount%+1
+  END FOR gpI%
+  FOR gpI%=gpCount%-1 TO 1 STEP -1
+    gpJ%=rng_next%(gpI%+1) : gpSwap%=gScratch%(gpI%)
+    gScratch%(gpI%)=gScratch%(gpJ%) : gScratch%(gpJ%)=gpSwap%
+  END FOR gpI%
+  FOR gpStart%=0 TO gpCount%-1
+    gpDepth%=1 : gGrowthPath%(1)=gScratch%(gpStart%) : gLocal%(gGrowthPath%(1))=1 : grow_enter 1
+    REPeat gpExtend
+      gen_poll : IF gCancel% THEN EXIT gpExtend
+      IF gpDepth%=gpTarget% THEN gpOK%=1 : EXIT gpExtend
+      IF growBudget%<=0 OR gpDepth%=0 THEN EXIT gpExtend
+      gpI%=gGrowthAt%(gpDepth%)
+      IF gpI%>=gGrowthCount%(gpDepth%) THEN
+        gLocal%(gGrowthPath%(gpDepth%))=0 : gpDepth%=gpDepth%-1
+      ELSE
+        gpNext%=gGrowthCandidates%(gpDepth%,gpI%) : gGrowthAt%(gpDepth%)=gpI%+1
+        gpDepth%=gpDepth%+1 : gGrowthPath%(gpDepth%)=gpNext% : gLocal%(gpNext%)=1 : grow_enter gpDepth%
+      END IF
+    END REPeat gpExtend
+    FOR gpI%=0 TO gN%-1
+      gLocal%(gpI%)=0
+    END FOR gpI%
+    IF gpOK% OR growBudget%<=0 OR gCancel% THEN EXIT gpStart%
+  END FOR gpStart%
+  RETurn gpOK%
+END DEFine
+
+## Build paths in sequence, reserving minimum space for every remaining pair.
+## If a requested longer path fails, retry at minimum length; if any pair still
+## fails, discard the board and restart within the configured attempt limit.
+DEFine PROCedure grow_generate(VAL ggSeed)
+  LOCal ggAttempt%,ggP%,ggI%,ggFree%,ggMax%,ggTarget%,ggOK%
+  gSuccess%=0 : gRngStream%=0 : rng_seed 0,ggSeed
+  DIM gGrowthCandidates%(gN%+1,3),gGrowthCount%(gN%+1),gGrowthAt%(gN%+1),gGrowthPath%(gN%+1)
+  FOR ggAttempt%=1 TO opt.attempts%
+    work.boardAttempts=work.boardAttempts+1 : gen_poll : IF gCancel% THEN RETurn
+    FOR ggI%=0 TO gN%-1
+      gOwner%(ggI%)=0 : gOrder%(ggI%)=0
+    END FOR ggI%
+    ggFree%=gN% : ggOK%=1
+    FOR ggP%=1 TO opt.pairs%
+      ggMax%=gen_min(opt.maximum%,ggFree%-(opt.pairs%-ggP%)*opt.minimum%)
+      ggTarget%=opt.minimum%+rng_next%(ggMax%-opt.minimum%+1)
+      ggOK%=grow_path%(ggTarget%)
+      IF NOT ggOK% AND ggTarget%<>opt.minimum% THEN ggTarget%=opt.minimum% : ggOK%=grow_path%(ggTarget%)
+      IF NOT ggOK% OR gCancel% THEN EXIT ggP%
+      gLength%(ggP%)=ggTarget% : gStart%(ggP%)=gGrowthPath%(1) : gFinish%(ggP%)=gGrowthPath%(ggTarget%)
+      FOR ggI%=1 TO ggTarget%
+        gOwner%(gGrowthPath%(ggI%))=ggP% : gOrder%(gGrowthPath%(ggI%))=ggI%
+      END FOR ggI%
+      ggFree%=ggFree%-ggTarget%
+    END FOR ggP%
+    IF ggOK% THEN gen_endpoints : gen_validate : gSuccess%=gValid% : RETurn
+  END FOR ggAttempt%
+END DEFine
+
+## Allocate traversal workspace and a bit-packed feasibility table on the heap.
+## State (p,i) means the suffix starting at traversal position i can form p paths.
+## Packing the table avoids Turbo's numeric-array size limit on larger recipes.
+DEFine PROCedure cover_init
+  LOCal ciAt,ciBytes
+  DIM gCuts%(opt.pairs%+1),gEnds%(gN%-1),gNeeded%(gN%),gTraversal%(gN%-1),gPositions%(gN%-1)
+  DIM gPrefix%(gN%+1),gWalk%(gN%-1),gWalkPos%(gN%-1),gBestWalk%(gN%-1)
+  DIM covTurn%(gN%),covBorder%(gN%),covSaved%(gN%-1)
+  IF covMemory THEN RECHP covMemory
+  covMemory=0
+  covStride=2*(1+INT(gN%/16)) : ciBytes=(opt.pairs%+1)*covStride
+  covMemory=ALCHP(ciBytes)
+  IF NOT covMemory THEN gExit%=1 : gError$="Not enough memory for coverage partition DP." : RETurn
+  FOR ciAt=0 TO ciBytes-2 STEP 2
+    POKE_W covMemory+ciAt,0
+  END FOR ciAt
+END DEFine
+
+## Read a feasibility bit with signed word operations. Converting a full mask
+## to a positive integer before MOD would overflow Turbo's 16-bit temporary.
+DEFine FuNction cover_dp%(VAL cdP%,VAL cdCell%)
+  LOCal cdWord%,cdBit%
+  cdWord%=word16%(PEEK_W(covMemory+cdP%*covStride+2*INT(cdCell%/16)))
+  cdBit%=word16%(gPower(cdCell% MOD 16))
+  RETurn (cdWord% && cdBit%)<>0
+END DEFine
+
+## Change one feasibility bit while preserving every other state in the word.
+DEFine PROCedure cover_set(VAL csP%,VAL csCell%,VAL csValue%)
+  LOCal csV,csBit,csOld%
+  csV=PEEK_W(covMemory+csP%*covStride+2*INT(csCell%/16)) : IF csV<0 THEN csV=csV+65536
+  csBit=gPower(csCell% MOD 16) : csOld%=((word16%(csV) && word16%(csBit))<>0)
+  csV=csV+(csValue%-csOld%)*csBit
+  POKE_W covMemory+csP%*covStride+2*INT(csCell%/16),word16%(csV)
+END DEFine
+
+## Join a traversal endpoint to another grid neighbour and reverse the intervening
+## section. Removing the old join keeps one continuous walk visiting every cell
+## once; the inverse position map is updated alongside the walk.
+DEFine PROCedure cover_backbite
+  LOCal cbFront%,cbEnd%,cbAdjacent%,cbI%,cbCount%,cbJoin%,cbLeft%,cbRight%,cbA%,cbB%
+  IF gN%<2 THEN RETurn
+  cbFront%=(rng_next%(2)=0)
+  IF cbFront% THEN
+    cbEnd%=gWalk%(0) : cbAdjacent%=gWalk%(1)
+  ELSE
+    cbEnd%=gWalk%(gN%-1) : cbAdjacent%=gWalk%(gN%-2)
+  END IF
+  cbCount%=0
+  FOR cbI%=0 TO gDegree%(cbEnd%)-1
+    IF gNb%(cbEnd%,cbI%)<>cbAdjacent% THEN gScratch%(cbCount%)=gNb%(cbEnd%,cbI%) : cbCount%=cbCount%+1
+  END FOR cbI%
+  IF cbCount%=0 THEN RETurn
+  cbJoin%=gWalkPos%(gScratch%(rng_next%(cbCount%)))
+  IF cbFront% THEN
+    cbLeft%=0 : cbRight%=cbJoin%-1
+  ELSE
+    cbLeft%=cbJoin%+1 : cbRight%=gN%-1
+  END IF
+  REPeat cbReverse
+    IF cbLeft%>=cbRight% THEN EXIT cbReverse
+    cbA%=gWalk%(cbLeft%) : cbB%=gWalk%(cbRight%)
+    gWalk%(cbLeft%)=cbB% : gWalk%(cbRight%)=cbA% : gWalkPos%(cbA%)=cbRight% : gWalkPos%(cbB%)=cbLeft%
+    cbLeft%=cbLeft%+1 : cbRight%=cbRight%-1
+  END REPeat cbReverse
+END DEFine
+
+## Start from a randomly reflected/transposed serpentine traversal. An optional
+## long, unfiltered backbite walk removes the initial stripe bias before testing
+## partitions; an unmixed traversal is retained as a bounded-search fallback.
+DEFine PROCedure cover_fresh(VAL cfMix%)
+  LOCal cfTranspose%,cfFlipX%,cfFlipY%,cfColumns%,cfRows%,cfRow%,cfCol%,cfAt%,cfX%,cfY%,cfI%,cfMoves%
+  cfTranspose%=(rng_next%(2)=0)
+  IF NOT cfMix% AND opt.width%<>opt.height% THEN cfTranspose%=(opt.width%<opt.height%)
+  cfFlipX%=(rng_next%(2)=0) : cfFlipY%=(rng_next%(2)=0)
+  cfColumns%=opt.width% : cfRows%=opt.height%
+  IF cfTranspose% THEN cfColumns%=opt.height% : cfRows%=opt.width%
+  cfAt%=0
+  FOR cfRow%=0 TO cfRows%-1
+    FOR cfI%=0 TO cfColumns%-1
+      cfCol%=cfI% : IF cfRow% MOD 2 THEN cfCol%=cfColumns%-1-cfI%
+      cfX%=cfCol% : cfY%=cfRow% : IF cfTranspose% THEN cfX%=cfRow% : cfY%=cfCol%
+      IF cfFlipX% THEN cfX%=opt.width%-1-cfX%
+      IF cfFlipY% THEN cfY%=opt.height%-1-cfY%
+      gWalk%(cfAt%)=cfY%*opt.width%+cfX% : gWalkPos%(gWalk%(cfAt%))=cfAt% : cfAt%=cfAt%+1
+    END FOR cfI%
+  END FOR cfRow%
+  IF NOT cfMix% THEN work.structuredStarts=work.structuredStarts+1
+  IF cfMix% AND opt.width%>1 AND opt.height%>1 THEN
+    cfMoves%=gen_min(16384,gen_max(256,gen_product(48,gN%)))
+    FOR cfI%=1 TO cfMoves%
+      cover_backbite : gen_poll : IF gCancel% THEN RETurn
+    END FOR cfI%
+  END IF
+END DEFine
+
+## Find the longest induced segment from every start and the minimum number of
+## legal segments needed to cover the traversal. This is a cheap lower bound;
+## cover_partition must still prove that exactly the requested count is possible.
+DEFine PROCedure cover_analyse
+  LOCal caJ%,caD%,caBound%,caCell%,caNext%,caStart%,caFinish%,caMax%
+  work.traversalEvaluations=work.traversalEvaluations+1 : caBound%=0
+  caMax%=gen_min(gN%,opt.maximum%)
+  FOR caJ%=0 TO gN%-1
+    caCell%=gWalk%(caJ%)
+    FOR caD%=0 TO gDegree%(caCell%)-1
+      caNext%=gWalkPos%(gNb%(caCell%,caD%))
+      IF caNext%<caJ%-1 THEN caBound%=gen_max(caBound%,caNext%+1)
+    END FOR caD%
+    gTraversal%(caJ%)=caBound%
+  END FOR caJ%
+  ## gTraversal records the earliest safe start after nonconsecutive contacts.
+  ## Extend each segment only while those contacts remain outside it; gEnds is
+  ## an exclusive finish index, also constrained by the maximum path length.
+  caFinish%=0
+  FOR caStart%=0 TO gN%-1
+    caFinish%=gen_max(caFinish%,caStart%)
+    REPeat caExtend
+      IF caFinish%>=gN% THEN EXIT caExtend
+      IF gTraversal%(caFinish%)>caStart% THEN EXIT caExtend
+      caFinish%=caFinish%+1
+    END REPeat caExtend
+    gEnds%(caStart%)=gen_min(caFinish%,caStart%+caMax%) : gNeeded%(caStart%)=gN%+1
+  END FOR caStart%
+  ## Work backwards: the empty suffix needs no path, and every legal first
+  ## segment adds one to the best count for the suffix that follows it.
+  gNeeded%(gN%)=0
+  FOR caStart%=gN%-1 TO 0 STEP -1
+    FOR caFinish%=caStart%+opt.minimum% TO gEnds%(caStart%)
+      gNeeded%(caStart%)=gen_min(gNeeded%(caStart%),1+gNeeded%(caFinish%))
+    END FOR caFinish%
+  END FOR caStart%
+  covScore%=gNeeded%(0)
+END DEFine
+
+## Prefer some bends, less border following and a spread of path lengths.
+## These weights bias only feasible cuts; they are not a difficulty proof.
+DEFine FuNction cover_weight(VAL cwStart%,VAL cwEnd%)
+  LOCal cwLen%,cwBends%,cwAverage,cwBoundary,cwVariety,cwW
+  cwLen%=cwEnd%-cwStart% : cwBends%=0
+  IF cwLen%>=3 THEN cwBends%=covTurn%(cwEnd%-1)-covTurn%(cwStart%+1)
+  cwBoundary=covBorder%(cwEnd%)-covBorder%(cwStart%) : cwBoundary=cwBoundary/cwLen%
+  cwAverage=gN% : cwAverage=cwAverage/opt.pairs% : cwVariety=gen_min(1,ABS(cwLen%-cwAverage)/cwAverage)
+  cwW=1+0.3*gen_min(2,cwBends%)-0.1*cwBoundary+0.15*cwVariety
+  IF cwBends%=0 THEN cwW=cwW-0.2
+  RETurn cwW
+END DEFine
+
+## Solve exact-count partitioning backwards from the empty suffix (0,N).
+## For each start, prefix sums test whether any legal finish reaches a feasible
+## previous row. Choose only such finishes, so every selected cut can be completed.
+DEFine PROCedure cover_partition
+  LOCal cpP%,cpI%,cpFirst%,cpLast%,cpStart%,cpEnd%,cpMax%,cpCount%,cpPick%,cpJ%,cpSwap%,cpReverse%,cpCell%,cpTurn%,cpBorder%
+  LOCal cpWeight,cpTarget,cpSum
+  covFeasible%=0 : cover_set 0,gN%,1 : cpMax%=gen_min(gN%,opt.maximum%)
+  FOR cpP%=1 TO opt.pairs%
+    ## A difference of prefix sums answers whether the previous DP row contains
+    ## any feasible finish in this start's permitted length range.
+    gPrefix%(0)=0
+    FOR cpI%=0 TO gN%
+      gPrefix%(cpI%+1)=gPrefix%(cpI%)+cover_dp%(cpP%-1,cpI%)
+    END FOR cpI%
+    cpFirst%=gen_max(0,gN%-gen_product(cpP%,cpMax%)) : cpLast%=gN%-cpP%*opt.minimum%
+    FOR cpStart%=cpFirst% TO cpLast%
+      cpI%=cpStart%+opt.minimum% : cpEnd%=gEnds%(cpStart%)
+      cover_set cpP%,cpStart%,(cpI%<=cpEnd% AND gPrefix%(cpEnd%+1)>gPrefix%(cpI%))
+    END FOR cpStart%
+  END FOR cpP%
+  IF NOT cover_dp%(opt.pairs%,0) THEN RETurn
+  IF opt.varied% THEN
+    covTurn%(0)=0 : covBorder%(0)=0
+    FOR cpI%=0 TO gN%-1
+      cpTurn%=0
+      IF cpI%>0 AND cpI%+1<gN% THEN cpTurn%=(gWalk%(cpI%)-gWalk%(cpI%-1)<>gWalk%(cpI%+1)-gWalk%(cpI%))
+      cpCell%=gWalk%(cpI%)
+      cpBorder%=(cpCell% MOD opt.width%=0 OR cpCell% MOD opt.width%=opt.width%-1 OR cpCell%<opt.width% OR cpCell%>=gN%-opt.width%)
+      covTurn%(cpI%+1)=covTurn%(cpI%)+cpTurn% : covBorder%(cpI%+1)=covBorder%(cpI%)+cpBorder%
+    END FOR cpI%
+  END IF
+  ## Walk forward through feasible states to choose the actual cuts. Varied
+  ## weights change their likelihood without weakening feasibility.
+  cpStart%=0 : gCuts%(1)=0
+  FOR cpP%=opt.pairs% TO 1 STEP -1
+    cpCount%=0 : cpSum=0
+    FOR cpEnd%=cpStart%+opt.minimum% TO gEnds%(cpStart%)
+      IF cover_dp%(cpP%-1,cpEnd%) THEN
+        gScratch%(cpCount%)=cpEnd% : cpCount%=cpCount%+1
+        IF opt.varied% THEN cpSum=cpSum+cover_weight(cpStart%,cpEnd%)
+      END IF
+    END FOR cpEnd%
+    cpPick%=rng_next%(cpCount%)
+    IF opt.varied% THEN
+      cpTarget=rng_unit*cpSum : cpWeight=0 : cpPick%=cpCount%-1
+      FOR cpI%=0 TO cpCount%-1
+        cpWeight=cpWeight+cover_weight(cpStart%,gScratch%(cpI%))
+        IF cpWeight>cpTarget THEN cpPick%=cpI% : EXIT cpI%
+      END FOR cpI%
+    END IF
+    cpStart%=gScratch%(cpPick%) : gCuts%(opt.pairs%-cpP%+2)=cpStart%
+  END FOR cpP%
+  ## Shuffle labels and reverse some paths so traversal order is not exposed
+  ## to the player through colour order or endpoint direction.
+  FOR cpP%=1 TO opt.pairs%
+    gCanonical%(cpP%)=cpP%
+  END FOR cpP%
+  FOR cpP%=opt.pairs% TO 2 STEP -1
+    cpJ%=1+rng_next%(cpP%) : cpSwap%=gCanonical%(cpP%)
+    gCanonical%(cpP%)=gCanonical%(cpJ%) : gCanonical%(cpJ%)=cpSwap%
+  END FOR cpP%
+  FOR cpI%=0 TO gN%-1
+    gOwner%(cpI%)=0 : gOrder%(cpI%)=0
+  END FOR cpI%
+  FOR cpP%=1 TO opt.pairs%
+    cpJ%=gCanonical%(cpP%) : cpStart%=gCuts%(cpJ%) : cpEnd%=gCuts%(cpJ%+1)
+    cpReverse%=(rng_next%(2)=0) : gLength%(cpP%)=cpEnd%-cpStart%
+    FOR cpI%=0 TO gLength%(cpP%)-1
+      cpCell%=gWalk%(cpStart%+cpI%) : IF cpReverse% THEN cpCell%=gWalk%(cpEnd%-1-cpI%)
+      gOwner%(cpCell%)=cpP% : gOrder%(cpCell%)=cpI%+1
+      IF cpI%=0 THEN gStart%(cpP%)=cpCell%
+      IF cpI%=gLength%(cpP%)-1 THEN gFinish%(cpP%)=cpCell%
+    END FOR cpI%
+  END FOR cpP%
+  gen_endpoints : covFeasible%=1
+END DEFine
+
+## Search for a splittable traversal using backbite proposals, periodic restarts
+## and occasional uphill moves in the minimum-segment score. After the first
+## success, spend only the bounded refinement allowance on further valid layouts.
+DEFine PROCedure cover_find(VAL cfRestarts%,VAL cfRefine%,VAL cfFallback%,VAL cfBursts%)
+  LOCal cfAttempt%,cfSince%,cfFirst%,cfScore%,cfI%,cfMoves%,cfMove%,cfNext%,cfAccept%
+  IF gExit% OR gCancel% THEN RETurn
+  covFound%=0 : cfFirst%=-1 : cfSince%=0 : cfScore%=32767
+  cover_fresh (cfFallback%<>0)
+  FOR cfI%=0 TO gN%-1
+    covSaved%(cfI%)=gWalk%(cfI%)
+  END FOR cfI%
+  FOR cfAttempt%=0 TO opt.attempts%-1
+    gen_poll : IF gCancel% THEN RETurn
+    IF opt.width%=1 OR opt.height%=1 THEN
+      IF cfAttempt%>0 THEN EXIT cfAttempt%
+    END IF
+    IF cfFirst%>=0 AND cfAttempt%-cfFirst%>cfRefine% THEN EXIT cfAttempt%
+    IF cfFirst%<0 AND cfAttempt%>0 AND (cfSince%=cfRestarts% OR cfAttempt%=cfFallback%) THEN
+      cover_fresh (cfAttempt%<>cfFallback%) : cfSince%=0 : cfScore%=32767
+      FOR cfI%=0 TO gN%-1
+        covSaved%(cfI%)=gWalk%(cfI%)
+      END FOR cfI%
+    END IF
+    FOR cfI%=0 TO gN%-1
+      gWalk%(cfI%)=covSaved%(cfI%) : gWalkPos%(gWalk%(cfI%))=cfI%
+    END FOR cfI%
+    IF cfSince%>0 THEN
+      cfMoves%=1 : IF cfBursts% AND cfSince% MOD 8=0 THEN cfMoves%=gen_max(2,INT(gN%/4))
+      FOR cfMove%=1 TO cfMoves%
+        cover_backbite
+      END FOR cfMove%
+    END IF
+    IF cfFirst%>=0 THEN work.refinementEvaluations=work.refinementEvaluations+1
+    cfSince%=cfSince%+1 : cover_analyse : cfNext%=covScore%
+    IF cfNext%<=opt.pairs% THEN
+      cover_partition
+      IF covFeasible% THEN
+        covFound%=1 : IF cfFirst%<0 THEN cfFirst%=cfAttempt%
+        FOR cfI%=0 TO gN%-1
+          gBestWalk%(cfI%)=gWalk%(cfI%)
+        END FOR cfI%
+      END IF
+    END IF
+    ## The annealing score is the minimum number of legal segments, not puzzle
+    ## difficulty. Occasionally accepting a worse score escapes local traps.
+    cfAccept%=(cfNext%<=cfScore%)
+    IF NOT cfAccept% THEN cfAccept%=(rng_unit<EXP((cfScore%-cfNext%)/0.4))
+    IF cfAccept% THEN
+      cfScore%=cfNext%
+      FOR cfI%=0 TO gN%-1
+        covSaved%(cfI%)=gWalk%(cfI%)
+      END FOR cfI%
+    END IF
+  END FOR cfAttempt%
+END DEFine

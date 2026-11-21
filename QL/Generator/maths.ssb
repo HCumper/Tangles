@@ -1,0 +1,330 @@
+## Portable integer primitives. No host generation code is used.
+DIM hashK(63),hashH(7),hashV(7),hashW(63),hashByte%(63),mixByte%(4,7)
+hashAt%=0 : hashBytes=0
+FOR mathI%=0 TO 32
+  gPower(mathI%)=2^mathI%
+END FOR mathI%
+## SHA-256 round constants are stored as signed 32-bit values. Negative literals
+## preserve the required bit patterns without unsigned floating-point rounding.
+hashK(0)=1116352408
+hashK(1)=1899447441
+hashK(2)=-1245643825
+hashK(3)=-373957723
+hashK(4)=961987163
+hashK(5)=1508970993
+hashK(6)=-1841331548
+hashK(7)=-1424204075
+hashK(8)=-670586216
+hashK(9)=310598401
+hashK(10)=607225278
+hashK(11)=1426881987
+hashK(12)=1925078388
+hashK(13)=-2132889090
+hashK(14)=-1680079193
+hashK(15)=-1046744716
+hashK(16)=-459576895
+hashK(17)=-272742522
+hashK(18)=264347078
+hashK(19)=604807628
+hashK(20)=770255983
+hashK(21)=1249150122
+hashK(22)=1555081692
+hashK(23)=1996064986
+hashK(24)=-1740746414
+hashK(25)=-1473132947
+hashK(26)=-1341970488
+hashK(27)=-1084653625
+hashK(28)=-958395405
+hashK(29)=-710438585
+hashK(30)=113926993
+hashK(31)=338241895
+hashK(32)=666307205
+hashK(33)=773529912
+hashK(34)=1294757372
+hashK(35)=1396182291
+hashK(36)=1695183700
+hashK(37)=1986661051
+hashK(38)=-2117940946
+hashK(39)=-1838011259
+hashK(40)=-1564481375
+hashK(41)=-1474664885
+hashK(42)=-1035236496
+hashK(43)=-949202525
+hashK(44)=-778901479
+hashK(45)=-694614492
+hashK(46)=-200395387
+hashK(47)=275423344
+hashK(48)=430227734
+hashK(49)=506948616
+hashK(50)=659060556
+hashK(51)=883997877
+hashK(52)=958139571
+hashK(53)=1322822218
+hashK(54)=1537002063
+hashK(55)=1747873779
+hashK(56)=1955562222
+hashK(57)=2024104815
+hashK(58)=-2067236844
+hashK(59)=-1933114872
+hashK(60)=-1866530822
+hashK(61)=-1538233109
+hashK(62)=-1090935817
+hashK(63)=-965641998
+
+## Initialise one independent subtractive random stream from a nonnegative seed.
+## Stream 0 constructs boards, 1 screens shortest routes, and 2 supplies retry seeds.
+DEFine PROCedure rng_seed(VAL rsStream%,VAL rsSeed)
+  LOCal rsI%,rsJ%,rsK%,rsM,rsN
+  rsM=161803398-rsSeed : IF rsM<0 THEN rsM=rsM+2147483647
+  gRng(rsStream%,55)=rsM : rsN=1
+  FOR rsI%=1 TO 54
+    rsJ%=(21*rsI%) MOD 55 : gRng(rsStream%,rsJ%)=rsN
+    rsN=rsM-rsN : IF rsN<0 THEN rsN=rsN+2147483647
+    rsM=gRng(rsStream%,rsJ%)
+  END FOR rsI%
+  FOR rsK%=1 TO 4
+    FOR rsI%=1 TO 55
+      rsM=gRng(rsStream%,rsI%)-gRng(rsStream%,1+(rsI%+30) MOD 55)
+      IF rsM<0 THEN rsM=rsM+2147483647
+      gRng(rsStream%,rsI%)=rsM
+    END FOR rsI%
+  END FOR rsK%
+  gRi%(rsStream%)=0 : gRj%(rsStream%)=21
+END DEFine
+
+## Advance only the selected stream and return a value below 2147483647.
+## Keeping streams separate prevents screening from changing future board proposals.
+DEFine FuNction rng_raw
+  LOCal rrI%,rrJ%,rrValue
+  rrI%=gRi%(gRngStream%)+1 : IF rrI%=56 THEN rrI%=1
+  rrJ%=gRj%(gRngStream%)+1 : IF rrJ%=56 THEN rrJ%=1
+  rrValue=gRng(gRngStream%,rrI%)-gRng(gRngStream%,rrJ%)
+  IF rrValue=2147483647 THEN rrValue=rrValue-1
+  IF rrValue<0 THEN rrValue=rrValue+2147483647
+  gRng(gRngStream%,rrI%)=rrValue : gRi%(gRngStream%)=rrI% : gRj%(gRngStream%)=rrJ%
+  RETurn rrValue
+END DEFine
+
+## Scale a random draw into 0..bound-1; cap rounding at the last valid index.
+DEFine FuNction rng_next%(VAL rnBound%)
+  RETurn gen_min(rnBound%-1,INT((rng_raw/2147483647)*rnBound%))
+END DEFine
+
+DEFine FuNction rng_unit
+  RETurn rng_raw/2147483647
+END DEFine
+
+## Keep the bit pattern while converting an unsigned word to a signed integer.
+## This avoids overflow when the top bit is set in a heap mask or hash limb.
+DEFine FuNction word16%(VAL wiV)
+  IF wiV>=32768 THEN RETurn wiV-65536
+  RETurn wiV
+END DEFine
+
+## Apply XOR to two signed 16-bit halves, then reassemble a signed 32-bit word.
+DEFine FuNction xor32(VAL xbA,VAL xbB)
+  LOCal xbLo,xbHi
+  xbLo=word16%(gen_mod(xbA,65536)) ^^ word16%(gen_mod(xbB,65536))
+  xbHi=word16%(INT(xbA/65536)) ^^ word16%(INT(xbB/65536))
+  IF xbLo<0 THEN xbLo=xbLo+65536
+  RETurn xbHi*65536+xbLo
+END DEFine
+
+## Use the same two-limb representation for AND without unsigned rounding loss.
+DEFine FuNction and32(VAL abA,VAL abB)
+  LOCal abLo,abHi
+  abLo=word16%(gen_mod(abA,65536)) && word16%(gen_mod(abB,65536))
+  abHi=word16%(INT(abA/65536)) && word16%(INT(abB/65536))
+  IF abLo<0 THEN abLo=abLo+65536
+  RETurn abHi*65536+abLo
+END DEFine
+
+## Add low halves with carry and discard overflow above bit 31, as SHA-256 needs.
+DEFine FuNction add32(VAL aaA,VAL aaB)
+  LOCal aaLo,aaHi
+  aaLo=gen_mod(aaA,65536)+gen_mod(aaB,65536)
+  aaHi=INT(aaA/65536)+INT(aaB/65536)+INT(aaLo/65536)
+  aaHi=gen_mod(aaHi,65536)
+  IF aaHi>=32768 THEN aaHi=aaHi-65536
+  RETurn aaHi*65536+gen_mod(aaLo,65536)
+END DEFine
+
+## Rotate right: bits shifted out of the low end reappear at the high end.
+DEFine FuNction rotate32(VAL rbV,VAL rbN%)
+  LOCal rbRight,rbLeft
+  rbRight=INT(rbV/gPower(rbN%)) : IF rbV<0 THEN rbRight=rbRight+gPower(32-rbN%)
+  rbLeft=gen_mod(rbV,gPower(rbN%))
+  IF rbLeft>=gPower(rbN%-1) THEN rbLeft=rbLeft-gPower(rbN%)
+  RETurn rbRight+rbLeft*gPower(32-rbN%)
+END DEFine
+
+## Start a new SHA-256 message with the standard initial chaining values.
+DEFine PROCedure hash_reset
+  LOCal hrI%
+  hashH(0)=1779033703
+  hashH(1)=-1150833019
+  hashH(2)=1013904242
+  hashH(3)=-1521486534
+  hashH(4)=1359893119
+  hashH(5)=-1694144372
+  hashH(6)=528734635
+  hashH(7)=1541459225
+  hashAt%=0 : hashBytes=0
+END DEFine
+
+## Consume one 64-byte block: expand the message schedule, perform 64 rounds,
+## then add the working words back into the running hash.
+DEFine PROCedure hash_compress
+  LOCal hcI%,hcJ%,hcS0,hcS1,hcT1,hcT2,hcCh,hcMaj,hcHi,hcLo
+  ## Build big-endian words through real temporaries; byte*256 can exceed a
+  ## Turbo integer temporary even though each input byte fits comfortably.
+  FOR hcI%=0 TO 15
+    hcJ%=hcI%*4
+    hcHi=hashByte%(hcJ%) : hcHi=hcHi*256+hashByte%(hcJ%+1)
+    IF hcHi>=32768 THEN hcHi=hcHi-65536
+    hcLo=hashByte%(hcJ%+2) : hcLo=hcLo*256+hashByte%(hcJ%+3)
+    hashW(hcI%)=hcHi*65536+hcLo
+  END FOR hcI%
+  FOR hcI%=16 TO 63
+    hcS0=xor32(xor32(rotate32(hashW(hcI%-15),7),rotate32(hashW(hcI%-15),18)),shift32(hashW(hcI%-15),3))
+    hcS1=xor32(xor32(rotate32(hashW(hcI%-2),17),rotate32(hashW(hcI%-2),19)),shift32(hashW(hcI%-2),10))
+    hashW(hcI%)=add32(add32(hashW(hcI%-16),hcS0),add32(hashW(hcI%-7),hcS1))
+  END FOR hcI%
+  FOR hcI%=0 TO 7
+    hashV(hcI%)=hashH(hcI%)
+  END FOR hcI%
+  FOR hcI%=0 TO 63
+    hcS1=xor32(xor32(rotate32(hashV(4),6),rotate32(hashV(4),11)),rotate32(hashV(4),25))
+    hcCh=xor32(and32(hashV(4),hashV(5)),and32(-1-hashV(4),hashV(6)))
+    hcT1=add32(add32(add32(hashV(7),hcS1),add32(hcCh,hashK(hcI%))),hashW(hcI%))
+    hcS0=xor32(xor32(rotate32(hashV(0),2),rotate32(hashV(0),13)),rotate32(hashV(0),22))
+    hcMaj=xor32(xor32(and32(hashV(0),hashV(1)),and32(hashV(0),hashV(2))),and32(hashV(1),hashV(2)))
+    hcT2=add32(hcS0,hcMaj)
+    FOR hcJ%=7 TO 1 STEP -1
+      hashV(hcJ%)=hashV(hcJ%-1)
+    END FOR hcJ%
+    hashV(4)=add32(hashV(4),hcT1) : hashV(0)=add32(hcT1,hcT2)
+  END FOR hcI%
+  FOR hcI%=0 TO 7
+    hashH(hcI%)=add32(hashH(hcI%),hashV(hcI%))
+  END FOR hcI%
+END DEFine
+
+## Buffer one byte and compress whenever a complete SHA-256 block is available.
+DEFine PROCedure hash_put(VAL hpByte%)
+  hashByte%(hashAt%)=hpByte% : hashAt%=hashAt%+1 : hashBytes=hashBytes+1
+  IF hashAt%=64 THEN hash_compress : hashAt%=0
+END DEFine
+
+## Feed identity text to the hash without constructing a large combined string.
+DEFine PROCedure hash_text(VAL htText$)
+  LOCal htI%
+  FOR htI%=1 TO LEN(htText$)
+    hash_put CODE(htText$(htI%))
+  END FOR htI%
+END DEFine
+
+## Append SHA-256 padding and the original bit length, then emit uppercase hex.
+## Call hash_reset before hashing the next identity; finalisation changes the state.
+DEFine FuNction hash_finish$
+  LOCal hfLength,hfI%,hfJ%,hfV,hfHex$(16),hfOut$(64)
+  hfLength=hashBytes*8 : hash_put 128
+  REPeat hfPad
+    IF hashAt%=56 THEN EXIT hfPad
+    hash_put 0
+  END REPeat hfPad
+  ## Identity messages are short, so the high 32 bits of the 64-bit bit length are zero.
+  FOR hfI%=1 TO 4
+    hash_put 0
+  END FOR hfI%
+  FOR hfI%=3 TO 0 STEP -1
+    hash_put gen_mod(INT(hfLength/(256^hfI%)),256)
+  END FOR hfI%
+  hfOut$="" : hfHex$="0123456789ABCDEF"
+  FOR hfI%=0 TO 7
+    FOR hfJ%=7 TO 0 STEP -1
+      hfV=gen_mod(INT(hashH(hfI%)/(16^hfJ%)),16)
+      hfOut$=hfOut$ & hfHex$(hfV+1)
+    END FOR hfJ%
+  END FOR hfI%
+  RETurn hfOut$
+END DEFine
+
+## Exact unsigned 64-bit SplitMix arithmetic in base 256, including overflow.
+## XOR the 64-bit accumulator with its logical right shift.
+## Bytes are little-endian, and shifted bits can span two neighbouring bytes.
+DEFine PROCedure mix_shift(VAL msBits%)
+  LOCal msI%,msJ%,msR%,msN%
+  msJ%=INT(msBits%/8) : msR%=msBits% MOD 8
+  FOR msI%=0 TO 7
+    msN%=msI%+msJ% : mixByte%(1,msI%)=0
+    IF msN%<8 THEN mixByte%(1,msI%)=INT(mixByte%(0,msN%)/gPower(msR%))
+    IF msN%+1<8 AND msR% THEN mixByte%(1,msI%)=mixByte%(1,msI%)+gen_mod(mixByte%(0,msN%+1),gPower(msR%))*gPower(8-msR%)
+  END FOR msI%
+  FOR msI%=0 TO 7
+    mixByte%(0,msI%)=mixByte%(0,msI%) ^^ mixByte%(1,msI%)
+  END FOR msI%
+END DEFine
+
+## Decode a 16-digit hexadecimal constant into the multiplier/addend byte row.
+DEFine PROCedure mix_constant(VAL mcHex$)
+  LOCal mcI%,mcJ%,mcCode%,mcV
+  FOR mcI%=0 TO 7
+    mcV=0
+    FOR mcJ%=0 TO 1
+      mcCode%=CODE(mcHex$(15-2*mcI%+mcJ%))-48
+      IF mcCode%>9 THEN mcCode%=mcCode%-7
+      mcV=16*mcV+mcCode%
+    END FOR mcJ%
+    mixByte%(2,mcI%)=mcV
+  END FOR mcI%
+END DEFine
+
+## Multiply byte limbs with carry, retaining only the low 64 bits.
+## Discarding the final carry implements the required unsigned wraparound.
+DEFine PROCedure mix_multiply
+  LOCal mmI%,mmJ%,mmCarry,mmV
+  mmCarry=0
+  FOR mmI%=0 TO 7
+    mmV=mmCarry
+    FOR mmJ%=0 TO mmI%
+      mmV=mmV+1.0*mixByte%(0,mmJ%)*mixByte%(2,mmI%-mmJ%)
+    END FOR mmJ%
+    mixByte%(3,mmI%)=gen_mod(mmV,256) : mmCarry=INT(mmV/256)
+  END FOR mmI%
+  FOR mmI%=0 TO 7
+    mixByte%(0,mmI%)=mixByte%(3,mmI%)
+  END FOR mmI%
+END DEFine
+
+## Derive a request seed directly from the pack seed and request number.
+## Request zero retains the supplied seed; later requests use the F# SplitMix64
+## mapping rather than consuming the board generator's random stream.
+DEFine FuNction batch_seed(VAL bsSeed,VAL bsRequest)
+  LOCal bsI%,bsCarry,bsV,bsOut
+  IF bsRequest=0 THEN RETurn bsSeed
+  FOR bsI%=0 TO 7
+    mixByte%(0,bsI%)=gen_mod(bsRequest,256) : bsRequest=INT(bsRequest/256)
+  END FOR bsI%
+  mix_constant "9E3779B97F4A7C15" : mix_multiply
+  mix_constant "54414E474C455342" : bsCarry=0
+  FOR bsI%=0 TO 7
+    bsV=mixByte%(0,bsI%)+mixByte%(2,bsI%)+gen_mod(bsSeed,256)+bsCarry
+    mixByte%(0,bsI%)=gen_mod(bsV,256) : bsCarry=INT(bsV/256) : bsSeed=INT(bsSeed/256)
+  END FOR bsI%
+  mix_shift 30 : mix_constant "BF58476D1CE4E5B9" : mix_multiply
+  mix_shift 27 : mix_constant "94D049BB133111EB" : mix_multiply : mix_shift 31
+  bsOut=mixByte%(0,3) MOD 128
+  FOR bsI%=2 TO 0 STEP -1
+    bsOut=bsOut*256+mixByte%(0,bsI%)
+  END FOR bsI%
+  RETurn bsOut
+END DEFine
+
+## Logical right shift inserts zeroes; compensate for signed division of negatives.
+DEFine FuNction shift32(VAL sbV,VAL sbN%)
+  LOCal sbOut
+  sbOut=INT(sbV/gPower(sbN%))
+  IF sbV<0 THEN sbOut=sbOut+gPower(32-sbN%)
+  RETurn sbOut
+END DEFine

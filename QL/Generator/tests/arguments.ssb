@@ -1,0 +1,15 @@
+DIM before$(4096),after$(4096)
+before$=OPTION_CMD$
+DIM captured$(4096)
+commandLength%=LEN(OPTION_CMD$)
+captured$=OPTION_CMD$
+COMMAND_LINE
+after$=OPTION_CMD$
+OPEN_NEW #9,"nfa1_native_args"
+PRINT #9,"BEFORE|";before$
+PRINT #9,"AFTER|";after$
+PRINT #9,"CAPTURED|";captured$;"|";commandLength%
+PRINT #9,"COMPILED|";COMPILED
+CLOSE #9
+argumentExit%=2 : RJOB -1,-argumentExit%
+STOP

@@ -1,0 +1,15 @@
+#INCLUDE model_ssb
+#INCLUDE maths_ssb
+OPEN_NEW #9,"nfa1_result"
+PRINT #9,"BITS|";xor32(-1,305419896);"|";and32(-1,305419896)
+hash_reset : hash_text "abc" : PRINT #9,"SHA|";hash_finish$
+FOR probeI%=0 TO 6
+  PRINT #9,"SEED|";probeI%;"|";gen_int$(batch_seed(42,probeI%))
+END FOR probeI%
+rng_seed 0,42
+FOR probeI%=1 TO 5
+  PRINT #9,"RNG|";gen_int$(rng_raw)
+END FOR probeI%
+CLOSE #9
+OPEN_NEW #9,"nfa1_done":PRINT #9,"OK":CLOSE #9
+STOP

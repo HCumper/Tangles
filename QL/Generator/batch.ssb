@@ -1,0 +1,400 @@
+## Disk-spooled batches keep memory bounded independently of puzzle count.
+DIM batchOffset(0),batchLength(0),batchConsoleOffset(0),batchConsoleLength(0),batchOrder%(0)
+DIM batchConsole$(220),batchBase$(220),batchCopy$(512)
+batchSpool%=-1 : batchConsole%=-1 : batchRead%=-1 : batchFinal%=-1
+batchAccepted%=0 : batchRequests=0 : batchRejected=0 : batchDuplicates=0 : batchConsumed=0
+## batchBacked means a complete old-file copy is available. batchCommitted
+## means the new output copy closed successfully; cleanup uses both flags
+## to decide whether a backup is disposable or still needed for recovery.
+batchBudget=0 : batchRequestLimit=0 : batchBacked%=0 : batchCommitted%=0
+batchSortMemory=0 : batchSortStride=28
+batchDepthSort%=0 : batchUseSelection%=0 : batchTemporary%=0 : batchRestoring%=0 : batchCopyOK%=0 : batchDestTouched%=0
+
+## Read a sorting metric from a heap row; seven 32-bit columns occupy 28 bytes.
+DEFine FuNction batch_value(VAL bvRow%,VAL bvColumn%)
+  RETurn PEEK_L(batchSortMemory+bvRow%*batchSortStride+4*bvColumn%)
+END DEFine
+
+DEFine PROCedure batch_metric(VAL bmRow%,VAL bmColumn%,VAL bmValue)
+  POKE_L batchSortMemory+bmRow%*batchSortStride+4*bmColumn%,bmValue
+END DEFine
+
+## Reserve an unused staging name without replacing any pre-existing file.
+## Only files successfully reserved here belong to this job's cleanup.
+DEFine FuNction batch_new$(VAL bnBase$)
+  LOCal bnI%,bnChannel%,bnName$(220)
+  FOR bnI%=0 TO 9999
+    bnName$=bnBase$ & "_" & gen_int$(bnI%)
+    ## TKII can prompt on a colliding NEW even inside FOP_NEW.
+    IF FTEST(bnName$)=0 THEN NEXT bnI%
+    bnChannel%=FOP_NEW(bnName$)
+    IF bnChannel%>=0 THEN CLOSE #bnChannel% : RETurn bnName$
+    IF bnChannel%<>-8 THEN gExit%=1 : gError$="Cannot create temporary file: " & bnBase$ : RETurn ""
+  END FOR bnI%
+  gExit%=1 : gError$="Cannot reserve a unique temporary filename." : RETurn ""
+END DEFine
+
+## Close only channels owned by the batch, resetting sentinels for repeated cleanup.
+DEFine PROCedure batch_close
+  IF batchSpool%>=0 THEN CLOSE #batchSpool% : batchSpool%=-1
+  IF batchConsole%>=0 THEN CLOSE #batchConsole% : batchConsole%=-1
+  IF batchRead%>=0 THEN CLOSE #batchRead% : batchRead%=-1
+  IF batchFinal%>=0 THEN CLOSE #batchFinal% : batchFinal%=-1
+  gJ%=-1
+END DEFine
+
+## Release owned heap blocks and staging files. Keep a previous-file backup
+## if publication/restoration has not succeeded, so it remains recoverable.
+DEFine PROCedure batch_cleanup
+  batch_close
+  IF batchSortMemory THEN RECHP batchSortMemory : batchSortMemory=0
+  IF sMemory THEN RECHP sMemory : sMemory=0
+  IF covMemory THEN RECHP covMemory : covMemory=0
+  IF LEN(gSpool$) THEN
+    IF FTEST(gSpool$)=0 THEN DELETE gSpool$
+  END IF
+  IF LEN(batchConsole$) THEN
+    IF FTEST(batchConsole$)=0 THEN DELETE batchConsole$
+  END IF
+  IF LEN(gTemp$) THEN
+    IF FTEST(gTemp$)=0 THEN DELETE gTemp$
+  END IF
+  IF LEN(gBackup$) AND NOT batchBacked% THEN
+    IF FTEST(gBackup$)=0 THEN DELETE gBackup$
+  END IF
+  IF batchCommitted% AND batchBacked% THEN
+    IF FTEST(gBackup$)=0 THEN DELETE gBackup$
+    batchBacked%=0
+  END IF
+END DEFine
+
+## Close active files before restoring an earlier output or removing a partial
+## new destination. The outer error trap handles a second failure during recovery.
+DEFine PROCedure batch_runtime_error(VAL brError)
+  gExit%=1 : gError$="Operating-system error " & gen_int$(brError) & ". Checking staged output and any previous-file backup."
+  batch_close
+  IF batchBacked% AND NOT batchCommitted% THEN
+    batchRestoring%=1
+    batch_clone gBackup$,gOutput$
+    batchRestoring%=0
+    IF batchCopyOK% THEN batchBacked%=0
+  ELSE
+    IF batchDestTouched% AND NOT batchCommitted% THEN
+      IF FTEST(gOutput$)=0 THEN DELETE gOutput$
+    END IF
+  END IF
+  PRINT #0,gError$
+  batch_cleanup
+  IF COMPILED THEN RJOB -1,-1
+  STOP
+END DEFine
+
+## Copy one recorded byte range using a small buffer instead of loading a pack.
+## Recovery copies ignore cancellation/error flags until the original is restored.
+DEFine PROCedure batch_copy(VAL bcFrom%,VAL bcTo%,VAL bcAt,VAL bcLength)
+  LOCal bcI%,bcCount%,bcByte$(1)
+  SET_POSITION #bcFrom%,bcAt
+  REPeat bcLoop
+    IF bcLength<=0 THEN EXIT bcLoop
+    IF NOT batchRestoring% AND (gCancel% OR gExit%) THEN EXIT bcLoop
+    bcCount%=gen_min(512,bcLength) : batchCopy$=FILL$(" ",bcCount%)
+    FOR bcI%=1 TO bcCount%
+      bcByte$=INKEY$(#bcFrom%,-1)
+      IF LEN(bcByte$)<>1 THEN gExit%=1 : gError$="Unexpected end of spool file." : RETurn
+      batchCopy$(bcI%)=bcByte$
+    END FOR bcI%
+    PRINT #bcTo%,batchCopy$;
+    bcLength=bcLength-bcCount%
+    IF NOT batchRestoring% THEN gen_poll
+  END REPeat bcLoop
+END DEFine
+
+## Publication uses closed, verified copies. NFA on Windows cannot rename an
+## open host file through the QDOS rename trap. The original stays backed up
+## until the final copy has closed; a failed forced publication restores it.
+DEFine PROCedure batch_clone(VAL bkFrom$,VAL bkTo$)
+  LOCal bkLength
+  batchCopyOK%=0
+  batchRead%=FOP_IN(bkFrom$)
+  IF batchRead%<0 THEN batchRead%=-1 : gExit%=1 : gError$="Cannot open publication source." : RETurn
+  bkLength=FLEN(#batchRead%)
+  batchFinal%=FOP_OVER(bkTo$)
+  IF batchFinal%<0 THEN CLOSE #batchRead% : batchRead%=-1 : batchFinal%=-1 : gExit%=1 : gError$="Cannot open publication destination." : RETurn
+  batch_copy batchRead%,batchFinal%,0,bkLength
+  IF POSITION(#batchFinal%)=bkLength THEN batchCopyOK%=1
+  CLOSE #batchRead% : batchRead%=-1 : CLOSE #batchFinal% : batchFinal%=-1
+END DEFine
+
+## Render either endpoint clues or the stored witness into the console spool.
+DEFine PROCedure batch_grid(VAL bgSolution%)
+  LOCal bgY%,bgX%,bgP%,bgCell%,bgWidth%,bgText$(16),bgLine$(512)
+  bgWidth%=LEN(gen_label$(opt.pairs%))
+  FOR bgY%=0 TO opt.height%-1
+    bgLine$=""
+    FOR bgX%=0 TO opt.width%-1
+      bgCell%=bgY%*opt.width%+bgX% : bgP%=gEndpoint%(bgCell%)
+      IF bgSolution% THEN bgP%=gOwner%(bgCell%)
+      bgText$="." : IF bgP% THEN bgText$=gen_label$(bgP%)
+      IF bgX% THEN bgLine$=bgLine$ & " "
+      bgLine$=bgLine$ & FILL$(" ",bgWidth%-LEN(bgText$)) & bgText$
+    END FOR bgX%
+    PRINT #batchConsole%,bgLine$
+  END FOR bgY%
+END DEFine
+
+## Save this puzzle's console text now, before shared state changes. Replay it
+## later in the same order as the JSON entries, including optional solution grids.
+DEFine PROCedure batch_console(VAL bpSeed)
+  PRINT #batchConsole%,""
+  PRINT #batchConsole%,gen_int$(opt.width%) & "x" & gen_int$(opt.height%) & ", " & gen_int$(opt.pairs%) & " pairs, seed " & gen_int$(bpSeed)
+  PRINT #batchConsole%,"Mode: " & gen_mode$
+  PRINT #batchConsole%,"Work: " & gen_int$(work.boardAttempts) & " board attempts; " & gen_int$(work.traversalEvaluations) & " traversal evaluations."
+  IF reasoning_primary% THEN
+    PRINT #batchConsole%,"Difficulty: " & sr.grade$ & " (" & gen_int$(sr.score%) & "/100; reasoning; provisional)"
+  ELSE
+    PRINT #batchConsole%,"Difficulty: " & geometry_grade$ & " (" & gen_int$(geoScore%) & "/100; geometric; provisional)"
+  END IF
+  IF gHasReason% THEN
+    PRINT #batchConsole%,"Solver: " & sr.tier$ & "; " & gen_int$(sr.trialSteps) & " trial eliminations; uniqueness " & sr.uniqueness$
+    PRINT #batchConsole%,"Assessment: " & sr.status$ & "; " & gen_int$(sr.work) & "/" & gen_int$(sr.workLimit) & " work units."
+  END IF
+  IF gHasShortest% THEN PRINT #batchConsole%,"Shortest-route screen: solved=" & gen_bool$(shortSolved%) & "; " & gen_int$(shortTrials%) & " trials."
+  PRINT #batchConsole%,"Puzzle (. = empty):" : batch_grid 0
+  IF opt.show% THEN PRINT #batchConsole%,"Known solution (. = unused):" : batch_grid 1
+END DEFine
+
+## Lexicographic ordering uses section, score, depth, first-solution nodes,
+## trials, route deductions and seed. Neutral columns let effort-based packs
+## prefer depth/nodes over the ordinary score ordering.
+DEFine FuNction batch_before%(VAL bbA%,VAL bbB%)
+  LOCal bbI%
+  FOR bbI%=0 TO 6
+    IF batch_value(bbA%,bbI%)<batch_value(bbB%,bbI%) THEN RETurn 1
+    IF batch_value(bbA%,bbI%)>batch_value(bbB%,bbI%) THEN RETurn 0
+  END FOR bbI%
+  RETurn 0
+END DEFine
+
+## Sort indices into the disk spool, not the puzzle data itself. Plain batches
+## keep generation order; selected full-coverage batches ascend by grade/effort.
+DEFine PROCedure batch_sort
+  LOCal bsI%,bsJ%,bsAt%
+  FOR bsI%=1 TO batchAccepted%
+    batchOrder%(bsI%)=bsI%
+  END FOR bsI%
+  IF NOT batchUseSelection% OR NOT opt.full% THEN RETurn
+  FOR bsI%=2 TO batchAccepted%
+    bsAt%=batchOrder%(bsI%) : bsJ%=bsI%-1
+    REPeat bsInsert
+      IF bsJ%<1 THEN EXIT bsInsert
+      IF NOT batch_before%(bsAt%,batchOrder%(bsJ%)) THEN EXIT bsInsert
+      batchOrder%(bsJ%+1)=batchOrder%(bsJ%) : bsJ%=bsJ%-1
+    END REPeat bsInsert
+    batchOrder%(bsJ%+1)=bsAt%
+  END FOR bsI%
+END DEFine
+
+## Write shared rules and batch provenance. A ramp has per-section recipes;
+## any recipe value that differs between sections is null at pack level.
+DEFine PROCedure batch_header
+  LOCal bhI%,bhSame%,bhPairs%,bhMax,bhAttempts%,bhAlgorithm$(64)
+  jsonLevel%=0 : json_object "" : json_integer "formatVersion",1
+  json_object "rules" : json_boolean "orthogonalOnly",1 : json_boolean "noSharedCells",1
+  json_boolean "noSelfTouching",1 : json_boolean "requireFullCoverage",opt.full% : json_end "}"
+  json_object "generation"
+  bhAlgorithm$=selAlgorithm$ : IF opt.rampFirst% THEN bhAlgorithm$="ql-difficulty-ramp-v1"
+  json_string "algorithm",bhAlgorithm$ : json_string "implementation","SSB 2.8 / Turbo 5.09"
+  json_string "randomAlgorithm","ql-subtractive-int31-v1"
+  json_string "batchSeedAlgorithm","splitmix64-batch-v1" : json_string "deduplication","board-symmetry-v1"
+  json_string "mode",gen_mode$ : json_integer "seed",opt.seed
+  json_integer "width",opt.width% : json_integer "height",opt.height% : json_string "cutStyle",gen_cut$
+  json_integer "minPathLength",opt.minimum%
+  IF opt.rampFirst% THEN
+    bhPairs%=rampPairs%(opt.rampFirst%) : bhMax=rampRawMax(opt.rampFirst%) : bhAttempts%=rampAttempts%(opt.rampFirst%)
+    FOR bhI%=opt.rampFirst% TO opt.rampLast%
+      IF rampPairs%(bhI%)<>rampPairs%(opt.rampFirst%) THEN bhPairs%=-1
+      IF rampRawMax(bhI%)<>rampRawMax(opt.rampFirst%) THEN bhMax=-1
+      IF rampAttempts%(bhI%)<>rampAttempts%(opt.rampFirst%) THEN bhAttempts%=-1
+    END FOR bhI%
+    IF bhPairs%<0 THEN
+      json_null "pairCount"
+    ELSE
+      json_integer "pairCount",bhPairs%
+    END IF
+    IF bhMax<0 THEN
+      json_null "maxPathLength"
+    ELSE
+      json_integer "maxPathLength",bhMax
+    END IF
+    IF bhAttempts%<0 THEN
+      json_null "maxAttempts"
+    ELSE
+      json_integer "maxAttempts",bhAttempts%
+    END IF
+    json_string "ramp",gen_grade$(opt.rampFirst%) & ".." & gen_grade$(opt.rampLast%)
+    json_array "rampSections"
+    FOR bhI%=opt.rampFirst% TO opt.rampLast%
+      json_object "" : json_string "target",gen_grade$(bhI%) : json_integer "count",rampCounts%(bhI%)
+      json_object "recipe" : json_integer "pairCount",rampPairs%(bhI%) : json_integer "minPathLength",opt.minimum%
+      json_integer "maxPathLength",rampRawMax(bhI%) : json_integer "maxAttempts",rampAttempts%(bhI%) : json_string "cutStyle",gen_cut$
+      json_end "}" : json_end "}"
+    END FOR bhI%
+    json_end "]" : json_null "selection"
+  ELSE
+    json_integer "pairCount",opt.pairs% : json_integer "maxPathLength",gRawMaximum : json_integer "maxAttempts",opt.attempts%
+    json_null "ramp" : json_null "rampSections"
+    IF gSelected% THEN
+      json_object "selection" : json_policy
+      json_integer "batchRequests",batchRequests : json_integer "rejectedSearches",batchRejected : json_integer "rejectedDuplicates",batchDuplicates
+      json_integer "batchCandidateBudget",batchBudget : json_integer "batchCandidatesConsidered",batchConsumed : json_end "}"
+    ELSE
+      json_null "selection"
+    END IF
+  END IF
+  json_object "batch" : json_integer "requests",batchRequests : json_integer "rejectedSearches",batchRejected
+  json_integer "rejectedDuplicates",batchDuplicates : json_integer "candidatesConsidered",batchConsumed
+  IF batchUseSelection% THEN
+    json_null "requestLimit" : json_integer "candidateBudget",batchBudget
+  ELSE
+    json_integer "requestLimit",batchRequestLimit : json_null "candidateBudget"
+  END IF
+  json_end "}" : json_end "}" : json_array "puzzles"
+END DEFine
+
+## Assemble the entire sorted JSON pack before touching the requested output.
+## With --force, retain a closed copy of the previous file until the replacement
+## copy closes successfully; this is recoverable copying, not atomic replacement.
+DEFine PROCedure batch_publish
+  LOCal bfI%,bfEntry%
+  batch_sort
+  IF LEN(opt.output$) THEN
+    gTemp$=batch_new$(batchBase$ & "_pack") : IF gExit% THEN RETurn
+    batchFinal%=FOP_OVER(gTemp$) : IF batchFinal%<0 THEN gExit%=1 : gError$="Cannot open completed pack staging file." : RETurn
+    gJ%=batchFinal% : batch_header
+    batchRead%=FOP_IN(gSpool$) : IF batchRead%<0 THEN gExit%=1 : gError$="Cannot reopen puzzle spool." : RETurn
+    FOR bfI%=1 TO batchAccepted%
+      bfEntry%=batchOrder%(bfI%) : json_key ""
+      batch_copy batchRead%,batchFinal%,batchOffset(bfEntry%),batchLength(bfEntry%)
+      IF gExit% OR gCancel% THEN RETurn
+    END FOR bfI%
+    CLOSE #batchRead% : batchRead%=-1
+    json_end "]" : json_end "}" : PRINT #batchFinal%
+    CLOSE #batchFinal% : batchFinal%=-1 : gJ%=-1
+    IF FTEST(gOutput$)=0 THEN
+      IF NOT opt.force% THEN gExit%=2 : gError$="Output appeared during generation; --force is required." : RETurn
+      gBackup$=batch_new$(batchBase$ & "_previous") : IF gExit% THEN RETurn
+      batch_clone gOutput$,gBackup$
+      IF NOT batchCopyOK% THEN RETurn
+      batchBacked%=1
+    END IF
+    batchDestTouched%=1
+    batch_clone gTemp$,gOutput$
+    IF NOT batchCopyOK% THEN
+      IF batchBacked% THEN
+        batchRestoring%=1 : batch_clone gBackup$,gOutput$ : batchRestoring%=0
+      ELSE
+        IF FTEST(gOutput$)=0 THEN DELETE gOutput$
+      END IF
+      gExit%=1 : gError$="Publication did not complete; previous output was retained for recovery." : RETurn
+    END IF
+    batchCommitted%=1
+    PRINT #0,"Saved " & gen_int$(batchAccepted%) & " puzzle(s) to " & gOutput$
+  END IF
+  batchRead%=FOP_IN(batchConsole$)
+  IF batchRead%>=0 THEN
+    FOR bfI%=1 TO batchAccepted%
+      bfEntry%=batchOrder%(bfI%) : batch_copy batchRead%,0,batchConsoleOffset(bfEntry%),batchConsoleLength(bfEntry%)
+      IF gCancel% OR gExit% THEN EXIT bfI%
+    END FOR bfI%
+    CLOSE #batchRead% : batchRead%=-1
+  END IF
+  PRINT #0,"Known solutions validated. Difficulty estimates are provisional."
+END DEFine
+
+## Generate within the batch budget, rejecting symmetric repeats before spooling
+## accepted entries. Publish only the complete requested count; failed exact
+## targets are skipped within budget, never filled with easier puzzles.
+DEFine PROCedure batch_run
+  LOCal btI%,btJ%,btP%,btDuplicate%,btSection%,btSectionCount%,btSeed,btBefore,btCan%,btUsed
+  gOutput$=opt.output$ : gSpool$="" : gTemp$="" : gBackup$="" : batchConsole$=""
+  batchSpool%=-1 : batchConsole%=-1 : batchRead%=-1 : batchFinal%=-1
+  batchBacked%=0 : batchCommitted%=0 : batchDestTouched%=0
+  IF LEN(gOutput$) THEN
+    IF FTEST(gOutput$)=0 AND NOT opt.force% THEN gExit%=2 : gError$="Output exists; use --force to replace it." : RETurn
+  END IF
+  batchBase$=gOutput$ : IF LEN(batchBase$)=0 THEN batchBase$=DATAD$ & "tangles"
+  gSpool$=batch_new$(batchBase$ & "_spool") : IF gExit% THEN RETurn
+  batchConsole$=batch_new$(batchBase$ & "_console") : IF gExit% THEN RETurn
+  batchSpool%=FOP_OVER(gSpool$) : batchConsole%=FOP_OVER(batchConsole$)
+  IF batchSpool%<0 OR batchConsole%<0 THEN gExit%=1 : gError$="Cannot open batch spool files." : RETurn
+  DIM batchOffset(opt.count%),batchLength(opt.count%),batchConsoleOffset(opt.count%),batchConsoleLength(opt.count%)
+  DIM batchOrder%(opt.count%),gBatchKeys$(opt.count%,64)
+  batchSortMemory=ALCHP((opt.count%+1)*batchSortStride)
+  IF NOT batchSortMemory THEN gExit%=1 : gError$="Not enough memory for batch ordering." : RETurn
+  batchAccepted%=0 : batchRequests=0 : batchRejected=0 : batchDuplicates=0 : batchConsumed=0
+  batchUseSelection%=(selection_active% OR opt.rampFirst%>0)
+  batchRequestLimit=gen_product(10,opt.count%) : batchBudget=batchRequestLimit
+  IF batchUseSelection% THEN batchBudget=gen_product(gen_product(2,opt.count%),opt.candidates%)
+  batchDepthSort%=(opt.minDepth%>0 OR opt.minNodes%>0 OR rampBaseDepth%>0 OR rampBaseNodes%>0)
+  btSection%=opt.rampFirst% : btSectionCount%=0
+  REPeat btGenerate
+    IF batchAccepted%>=opt.count% OR gExit% OR gCancel% THEN EXIT btGenerate
+    ## Reserve a full candidate allowance before starting a selected request.
+    ## This prevents a final request from overspending the shared batch budget.
+    btCan%=(batchRequests<batchRequestLimit)
+    IF batchUseSelection% THEN btCan%=(batchConsumed+opt.candidates%<=batchBudget)
+    IF NOT btCan% THEN EXIT btGenerate
+    IF opt.rampFirst% THEN cli_section btSection%
+    btSeed=batch_seed(opt.seed,batchRequests) : batchRequests=batchRequests+1
+    gen_board : selection_generate btSeed
+    IF gExit% OR gCancel% THEN EXIT btGenerate
+    btUsed=1 : IF batchUseSelection% THEN btUsed=opt.candidates%
+    IF gSuccess% THEN
+      IF batchUseSelection% THEN btUsed=selConsidered%
+      selKey$=identity_symmetry$ : btDuplicate%=0
+      FOR btI%=1 TO batchAccepted%
+        IF cli_equal%(gBatchKeys$(btI%),selKey$) THEN btDuplicate%=1 : EXIT btI%
+      END FOR btI%
+      IF btDuplicate% THEN
+        batchDuplicates=batchDuplicates+1
+      ELSE
+        batchAccepted%=batchAccepted%+1 : gBatchKeys$(batchAccepted%)=selKey$
+        ## Retain byte ranges, not puzzle objects. Publication can reorder entries
+        ## by copying these ranges without reconstructing their earlier shared state.
+        batchOffset(batchAccepted%)=POSITION(#batchSpool%) : gJ%=batchSpool% : json_puzzle btSeed
+        batchLength(batchAccepted%)=POSITION(#batchSpool%)-batchOffset(batchAccepted%)
+        IF gExit% OR gCancel% THEN EXIT btGenerate
+        batchConsoleOffset(batchAccepted%)=POSITION(#batchConsole%) : batch_console btSeed
+        batchConsoleLength(batchAccepted%)=POSITION(#batchConsole%)-batchConsoleOffset(batchAccepted%)
+        FOR btI%=0 TO 6
+          batch_metric batchAccepted%,btI%,0
+        END FOR btI%
+        IF opt.rampFirst% THEN batch_metric batchAccepted%,0,opt.target%
+        IF gHasReason% THEN
+          batch_metric batchAccepted%,1,sr.score%
+          IF batchDepthSort% THEN batch_metric batchAccepted%,1,0 : batch_metric batchAccepted%,2,sr.firstDepth% : batch_metric batchAccepted%,3,sr.firstNodes
+          batch_metric batchAccepted%,4,sr.trialSteps : batch_metric batchAccepted%,5,sr.routeDeductions
+        END IF
+        batch_metric batchAccepted%,6,btSeed
+        PRINT #0,"Selected " & gen_int$(batchAccepted%) & "/" & gen_int$(opt.count%) & " (seed " & gen_int$(btSeed) & ")."
+        IF opt.rampFirst% THEN
+          btSectionCount%=btSectionCount%+1
+          IF btSectionCount%>=rampCounts%(btSection%) THEN btSection%=btSection%+1 : btSectionCount%=0
+        END IF
+      END IF
+    ELSE
+      IF NOT batchUseSelection% THEN gExit%=1 : gError$="No candidate found within --max-attempts. This does not prove impossibility." : EXIT btGenerate
+      batchRejected=batchRejected+1
+      PRINT #0,"Skipped seed " & gen_int$(btSeed) & ": no candidate met the bounded selection policy."
+    END IF
+    batchConsumed=batchConsumed+btUsed : gen_poll
+  END REPeat btGenerate
+  CLOSE #batchSpool% : batchSpool%=-1 : CLOSE #batchConsole% : batchConsole%=-1
+  IF NOT gExit% AND NOT gCancel% THEN
+    IF batchAccepted%<>opt.count% THEN
+      gExit%=1 : gError$="Batch budget exhausted. No partial pack was written; no easier puzzle was substituted."
+    ELSE
+      batch_publish
+    END IF
+  END IF
+END DEFine

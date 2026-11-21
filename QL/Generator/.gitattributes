@@ -1,0 +1,2 @@
+# Keep the translated QL BASIC file in its native line-ending format.
+generator.bas text eol=lf

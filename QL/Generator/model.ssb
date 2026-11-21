@@ -1,0 +1,307 @@
+## Native state. Cells are zero-based row-major indices; path labels are 1-based.
+MANIFEST : G_MAX_SIDE% = 64
+MANIFEST : G_MAX_CELLS% = 4096
+MANIFEST : G_SOLVER_SIDE% = 16
+MANIFEST : G_SEARCH_NODES = 20000
+MANIFEST : G_ROUTE_CAP% = 1024
+## Options and reports use named records shared by construction, selection and export.
+## A % suffix is a signed 16-bit integer; larger counters/capacities use real fields.
+TYPE GeneratorOptions
+  width%
+  height%
+  pairs%
+  minimum%
+  maximum%
+  attempts%
+  count%
+  full%
+  varied%
+  seed
+  candidates%
+  improve%
+  solverWork
+  target%
+  minTrials
+  maxTrials
+  minDepth%
+  minNodes%
+  assess%
+  unique%
+  shortest%
+  show%
+  force%
+  output$(200)
+  rampFirst%
+  rampLast%
+END TYPE
+TYPE SolverReport
+  status$(20)
+  limitReason$(128)
+  tier$(20)
+  grade$(12)
+  score%
+  logical%
+  localDeductions
+  routeDeductions
+  routePasses
+  trialSteps
+  trialAssumptions
+  searchNodes
+  firstNodes
+  firstDepth%
+  maxDepth%
+  solutionCount%
+  exhaustive%
+  uniqueness$(20)
+  work
+  workLimit
+  boardKey$(64)
+END TYPE
+## Keep board restarts, traversal tests, refinement and structured starts distinct;
+## these counters describe different amounts of work, not elapsed time.
+TYPE WorkCounters
+  boardAttempts
+  traversalEvaluations
+  refinementEvaluations
+  structuredStarts
+END TYPE
+DIM opt AS GeneratorOptions
+DIM work AS WorkCounters
+DIM sr AS SolverReport
+DIM gError$(255),gCommand$(4096),gOutput$(200),gSpool$(220),gTemp$(220),gBackup$(220)
+## Owner 0 means unused; positive owners identify pairs. Order is 1-based within
+## each path. These witness arrays must never be used to guide the clue-only solver.
+DIM gOwner%(0),gOrder%(0),gLength%(0),gStart%(0),gFinish%(0),gEndpoint%(0)
+DIM gNb%(0,3),gDegree%(0),gQueue%(0),gScratch%(0),gLocal%(0)
+DIM gRng(2,55),gRi%(2),gRj%(2),gPower(32)
+DIM gSeen$(0,64),gBatchKeys$(0,64),gSavedOwner%(0),gSavedOrder%(0)
+DIM gCuts%(0),gEnds%(0),gNeeded%(0),gTraversal%(0),gPositions%(0)
+DIM gDP%(0,0),gPrefix%(0),gWalk%(0),gWalkPos%(0),gBestWalk%(0)
+DIM gGrowthCandidates%(0,3),gGrowthCount%(0),gGrowthAt%(0),gGrowthPath%(0)
+DIM gCanonical%(0),gA%(0),gB%(0),gSymA%(0),gSymB%(0)
+DIM gBaseA%(0),gBaseB%(0)
+gExit%=0 : gCancel%=0 : gPoll=0 : gInput%=-1 : gRngStream%=0 : gError$=""
+gN%=0 : gValid%=0 : gSuccess%=0 : gSelected%=0 : gHasReason%=0 : gHasShortest%=0
+
+## Reinitialise the option record so a second parse cannot inherit old switches.
+## A negative maxTrials means that no upper effort bound was requested.
+DEFine PROCedure gen_defaults
+  DIM opt AS GeneratorOptions
+  opt.width%=8 : opt.height%=8 : opt.pairs%=6 : opt.minimum%=4 : opt.maximum%=16
+  opt.attempts%=500 : opt.count%=1 : opt.candidates%=100 : opt.improve%=100
+  opt.solverWork=2000000 : opt.maxTrials=-1 : opt.target%=0
+  opt.rampFirst%=0 : opt.rampLast%=0 : opt.seed=0
+END DEFine
+
+## Poll without waiting, once per 256 calls, to keep inner searches responsive.
+## Tests disable keyboard input by leaving gInput% at -1.
+DEFine PROCedure gen_poll
+  LOCal gpKey$(1)
+  gPoll=gPoll+1
+  IF gInput%<0 OR gPoll MOD 256<>0 THEN RETurn
+  gpKey$=INKEY$(#gInput%,0)
+  IF LEN(gpKey$) THEN
+    IF CODE(gpKey$)=3 OR CODE(gpKey$)=27 THEN gCancel%=1 : gExit%=130 : gError$="Generation cancelled."
+  END IF
+END DEFine
+
+DEFine FuNction gen_min(VAL gmA,VAL gmB)
+  IF gmA<gmB THEN RETurn gmA
+  RETurn gmB
+END DEFine
+
+DEFine FuNction gen_max(VAL gmA,VAL gmB)
+  IF gmA>gmB THEN RETurn gmA
+  RETurn gmB
+END DEFine
+
+## Use real arithmetic for remainders that may exceed Turbo's integer range.
+DEFine FuNction gen_mod(VAL gmA,VAL gmB)
+  RETurn gmA-gmB*INT(gmA/gmB)
+END DEFine
+
+## Force capacity arithmetic through real parameters, beyond signed 16-bit
+## integer temporaries even when the supplied options carry a % suffix.
+DEFine FuNction gen_product(VAL gmA,VAL gmB)
+  RETurn gmA*gmB
+END DEFine
+
+## Round halves away from zero, matching the F# grading and ramp recipes.
+DEFine FuNction gen_round(VAL grV)
+  IF grV<0 THEN RETurn -INT(-grV+0.5)
+  RETurn INT(grV+0.5)
+END DEFine
+
+## Use the same six-decimal convention for measurements and JSON numbers.
+DEFine FuNction gen_six(VAL gsV)
+  RETurn gen_round(gsV*1000000)/1000000
+END DEFine
+
+DEFine FuNction gen_log2(VAL glV)
+  RETurn LN(glV)/LN(2)
+END DEFine
+
+## Use A..Z first, then decimal labels; the label is separate from a cell index.
+DEFine FuNction gen_label$(VAL glP%)
+  IF glP%<=26 THEN RETurn CHR$(64+glP%)
+  RETurn gen_int$(glP%)
+END DEFine
+
+## PRINT may use exponent notation above six digits. JSON integers never do.
+DEFine FuNction gen_int$(VAL giV)
+  LOCal giText$(32),giDigit%,giNegative%
+  giText$="" : giNegative%=(giV<0) : giV=ABS(giV)
+  REPeat giLoop
+    giDigit%=gen_mod(giV,10) : giText$=CHR$(48+giDigit%) & giText$
+    giV=INT(giV/10) : IF giV=0 THEN EXIT giLoop
+  END REPeat giLoop
+  IF giNegative% THEN giText$="-" & giText$
+  RETurn giText$
+END DEFine
+
+## Format a rounded decimal without exponent notation or unnecessary zeroes.
+## Carry a rounded fractional part of 1.000000 into the whole-number part.
+DEFine FuNction gen_number$(VAL gnV)
+  LOCal gnWhole,gnFrac,gnText$(48),gnPart$(8)
+  gnV=gen_six(gnV) : gnWhole=INT(ABS(gnV))
+  gnFrac=gen_round((ABS(gnV)-gnWhole)*1000000)
+  IF gnFrac=1000000 THEN gnWhole=gnWhole+1 : gnFrac=0
+  gnText$=gen_int$(gnWhole)
+  IF gnFrac THEN
+    gnPart$=gen_int$(gnFrac) : gnPart$=FILL$("0",6-LEN(gnPart$)) & gnPart$
+    REPeat gnTrim
+      IF gnPart$(LEN(gnPart$))<>"0" THEN EXIT gnTrim
+      gnPart$=gnPart$(1 TO LEN(gnPart$)-1)
+    END REPeat gnTrim
+    gnText$=gnText$ & "." & gnPart$
+  END IF
+  IF gnV<0 THEN gnText$="-" & gnText$
+  RETurn gnText$
+END DEFine
+
+DEFine FuNction gen_bool$(VAL gbV%)
+  IF gbV% THEN RETurn "true"
+  RETurn "false"
+END DEFine
+
+DEFine FuNction gen_grade$(VAL ggV%)
+  SELect ON ggV%
+    =1: RETurn "easy"
+    =2: RETurn "medium"
+    =3: RETurn "hard"
+    =4: RETurn "expert"
+  END SELect
+  RETurn "any"
+END DEFine
+
+## Grade ranks are ordered easy..expert; zero represents an unrestricted target.
+DEFine FuNction gen_rank%(VAL grText$)
+  SELect ON grText$
+    ="easy": RETurn 1
+    ="medium": RETurn 2
+    ="hard": RETurn 3
+    ="expert": RETurn 4
+  END SELect
+  RETurn 0
+END DEFine
+
+DEFine FuNction gen_mode$
+  IF opt.full% THEN RETurn "full-coverage"
+  RETurn "connect-only"
+END DEFine
+
+DEFine FuNction gen_cut$
+  IF opt.varied% THEN RETurn "varied"
+  RETurn "random"
+END DEFine
+
+## Compare character codes, avoiding BASIC's language-dependent string ordering.
+## Hashes and canonical label ordering must be stable across machines.
+DEFine FuNction gen_less%(VAL geA$,VAL geB$)
+  LOCal geI%,geCount%
+  geCount%=gen_min(LEN(geA$),LEN(geB$))
+  FOR geI%=1 TO geCount%
+    IF CODE(geA$(geI%))<CODE(geB$(geI%)) THEN RETurn 1
+    IF CODE(geA$(geI%))>CODE(geB$(geI%)) THEN RETurn 0
+  END FOR geI%
+  RETurn LEN(geA$)<LEN(geB$)
+END DEFine
+
+## Resize shared arrays for the current recipe and build orthogonal neighbours.
+## Degree counts stop later searches reading unused slots at edges and corners.
+DEFine PROCedure gen_board
+  LOCal gbI%,gbJ%
+  gN%=opt.width%*opt.height%
+  DIM gOwner%(gN%-1),gOrder%(gN%-1),gEndpoint%(gN%-1),gLocal%(gN%-1)
+  DIM gNb%(gN%-1,3),gDegree%(gN%-1),gQueue%(gN%-1),gScratch%(gN%-1)
+  DIM gLength%(opt.pairs%),gStart%(opt.pairs%),gFinish%(opt.pairs%)
+  DIM gCanonical%(opt.pairs%),gA%(opt.pairs%),gB%(opt.pairs%),gSymA%(opt.pairs%),gSymB%(opt.pairs%)
+  DIM gBaseA%(opt.pairs%),gBaseB%(opt.pairs%)
+  FOR gbI%=0 TO gN%-1
+    gbJ%=0
+    IF gbI% MOD opt.width%>0 THEN gNb%(gbI%,gbJ%)=gbI%-1 : gbJ%=gbJ%+1
+    IF gbI% MOD opt.width%+1<opt.width% THEN gNb%(gbI%,gbJ%)=gbI%+1 : gbJ%=gbJ%+1
+    IF gbI%>=opt.width% THEN gNb%(gbI%,gbJ%)=gbI%-opt.width% : gbJ%=gbJ%+1
+    IF gbI%+opt.width%<gN% THEN gNb%(gbI%,gbJ%)=gbI%+opt.width% : gbJ%=gbJ%+1
+    gDegree%(gbI%)=gbJ% : gOwner%(gbI%)=0 : gOrder%(gbI%)=0 : gEndpoint%(gbI%)=0
+  END FOR gbI%
+END DEFine
+
+## A Manhattan distance of one permits only horizontal or vertical steps.
+DEFine FuNction gen_adjacent%(VAL gaA%,VAL gaB%)
+  RETurn ABS((gaA% MOD opt.width%)-(gaB% MOD opt.width%))+ABS(INT(gaA%/opt.width%)-INT(gaB%/opt.width%))=1
+END DEFine
+
+## Independent final validator; never trust a construction or solver verdict.
+## Reconstruct each path from its owner/order entries, checking every step and
+## endpoint. Then reject same-colour side contacts between nonconsecutive cells.
+## Only full-coverage mode requires the reconstructed paths to occupy every cell.
+DEFine PROCedure gen_validate
+  LOCal gvI%,gvP%,gvJ%,gvN%,gvCount%,gvFirst%,gvLast%,gvPrevious%
+  gValid%=0
+  DIM gvSeen%(gN%-1)
+  gvCount%=0
+  FOR gvP%=1 TO opt.pairs%
+    IF gLength%(gvP%)<opt.minimum% OR gLength%(gvP%)>opt.maximum% THEN RETurn
+    gvPrevious%=-1 : gvFirst%=-1 : gvLast%=-1
+    FOR gvJ%=1 TO gLength%(gvP%)
+      gvN%=-1
+      FOR gvI%=0 TO gN%-1
+        IF gOwner%(gvI%)=gvP% AND gOrder%(gvI%)=gvJ% THEN
+          IF gvN%>=0 THEN RETurn
+          gvN%=gvI%
+        END IF
+      END FOR gvI%
+      IF gvN%<0 THEN RETurn
+      IF gvPrevious%>=0 THEN
+        IF NOT gen_adjacent%(gvPrevious%,gvN%) THEN RETurn
+      END IF
+      IF gvJ%=1 THEN gvFirst%=gvN%
+      gvLast%=gvN% : gvPrevious%=gvN% : gvSeen%(gvN%)=1 : gvCount%=gvCount%+1
+    END FOR gvJ%
+    IF gvFirst%<>gStart%(gvP%) OR gvLast%<>gFinish%(gvP%) THEN RETurn
+  END FOR gvP%
+  FOR gvI%=0 TO gN%-1
+    IF (gOwner%(gvI%)<>0)<>gvSeen%(gvI%) THEN RETurn
+    IF gOwner%(gvI%) THEN
+      FOR gvJ%=0 TO gDegree%(gvI%)-1
+        gvN%=gNb%(gvI%,gvJ%)
+        IF gOwner%(gvN%)=gOwner%(gvI%) AND ABS(gOrder%(gvN%)-gOrder%(gvI%))<>1 THEN RETurn
+      END FOR gvJ%
+    END IF
+  END FOR gvI%
+  IF opt.full% AND gvCount%<>gN% THEN RETurn
+  gValid%=1
+END DEFine
+
+## Rebuild the clue lookup after constructing or restoring a solution.
+## Interior path cells remain zero so clue-only routines cannot see the witness.
+DEFine PROCedure gen_endpoints
+  LOCal geI%
+  FOR geI%=0 TO gN%-1
+    gEndpoint%(geI%)=0
+  END FOR geI%
+  FOR geI%=1 TO opt.pairs%
+    gEndpoint%(gStart%(geI%))=geI% : gEndpoint%(gFinish%(geI%))=geI%
+  END FOR geI%
+END DEFine

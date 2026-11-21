@@ -1,0 +1,197 @@
+{
+  "verifiedAtUtc": "2026-11-21T04:18:53.237634+00:00",
+  "passed": true,
+  "nativeExecution": true,
+  "environment": {
+    "system": "SMSQ/E under SMSQmulator on Windows",
+    "ramMiB": 16,
+    "compiler": "SSB 2.8 / Turbo 5.09",
+    "errors": 0,
+    "warnings": 54
+  },
+  "executableSha256": "bb58f4b8f7c5c601f240d6917cb5a5f2add210170a221348cdb1259b66144bf2",
+  "nativeSourceSha256": {
+    "batch.ssb": "940f913d336ff702f48678a8ff6ba2e2ca511bef443b8238454bc60fb16b6f92",
+    "cli.ssb": "6b16cea466a5ecb0b5e72080f44502c9bb17537e2587389594f840f186f382cd",
+    "construction.ssb": "93f316df97e5e9c69ff5e377cde75f2c7a97756d5ac79fa610adadf38dd81560",
+    "difficulty.ssb": "495ee9634bc633b75b6330e5d3e27493659df1658f4ac92d515151bf6972c414",
+    "export.ssb": "5acf8ac8796bed937d9f9e598d37d7219aa76d4c9883423c4720cd463aeb8f8a",
+    "generator.ssb": "15fdcb35d8b4fae1503c2f1d4d04d2342d54a6a2e1d9f0ad61b5c1118176d996",
+    "identity.ssb": "57b749230b6cc3388c34011c551db0e0e4159fbee996585ad5f9bc048c86c87f",
+    "maths.ssb": "7f4c25be0147722741740513c1e823e3a92894eb0f8463e277264e05bf60cf47",
+    "model.ssb": "fc33e29009d83afae6a8bd568300c3d4afdbf57e65606ab51ddc5ffac1eeade8",
+    "selection.ssb": "c2e9ab9cb542451c239922bb5029753e6dd97eb6b7ba393f7a4e7ad3c8d64daf",
+    "solver.ssb": "4cfccc1a3312ab740c5949e4c14580a4e13d7b5168ac94ca49b4f8bc9219f8e5"
+  },
+  "testSourceSha256": {
+    "batch.ssb": "940f913d336ff702f48678a8ff6ba2e2ca511bef443b8238454bc60fb16b6f92",
+    "build.py": "b9b8ff9c106cd1ad4136a7158d5cc7da363ea6ac152c78021e8be6b28e6bcc54",
+    "cli.ssb": "6b16cea466a5ecb0b5e72080f44502c9bb17537e2587389594f840f186f382cd",
+    "construction.ssb": "93f316df97e5e9c69ff5e377cde75f2c7a97756d5ac79fa610adadf38dd81560",
+    "difficulty.ssb": "495ee9634bc633b75b6330e5d3e27493659df1658f4ac92d515151bf6972c414",
+    "export.ssb": "5acf8ac8796bed937d9f9e598d37d7219aa76d4c9883423c4720cd463aeb8f8a",
+    "generator.ssb": "15fdcb35d8b4fae1503c2f1d4d04d2342d54a6a2e1d9f0ad61b5c1118176d996",
+    "identity.ssb": "57b749230b6cc3388c34011c551db0e0e4159fbee996585ad5f9bc048c86c87f",
+    "maths.ssb": "7f4c25be0147722741740513c1e823e3a92894eb0f8463e277264e05bf60cf47",
+    "model.ssb": "fc33e29009d83afae6a8bd568300c3d4afdbf57e65606ab51ddc5ffac1eeade8",
+    "Oracle.fsx": "ed9189a44a6990345c418ba33289a6f029d30ad9e1d39dfe7ab2c7b5f7fe424a",
+    "run.py": "3ec9c975fec922e210f7a2050e0df2d8f8531c92633b674e946b7ce9fb75a018",
+    "selection.ssb": "c2e9ab9cb542451c239922bb5029753e6dd97eb6b7ba393f7a4e7ad3c8d64daf",
+    "solver.ssb": "4cfccc1a3312ab740c5949e4c14580a4e13d7b5168ac94ca49b4f8bc9219f8e5",
+    "test_core.py": "7328315401cd8cd120bc4427c0dba098bb9484a2175e0639b5cefa2c015471af",
+    "test_generator.py": "3937d3a18a8ed1f430cda59d357b653d9c76ffae7b5679e8b46498ee3555dceb",
+    "test_policy.py": "f17d14eb5d97b0fe673725f93924c39054fc00570782aeee327cd86c7f7a942e",
+    "tests/arguments.ssb": "548ac378539262421fab681b06d2c075aed9d432b23bc824deda17573a19f563",
+    "tests/construction.ssb": "eeb815f461fca63379f23a30012969aff2e631fe4d410548ef62af1393b2f293",
+    "tests/hard-fixture.json": "b1d6c75a701d2f8bb64f51cf91b91947015324e5f45953c1360a80302b16ea3c",
+    "tests/io.ssb": "cb180e59c4a9464b0eb568d25283faa319f40659275247b0767058e1b86e9d38",
+    "tests/options.ssb": "aae0000067f5f806622e1e1307e63dc0fddf15ac8e2b1bd8dc88257a145886bd",
+    "tests/primitives.ssb": "0547f5b37ea267e48d2205d456bdc7da4af19795e02f893c4b7775fab2bbabaf",
+    "Validate.fsx": "e550e61cc52181139e5bb545fedc6a29496709d50e226ae86b03d96d16960729"
+  },
+  "referenceAssemblySha256": {
+    "Tangles.Core": "a024c2302138e23381f5eae4ad2e0281011a47f69f2e51f57e8abecb5a5c1f30",
+    "Tangles.Generator": "74bb02571d4186ed6ba7bfdfbaa5a3c86f9b613bb1759ed9c6fcfbb89f10e502"
+  },
+  "solverAndGeometry": {
+    "passed": true,
+    "compiled": true,
+    "cases": 42,
+    "reference": "Tangles.Generator.Solver / Difficulty",
+    "errors": []
+  },
+  "selectionPolicies": {
+    "passed": true,
+    "checks": [
+      "hard exact-grade acceptance",
+      "stored witness/report restoration",
+      "trial effort ceiling",
+      "no grade fallback",
+      "reflection deduplication",
+      "SHA-256",
+      "seven SplitMix64 seeds",
+      "balanced 12x12 ramp recipes and section effort floors",
+      "large capacity arithmetic and invalid-size rejection"
+    ]
+  },
+  "construction": {
+    "passed": true,
+    "results": [
+      "FULL_WORD|16",
+      "CAPACITY|196608",
+      "COVER|8|1|1|441|1",
+      "COVER|12|1|1|941|2"
+    ]
+  },
+  "commandLineAndPacks": {
+    "passed": true,
+    "compiled": true,
+    "checks": [
+      "help",
+      "negative seed",
+      "duplicate flag",
+      "connect target rejected",
+      "ramp pair override rejected",
+      "connections batch",
+      "temporary filename collision preserves existing file",
+      "deterministic replay",
+      "identical native replay bytes",
+      "portable SplitMix64 batch seed sequence",
+      "full varied cuts",
+      "exact easy proof",
+      "assessed full batch ordering",
+      "assessed full-coverage ordering is ascending",
+      "honest solver limit",
+      "optional uniqueness",
+      "maximum dimension and seed",
+      "quoted output filename",
+      "shortest screen rejects trivial board",
+      "existing output protected",
+      "keyboard cancellation preserves output",
+      "failed exact grade preserves forced output",
+      "successful force replacement"
+    ],
+    "packs": [
+      {
+        "name": "connect_json",
+        "sha256": "45ddf94f60d6db2742e602d3dc41852a42f440b99cd535e7e26954ac4a541651"
+      },
+      {
+        "name": "replay_json",
+        "sha256": "45ddf94f60d6db2742e602d3dc41852a42f440b99cd535e7e26954ac4a541651"
+      },
+      {
+        "name": "full_json",
+        "sha256": "cdd62d82b8d1816717623507a2a51a003f91d8e81734d8f888fd4f59a7a5c8c1"
+      },
+      {
+        "name": "easy_json",
+        "sha256": "82d707d478b998d18a371aaea5d262fbc3017da200db895ab9f51aa7cffeb4cb"
+      },
+      {
+        "name": "ordered_json",
+        "sha256": "25849710b9ae35f39d0ac91289d9554a1cf1c7806302d42db1f68b9da3851c7a"
+      },
+      {
+        "name": "limited_json",
+        "sha256": "33c7cea8c009db4a3ee4116422f7906a07a6d4f157b6f7d86869a478fc8cdb70"
+      },
+      {
+        "name": "unique_json",
+        "sha256": "98177da6c18d1be174dfc776178aee795ecc94c333ae7345c4bc9c3ad4b34fd8"
+      },
+      {
+        "name": "boundary_json",
+        "sha256": "e1079ee3a0cc399ace4c76809739f62d046118493235c915bd313cd5143cb7ac"
+      },
+      {
+        "name": "quoted pack_json",
+        "sha256": "5d93a879aac2a68b828d79a6890a1277bc666a0f9ff8d230f879c6c6634cf4a5"
+      },
+      {
+        "name": "protected_json",
+        "sha256": "e661ca280692f9a18a77464b31231789a5b754478df5d94c3977a538446d9038"
+      }
+    ],
+    "executableSha256": "bb58f4b8f7c5c601f240d6917cb5a5f2add210170a221348cdb1259b66144bf2",
+    "reference": "Actual shared F# loader, rules, hints, solver and grader"
+  },
+  "largerSamplePacks": {
+    "passed": true,
+    "reference": "Actual shared F# loader, rules, hints, identities and difficulty measurements",
+    "packs": [
+      {
+        "name": "native8full_json",
+        "sha256": "c3aaaa00a8325cced8f46e71786e3acbbe0462edf322cbb9e31aae19ecfee232",
+        "width": 8,
+        "height": 8,
+        "fullCoverage": true,
+        "puzzles": 1
+      },
+      {
+        "name": "native12full_json",
+        "sha256": "8ac7e0902090c8d2188eb777e1126cbf2a227bb13b30726fcd1aae9224935501",
+        "width": 12,
+        "height": 12,
+        "fullCoverage": true,
+        "puzzles": 1
+      },
+      {
+        "name": "native12connect_json",
+        "sha256": "f3081cee23724900f34985982fe4ed0c6f89984790afd04e558f852cb78b7a71",
+        "width": 12,
+        "height": 12,
+        "fullCoverage": false,
+        "puzzles": 1
+      }
+    ]
+  },
+  "totalExportedPuzzlesValidated": 16,
+  "nativeDifferences": [
+    "Native deterministic random stream is versioned; an F# seed need not produce the same native puzzle.",
+    "Small geometry rounding differences are possible with QL floating-point precision.",
+    "Publication uses staged copies with a previous-file backup when forcing; final device copy is not atomic.",
+    "Windows collection calibration/checkpoint tooling is separate from the ordinary generator CLI."
+  ],
+  "scope": "Native algorithm and CLI conformance; no claim of exhaustive correctness for every board, budget or random seed."
+}

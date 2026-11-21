@@ -1,0 +1,52 @@
+## Native Tangles CLI. Dependencies: Toolkit II and Turbo Toolkit
+## include every other source file
+#INCLUDE model_ssb
+#INCLUDE maths_ssb
+#INCLUDE construction_ssb
+#INCLUDE identity_ssb
+#INCLUDE solver_ssb
+#INCLUDE difficulty_ssb
+#INCLUDE selection_ssb
+#INCLUDE cli_ssb
+#INCLUDE export_ssb
+#INCLUDE batch_ssb
+## Modules above initialise shared state and define routines. The driver below
+## reads options, runs either help or the batch, then performs common cleanup.
+WHEN_ERROR 0
+  ## Last-resort trap: a cleanup/media error must never return success.
+  RJOB -1,-1
+END_WHEN
+## The inner handler attempts file recovery. Any error during that recovery
+## falls through to the outer handler, which always reports job failure.
+WHEN_ERROR 1
+  batch_runtime_error ERNUM%
+END_WHEN
+## Own the console explicitly; automatic copied windows can block under EW.
+OPEN #0,con
+WINDOW #0,512,256,0,0
+PAPER #0,0 : INK #0,4 : CLS #0
+gInput%=0
+## Compiled jobs receive one option string from EW; the interpreted fallback
+## uses CMD$. Parsing and cross-option validation finish before generation starts.
+gCommand$=""
+IF COMPILED THEN
+  IF LEN(OPTION_CMD$)>4096 THEN cli_error "Option string exceeds 4096 bytes."
+  IF NOT gExit% THEN gCommand$=OPTION_CMD$
+ELSE
+  gCommand$=CMD$
+END IF
+IF NOT gExit% THEN cli_parse gCommand$
+IF NOT gExit% THEN
+  IF cliHelp% THEN
+    cli_help
+  ELSE
+    batch_run
+  END IF
+END IF
+## Use the same cleanup path for success, argument errors and cancellation.
+## QDOS returns failures to the owner as negative job error numbers.
+batch_cleanup
+IF gCancel% THEN gExit%=130
+IF gExit% THEN PRINT #0,"Tangles: " & gError$ & " (exit " & gen_int$(gExit%) & ")."
+IF COMPILED THEN RJOB -1,-gExit%
+STOP

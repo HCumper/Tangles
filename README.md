@@ -238,10 +238,14 @@ loaded again after a reload unless supplied as a static pack URL.
 
 ### Loading generator packs
 
-The hosted pack chooser includes the six 12×12 collections generated on
-20 November 2026 (100 puzzles per grade and coverage mode), plus the 8×8,
-12×12 and 16×16 easy-to-hard full-coverage ramps. Connect-only grades are
-provisional geometric estimates; full-coverage grades use solver reasoning.
+The hosted pack chooser includes six 12×12 collections with 100 puzzles per
+tier and coverage mode. These were regenerated with stronger requirements
+after player feedback: every connections-only Medium puzzle defeats 256 greedy
+shortest-route attempts, and Hard defeats 8,192. Full-coverage Easy now needs
+trial deductions, while Medium and Hard need branching. The displayed collection
+tiers are provisional and separate from the raw diagnostic grades in the JSON.
+See [collection calibration](docs/collection-calibration.md) for the exact
+requirements. Earlier 8×8, 12×12 and 16×16 ramp samples are labelled separately.
 The player project links these JSON files from `puzzles/` into the published
 `packs/` directory, so the website and repository use the same pack contents.
 
@@ -252,11 +256,12 @@ that imported entry. Switching packs saves the current puzzle's progress and
 restores saved progress when another puzzle is selected.
 The file is read locally; it is not uploaded. Unsupported versions/rules and
 invalid endpoint layouts are rejected without replacing the current puzzle.
-Only clues are loaded into game state; stored solutions and verification claims
-are ignored. The pack's coverage rule is retained and enforced. Duplicate
+Clues are loaded into game state, and valid stored solutions are retained for
+hints. Completion accepts any valid route; verification claims are not trusted.
+The pack's coverage rule is retained and enforced. Duplicate
 identical puzzles are permitted; conflicting boards with
 the same ID are rejected. Imported clues are validated, but arbitrary imported
-packs are not independently checked for solvability.
+packs without a valid stored witness are not independently checked for solvability.
 
 Alternatively copy a pack to `src/Tangles.Player/wwwroot/packs/` and open
 `?pack=packs/your-pack.json`. Pack URLs must be on the same site.

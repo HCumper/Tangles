@@ -169,7 +169,9 @@ type App() as this =
             let warnings = ResizeArray<string>()
             let! catalog = task {
                 try
-                    let! json = this.Http.GetStringAsync "packs.json"
+                    // The small catalogue should discover new pack editions
+                    // immediately; individual versioned packs remain cacheable.
+                    let! json = this.Http.GetStringAsync $"packs.json?refresh={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}"
                     return PuzzlePacks.readCatalog json
                 with _ -> return Error "The pack list could not be loaded."
             }
@@ -202,7 +204,14 @@ type App() as this =
                 | Some source ->
                     try
                         let target = this.PackTarget source
-                        match choices |> Array.tryFind (fun choice -> choice.Key = target.AbsoluteUri) with
+                        let requested =
+                            choices |> Array.tryFind (fun choice -> choice.Key = target.AbsoluteUri)
+                            |> Option.orElseWith (fun () ->
+                                // Older bookmarks name the unversioned file.
+                                choices |> Array.tryFind (fun choice ->
+                                    choice.Source.IsSome
+                                    && (Uri choice.Key).GetLeftPart(UriPartial.Path) = target.GetLeftPart(UriPartial.Path)))
+                        match requested with
                         | Some choice -> return Some choice
                         | None ->
                             let name = target.Segments |> Array.last |> Uri.UnescapeDataString

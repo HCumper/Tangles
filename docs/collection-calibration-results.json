@@ -1,0 +1,152 @@
+{
+  "baselineCommit": "a1d05d68609bfb319112fede54d3daafdaee1cff",
+  "hintCompletion": true,
+  "noOldOrSymmetricRepeats": true,
+  "rows": [
+    {
+      "bytes": 1680717,
+      "count": 100,
+      "firstSolutionDepth": null,
+      "firstSolutionNodes": null,
+      "firstSuccessfulGreedyTrial": {
+        "maximum": 250,
+        "median": 62.5,
+        "minimum": 33
+      },
+      "mode": "connect-only",
+      "newGreedyWins256": 100,
+      "newGreedyWins32": 0,
+      "newPairs": 8,
+      "oldGreedyWins256": 100,
+      "oldGreedyWins32": 100,
+      "oldPairs": 4,
+      "tier": "easy",
+      "trialSteps": null
+    },
+    {
+      "bytes": 1899861,
+      "count": 100,
+      "firstSolutionDepth": null,
+      "firstSolutionNodes": null,
+      "firstSuccessfulGreedyTrial": {
+        "maximum": 1973,
+        "median": 465.5,
+        "minimum": 257
+      },
+      "mode": "connect-only",
+      "newGreedyWins256": 0,
+      "newGreedyWins32": 0,
+      "newPairs": 10,
+      "oldGreedyWins256": 100,
+      "oldGreedyWins32": 99,
+      "oldPairs": 8,
+      "tier": "medium",
+      "trialSteps": null
+    },
+    {
+      "bytes": 1911661,
+      "count": 100,
+      "firstSolutionDepth": null,
+      "firstSolutionNodes": null,
+      "firstSuccessfulGreedyTrial": null,
+      "mode": "connect-only",
+      "newGreedyWins256": 0,
+      "newGreedyWins32": 0,
+      "newPairs": 10,
+      "oldGreedyWins256": 93,
+      "oldGreedyWins32": 71,
+      "oldPairs": 10,
+      "tier": "hard",
+      "trialSteps": null
+    },
+    {
+      "bytes": 2511817,
+      "count": 100,
+      "firstSolutionDepth": {
+        "maximum": 0,
+        "median": 0,
+        "minimum": 0
+      },
+      "firstSolutionNodes": {
+        "maximum": 0,
+        "median": 0,
+        "minimum": 0
+      },
+      "firstSuccessfulGreedyTrial": null,
+      "mode": "full-coverage",
+      "newGreedyWins256": null,
+      "newGreedyWins32": null,
+      "newPairs": 12,
+      "oldGreedyWins256": null,
+      "oldGreedyWins32": null,
+      "oldPairs": 24,
+      "tier": "easy",
+      "trialSteps": {
+        "maximum": 200,
+        "median": 64.5,
+        "minimum": 1
+      }
+    },
+    {
+      "bytes": 2246631,
+      "count": 100,
+      "firstSolutionDepth": {
+        "maximum": 19,
+        "median": 8,
+        "minimum": 2
+      },
+      "firstSolutionNodes": {
+        "maximum": 244,
+        "median": 74,
+        "minimum": 11
+      },
+      "firstSuccessfulGreedyTrial": null,
+      "mode": "full-coverage",
+      "newGreedyWins256": null,
+      "newGreedyWins32": null,
+      "newPairs": 8,
+      "oldGreedyWins256": null,
+      "oldGreedyWins32": null,
+      "oldPairs": 20,
+      "tier": "medium",
+      "trialSteps": {
+        "maximum": 149,
+        "median": 29,
+        "minimum": 0
+      }
+    },
+    {
+      "bytes": 2247239,
+      "count": 100,
+      "firstSolutionDepth": {
+        "maximum": 24,
+        "median": 11,
+        "minimum": 8
+      },
+      "firstSolutionNodes": {
+        "maximum": 13925,
+        "median": 1196,
+        "minimum": 520
+      },
+      "firstSuccessfulGreedyTrial": null,
+      "mode": "full-coverage",
+      "newGreedyWins256": null,
+      "newGreedyWins32": null,
+      "newPairs": 8,
+      "oldGreedyWins256": null,
+      "oldGreedyWins32": null,
+      "oldPairs": 18,
+      "tier": "hard",
+      "trialSteps": {
+        "maximum": 123,
+        "median": 17,
+        "minimum": 0
+      }
+    }
+  ],
+  "sharedDrawingCompletion": true,
+  "sharedLoader": true,
+  "verifiedPuzzles": 600,
+  "version": "player-feedback-v2",
+  "witnessValidation": true
+}

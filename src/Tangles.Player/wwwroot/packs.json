@@ -1,16 +1,16 @@
 {
   "packs": [
-    { "name": "Starter collection", "path": "packs/starter.json" },
-    { "name": "Full coverage collection", "path": "packs/full-coverage.json" },
-    { "name": "Quick start", "path": "packs/quick-start.json" },
-    { "name": "Easy connections (4 pairs)", "path": "packs/connect-only-12x12-easy-100-20261120.json" },
-    { "name": "Medium connections (8 pairs)", "path": "packs/connect-only-12x12-medium-100-20261120.json" },
-    { "name": "Hard connections (10 pairs; heuristic grade)", "path": "packs/connect-only-12x12-hard-100-20261120.json" },
-    { "name": "Easy full coverage (24 pairs)", "path": "packs/full-coverage-12x12-easy-100-20261120.json" },
-    { "name": "Medium full coverage (20 pairs)", "path": "packs/full-coverage-12x12-medium-100-20261120.json" },
-    { "name": "Hard full coverage (18 pairs)", "path": "packs/full-coverage-12x12-hard-100-20261120.json" },
-    { "name": "Easy to hard full coverage — 8×8", "path": "packs/ramp-8x8-easy-hard.json" },
-    { "name": "Easy to hard full coverage — 12×12", "path": "packs/ramp-12x12-easy-hard.json" },
-    { "name": "Easy to hard full coverage — 16×16", "path": "packs/ramp-16x16-easy-hard.json" }
+    { "name": "Starter collection — beginner", "path": "packs/starter.json" },
+    { "name": "Full coverage collection — beginner", "path": "packs/full-coverage.json" },
+    { "name": "Quick start — beginner", "path": "packs/quick-start.json" },
+    { "name": "Easy connections (8 pairs)", "path": "packs/connect-only-12x12-easy-100-20261120.json?edition=2" },
+    { "name": "Medium connections (10 pairs)", "path": "packs/connect-only-12x12-medium-100-20261120.json?edition=2" },
+    { "name": "Hard connections (10 pairs)", "path": "packs/connect-only-12x12-hard-100-20261120.json?edition=2" },
+    { "name": "Easy full coverage (12 pairs)", "path": "packs/full-coverage-12x12-easy-100-20261120.json?edition=2" },
+    { "name": "Medium full coverage (8 pairs)", "path": "packs/full-coverage-12x12-medium-100-20261120.json?edition=2" },
+    { "name": "Hard full coverage (8 pairs)", "path": "packs/full-coverage-12x12-hard-100-20261120.json?edition=2" },
+    { "name": "Earlier ramp sample — 8×8", "path": "packs/ramp-8x8-easy-hard.json" },
+    { "name": "Earlier ramp sample — 12×12", "path": "packs/ramp-12x12-easy-hard.json" },
+    { "name": "Earlier ramp sample — 16×16", "path": "packs/ramp-16x16-easy-hard.json" }
   ]
 }

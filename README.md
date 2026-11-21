@@ -25,6 +25,10 @@ dotnet test Tangles.slnx
 
 With no options, generate an 8x8 puzzle with six pairs and a random seed.
 
+The [generator options and latest six-pack recipes](src/Tangles.Generator/Generation%20Options.md)
+document lists every CLI option, defaults and restrictions, plus the exact seeds,
+selection settings and script commands used for the current collections.
+
 Pack-quality options include `--max-trials N` (optional), experimental
 `--cut-style varied`, and `--ramp easy..hard`. Batches reject rotated and
 reflected duplicates. See [pack quality and measured results](docs/pack-quality.md)
